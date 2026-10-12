@@ -138,24 +138,77 @@ function showNewOrder() {
 // ============ ЛОКАЦИЯ ============
 
 function sendLocation() {
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                orderData.location = {
-                    lat: pos.coords.latitude,
-                    lon: pos.coords.longitude,
-                };
-                document.getElementById('location_status').textContent =
-                    `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-                document.getElementById('location_status').style.color = '#43a047';
-            },
-            (err) => {
-                showAlert('Не удалось получить локацию: ' + err.message);
-            }
-        );
-    } else {
-        showAlert('Геолокация не поддерживается');
+    const status = document.getElementById('location_status');
+    status.textContent = '⏳ Определяем локацию...';
+    status.style.color = '#888';
+
+    // Способ 1: Telegram LocationManager (правильный)
+    if (tg.LocationManager && typeof tg.LocationManager.init === 'function') {
+        try {
+            tg.LocationManager.init(() => {
+                tg.LocationManager.getLocation((loc) => {
+                    if (loc && loc.latitude && loc.longitude) {
+                        orderData.location = {
+                            lat: loc.latitude,
+                            lon: loc.longitude,
+                        };
+                        status.textContent =
+                            `✅ ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
+                        status.style.color = '#43a047';
+                    } else {
+                        // Fallback на браузерный API
+                        getBrowserLocation();
+                    }
+                });
+            });
+            return;
+        } catch (e) {
+            console.error("LocationManager error:", e);
+            // Fallback
+        }
     }
+
+    // Способ 2: браузерный API (если Telegram не поддерживает)
+    getBrowserLocation();
+}
+
+function getBrowserLocation() {
+    const status = document.getElementById('location_status');
+
+    if (!navigator.geolocation) {
+        status.textContent = '❌ Геолокация не поддерживается';
+        status.style.color = '#e53935';
+        showAlert('Геолокация не поддерживается на этом устройстве');
+        return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            orderData.location = {
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+            };
+            status.textContent =
+                `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (точность ±${Math.round(pos.coords.accuracy)} м)`;
+            status.style.color = '#43a047';
+        },
+        (err) => {
+            console.error("Geolocation error:", err);
+            let msg = 'Не удалось получить локацию';
+            if (err.code === 1) msg = 'Вы запретили доступ к геолокации';
+            else if (err.code === 2) msg = 'Локация недоступна';
+            else if (err.code === 3) msg = 'Превышено время ожидания';
+
+            status.textContent = `❌ ${msg}`;
+            status.style.color = '#e53935';
+            showAlert(msg);
+        },
+        {
+            enableHighAccuracy: true,   // Точное определение через GPS
+            timeout: 15000,              // 15 секунд
+            maximumAge: 0,               // Не использовать кэш
+        }
+    );
 }
 
 // ============ ОТПРАВКА ЗАЯВКИ ============
