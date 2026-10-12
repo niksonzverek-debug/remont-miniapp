@@ -5,10 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Панель</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=2">
+
+    <!-- iOS-style wheel picker -->
+    <link rel="stylesheet" href="https://unpkg.com/mobile-select@3.0.0/dist/mobile-select.min.css">
+    <script src="https://unpkg.com/mobile-select@3.0.0/dist/mobile-select.min.js"></script>
+
+    <link rel="stylesheet" href="css/style.css?v=6">
 </head>
 <body>
-    <script src="js/common.js?v=2"></script>
+    <script src="js/common.js?v=6"></script>
     <script>
         const MASTER_ID = 450540408;
         const userId = tg.initDataUnsafe?.user?.id;
@@ -18,12 +23,12 @@
         if (userId === MASTER_ID) {
             console.log("→ Мастер");
             const s = document.createElement('script');
-            s.src = 'js/master.js?v=2';
+            s.src = 'js/master.js?v=6';
             document.body.appendChild(s);
         } else {
             console.log("→ Клиент");
             const s = document.createElement('script');
-            s.src = 'js/client.js?v=2';
+            s.src = 'js/client.js?v=6';
             document.body.appendChild(s);
         }
     </script>
