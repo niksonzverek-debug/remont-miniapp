@@ -13,11 +13,11 @@ function renderClientMenu() {
         <button class="menu-btn" onclick="showEnterPromo()">
             <span class="emoji">🎟️</span> Ввести промокод
         </button>
+        <button class="menu-btn" onclick="showProfile()">
+            <span class="emoji">👤</span> Мой профиль
+        </button>
         <button class="menu-btn" onclick="showCallMaster()">
             <span class="emoji">📞</span> Позвонить мастеру
-        </button>
-        <button class="menu-btn" onclick="showFeedbackList()">
-            <span class="emoji">⭐</span> Оставить отзыв
         </button>
     `;
 }
@@ -30,7 +30,6 @@ function showMyActs() {
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📄 Мои акты</h1>
         <div class="empty">
-            Запрос отправлен.<br>
             Список актов придёт в чат бота 📩
         </div>
     `;
@@ -52,7 +51,6 @@ function showEnterPromo() {
 
         <button id="submit" onclick="submitPromo()">✅ Активировать</button>
     `;
-
     document.getElementById('promo_code').focus();
 }
 
@@ -61,10 +59,20 @@ function submitPromo() {
     if (!code || code.length < 4) {
         return showAlert('Введите промокод (минимум 4 символа)');
     }
-    sendToBot({
-        event: 'enter_promo',
-        code: code,
-    });
+    sendToBot({ event: 'enter_promo', code: code });
+}
+
+// ============ МОЙ ПРОФИЛЬ ============
+
+function showProfile() {
+    sendEvent('get_profile');
+    document.body.innerHTML = `
+        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
+        <h1>👤 Мой профиль</h1>
+        <div class="empty">
+            Профиль придёт в чат бота 📩
+        </div>
+    `;
 }
 
 // ============ ПОЗВОНИТЬ МАСТЕРУ ============
@@ -76,20 +84,6 @@ function showCallMaster() {
         <h1>📞 Позвонить мастеру</h1>
         <div class="empty">
             Номер мастера придёт в чат бота 📩
-        </div>
-    `;
-}
-
-// ============ ОТЗЫВЫ ============
-
-function showFeedbackList() {
-    sendEvent('get_feedback_list');
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>⭐ Оставить отзыв</h1>
-        <p class="subtitle">Выберите акт, по которому хотите оставить отзыв</p>
-        <div class="empty">
-            Список ваших актов придёт в чат бота 📩
         </div>
     `;
 }
