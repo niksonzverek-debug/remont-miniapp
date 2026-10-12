@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Панель</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2">
 </head>
 <body>
-    <script src="js/common.js"></script>
+    <script src="js/common.js?v=2"></script>
     <script>
-        // ID мастера — ЗАМЕНИ на свой (450540408)
         const MASTER_ID = 450540408;
-
         const userId = tg.initDataUnsafe?.user?.id;
 
         console.log("User ID:", userId, "Master ID:", MASTER_ID);
@@ -20,12 +18,12 @@
         if (userId === MASTER_ID) {
             console.log("→ Мастер");
             const s = document.createElement('script');
-            s.src = 'js/master.js';
+            s.src = 'js/master.js?v=2';
             document.body.appendChild(s);
         } else {
             console.log("→ Клиент");
             const s = document.createElement('script');
-            s.src = 'js/client.js';
+            s.src = 'js/client.js?v=2';
             document.body.appendChild(s);
         }
     </script>
