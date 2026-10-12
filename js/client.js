@@ -8,7 +8,9 @@ let orderData = {
     problem: "",
     when_date: "",
     when_time: "",
-    address: "",
+    house: "",
+    apartment: "",
+    comment: "",
     location: null,
 };
 
@@ -47,7 +49,9 @@ function showNewOrder() {
         problem: "",
         when_date: "",
         when_time: "",
-        address: "",
+        house: "",
+        apartment: "",
+        comment: "",
         location: null,
     };
 
@@ -110,18 +114,28 @@ function showNewOrder() {
         </div>
 
         <div class="card">
-            <label>Адрес</label>
-            <input id="address" placeholder="Улица, дом, квартира" autocomplete="off">
+            <label>Дом (номер дома) *</label>
+            <input id="house" placeholder="Например: 15А" autocomplete="off">
 
-            <button onclick="sendLocation()" style="margin-top:12px;padding:12px;font-size:15px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
-                📍 Отправить локацию
+            <label>Квартира (необязательно)</label>
+            <input id="apartment" placeholder="Например: 42" autocomplete="off">
+
+            <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
+                📍 Отправить мою локацию
             </button>
             <p id="location_status" style="color:#888;font-size:13px;margin-top:8px;">Локация не отправлена</p>
+        </div>
+
+        <div class="card">
+            <label>Комментарий к заказу (необязательно)</label>
+            <textarea id="comment" placeholder="Любая дополнительная информация" maxlength="300"></textarea>
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
     `;
 }
+
+// ============ ЛОКАЦИЯ ============
 
 function sendLocation() {
     if (navigator.geolocation) {
@@ -144,6 +158,8 @@ function sendLocation() {
     }
 }
 
+// ============ ОТПРАВКА ЗАЯВКИ ============
+
 function submitOrder() {
     const device = document.getElementById('device').value;
     const brand = document.getElementById('brand').value;
@@ -151,14 +167,17 @@ function submitOrder() {
     const problem = document.getElementById('problem').value.trim();
     const when_date = document.getElementById('when_date').value;
     const when_time = document.getElementById('when_time').value;
-    const address = document.getElementById('address').value.trim();
+    const house = document.getElementById('house').value.trim();
+    const apartment = document.getElementById('apartment').value.trim();
+    const comment = document.getElementById('comment').value.trim();
 
+    // Валидация
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
     if (!problem || problem.length < 5) return showAlert('Опишите проблему (минимум 5 символов)');
     if (!when_date) return showAlert('Выберите день');
     if (!when_time) return showAlert('Выберите время');
-    if (!address) return showAlert('Укажите адрес');
+    if (!house) return showAlert('Укажите номер дома');
 
     const data = {
         event: 'new_order',
@@ -168,7 +187,9 @@ function submitOrder() {
         problem: problem,
         when_date: when_date,
         when_time: when_time,
-        address: address,
+        house: house,
+        apartment: apartment,
+        comment: comment,
         location: orderData.location || null,
     };
 
