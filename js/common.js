@@ -1,13 +1,18 @@
 // miniapp/js/common.js
 
 const tg = window.Telegram.WebApp;
+
+console.log("=== Mini App START ===");
+console.log("initData length:", tg.initData?.length || 0);
+console.log("user:", tg.initDataUnsafe?.user);
+
 tg.ready();
 tg.expand();
 
 // Применяем тему Telegram
 function applyTheme() {
     const root = document.documentElement;
-    const params = tg.themeParams;
+    const params = tg.themeParams || {};
     if (params.bg_color) root.style.setProperty('--bg', params.bg_color);
     if (params.text_color) root.style.setProperty('--text', params.text_color);
     if (params.hint_color) root.style.setProperty('--hint', params.hint_color);
@@ -22,33 +27,33 @@ function applyTheme() {
 applyTheme();
 tg.onEvent('themeChanged', applyTheme);
 
-// Хелпер: показать алерт
 function showAlert(msg) {
-    tg.showAlert(msg);
+    try { tg.showAlert(msg); } catch (e) { alert(msg); }
 }
 
-// Хелпер: показать подтверждение
 function showConfirm(msg, callback) {
-    tg.showConfirm(msg, callback);
+    try { tg.showConfirm(msg, callback); } catch (e) { callback(confirm(msg)); }
 }
 
-// Отправка данных в бота
+// ВАЖНО: НЕ вызываем tg.close() — Telegram сам закроет после sendData
 function sendToBot(data) {
-    tg.sendData(JSON.stringify(data));
-    tg.close();
+    console.log("sendToBot:", data);
+    try {
+        tg.sendData(JSON.stringify(data));
+    } catch (e) {
+        console.error("sendData error:", e);
+        showAlert("Ошибка отправки: " + e.message);
+    }
 }
 
-// Отправка события (без закрытия)
 function sendEvent(type, payload = {}) {
-    tg.sendData(JSON.stringify({ event: type, ...payload }));
+    sendToBot({ event: type, ...payload });
 }
 
-// Форматирование цены
 function fmtPrice(n) {
     return new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 }
 
-// Форматирование телефона
 function fmtPhone(p) {
     p = (p || '').replace(/\D/g, '');
     if (p.length === 12 && p.startsWith('998')) {
@@ -57,12 +62,10 @@ function fmtPhone(p) {
     return p;
 }
 
-// Нормализация телефона
 function cleanPhone(p) {
     return (p || '').replace(/\D/g, '');
 }
 
-// Валидация телефона
 function validPhone(p) {
     return /^998\d{9}$/.test(cleanPhone(p));
 }

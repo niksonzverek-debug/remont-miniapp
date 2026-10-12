@@ -1,10 +1,6 @@
 // miniapp/js/master.js
 
-const state = {
-    selectedWorks: [],
-};
-
-// ============ РЕНДЕР: ГЛАВНОЕ МЕНЮ МАСТЕРА ============
+// ============ ГЛАВНОЕ МЕНЮ МАСТЕРА ============
 
 function renderMasterMenu() {
     document.body.innerHTML = `
@@ -14,23 +10,19 @@ function renderMasterMenu() {
         <button class="menu-btn" onclick="showCreateAct()">
             <span class="emoji">📝</span> Создать акт
         </button>
-        <button class="menu-btn" onclick="showMyStats()">
+        <button class="menu-btn" onclick="sendEvent('get_stats')">
             <span class="emoji">📊</span> Моя статистика
         </button>
-        <button class="menu-btn" onclick="showPromos()">
+        <button class="menu-btn" onclick="sendEvent('get_promos')">
             <span class="emoji">🎟️</span> Промокоды
         </button>
-        <button class="menu-btn" onclick="showClients()">
+        <button class="menu-btn" onclick="sendEvent('get_clients')">
             <span class="emoji">👥</span> Клиенты
-        </button>
-
-        <button class="menu-btn" onclick="showHelp()" style="margin-top:20px;">
-            <span class="emoji">❓</span> Помощь
         </button>
     `;
 }
 
-// ============ СТРАНИЦА: СОЗДАНИЕ АКТА ============
+// ============ СОЗДАНИЕ АКТА ============
 
 function showCreateAct() {
     document.body.innerHTML = `
@@ -94,7 +86,6 @@ function showCreateAct() {
         <button id="submit" onclick="submitAct()">📤 Отправить</button>
     `;
 
-    // Авто-формат телефона
     const phoneInput = document.getElementById('client_phone');
     phoneInput.addEventListener('input', (e) => {
         const digits = e.target.value.replace(/\D/g, '').slice(0, 12);
@@ -114,8 +105,6 @@ function showCreateAct() {
     });
 }
 
-// ============ ОТПРАВКА АКТА ============
-
 function submitAct() {
     const device = document.getElementById('device').value;
     const brand = document.getElementById('brand').value.trim();
@@ -134,11 +123,10 @@ function submitAct() {
     const client_phone = document.getElementById('client_phone').value.trim();
     const address = document.getElementById('address').value.trim();
 
-    // Валидация
     if (!brand) return showAlert('Укажите бренд');
     if (works.length === 0) return showAlert('Выберите хотя бы одну работу');
     if (!price || price <= 0) return showAlert('Укажите корректную стоимость');
-    if (!validPhone(client_phone)) return showAlert('Неверный номер телефона (нужно 998XXXXXXXXX)');
+    if (!validPhone(client_phone)) return showAlert('Неверный номер телефона (998XXXXXXXXX)');
 
     const data = {
         event: 'create_act',
@@ -152,57 +140,8 @@ function submitAct() {
         address,
     };
 
+    console.log("Отправляем данные:", data);
     sendToBot(data);
-}
-
-// ============ МОЯ СТАТИСТИКА ============
-
-function showMyStats() {
-    // Запрашиваем данные у бота через sendEvent
-    // (в реальности бот пришлёт ответ в чат)
-    sendEvent('get_stats');
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
-        <h1>📊 Статистика</h1>
-        <div class="empty">
-            Статистика придёт в чат бота 📩<br>
-            Проверьте сообщения.
-        </div>
-    `;
-}
-
-function showPromos() {
-    sendEvent('get_promos');
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
-        <h1>🎟️ Промокоды</h1>
-        <div class="empty">
-            Список придёт в чат бота 📩
-        </div>
-    `;
-}
-
-function showClients() {
-    sendEvent('get_clients');
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
-        <h1>👥 Клиенты</h1>
-        <div class="empty">
-            Список придёт в чат бота 📩
-        </div>
-    `;
-}
-
-function showHelp() {
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
-        <h1>❓ Помощь</h1>
-        <div class="card">
-            <p><b>Создание акта:</b> заполните все обязательные поля (бренд, работы, цена, телефон клиента) и нажмите «Отправить». Данные придут боту, он покажет превью.</p>
-            <p style="margin-top:12px;"><b>Промокод клиента</b> применится автоматически, если у клиента он есть.</p>
-            <p style="margin-top:12px;"><b>Статистика, промокоды, клиенты</b> — отправляются в чат бота, так как Mini App не может читать данные напрямую.</p>
-        </div>
-    `;
 }
 
 // ============ СТАРТ ============
