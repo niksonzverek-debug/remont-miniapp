@@ -55,6 +55,27 @@ function showNewOrder() {
         location: null,
     };
 
+    // Генерируем даты на 7 дней вперёд
+    const dateOptions = [];
+    const today = new Date();
+    const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+    const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() + i);
+        const label = `${d.getDate()} ${months[d.getMonth()]}, ${days[d.getDay()]}`;
+        const value = d.toISOString().split('T')[0];
+        dateOptions.push(`<option value="${value}">${label}</option>`);
+    }
+
+    // Время: с 9:00 до 21:00
+    const timeOptions = [];
+    for (let h = 9; h <= 21; h++) {
+        const t = `${String(h).padStart(2, '0')}:00`;
+        timeOptions.push(`<option value="${t}">${t}</option>`);
+    }
+
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📝 Новая заявка</h1>
@@ -62,25 +83,35 @@ function showNewOrder() {
 
         <div class="card">
             <label>Вид техники</label>
-            <select id="device">
+            <select id="device" onchange="onDeviceChange()">
                 <option value="">— Выберите —</option>
                 <option value="Стиральная машина">🧺 Стиральная машина</option>
                 <option value="Холодильник">❄️ Холодильник</option>
                 <option value="Кондиционер">🌬️ Кондиционер</option>
-                <option value="Посудомоечная машина">🍽️ Посудомоечная</option>
-                <option value="Другое">📱 Другое</option>
+                <option value="Микроволновка">📻 Микроволновка</option>
+                <option value="__other__">✏️ Другое (ввести вручную)</option>
             </select>
 
+            <div id="device_custom_wrap" style="display:none;margin-top:10px;">
+                <label>Укажите вид техники</label>
+                <input id="device_custom" placeholder="Например: Пылесос" autocomplete="off">
+            </div>
+
             <label>Бренд</label>
-            <select id="brand">
+            <select id="brand" onchange="onBrandChange()">
                 <option value="">— Выберите —</option>
                 <option value="LG">LG</option>
                 <option value="Samsung">Samsung</option>
                 <option value="Indesit">Indesit</option>
                 <option value="Bosch">Bosch</option>
                 <option value="Beko">Beko</option>
-                <option value="Другое">Другое</option>
+                <option value="__other__">✏️ Другое (ввести вручную)</option>
             </select>
+
+            <div id="brand_custom_wrap" style="display:none;margin-top:10px;">
+                <label>Укажите бренд</label>
+                <input id="brand_custom" placeholder="Например: Whirlpool" autocomplete="off">
+            </div>
 
             <label>Модель (необязательно)</label>
             <input id="model" placeholder="Например: F2M5HS6S" autocomplete="off">
@@ -93,23 +124,23 @@ function showNewOrder() {
 
         <div class="card">
             <label>Когда удобно приехать?</label>
-            <select id="when_date">
-                <option value="">— Выберите день —</option>
-                <option value="Сегодня">Сегодня</option>
-                <option value="Завтра">Завтра</option>
-                <option value="Послезавтра">Послезавтра</option>
-                <option value="На выходных">На выходных</option>
-                <option value="В любое время">В любое время</option>
-            </select>
+            <div style="display:flex;gap:8px;margin-top:8px;">
+                <button type="button" onclick="setDay('today')" id="btn_today" class="day-btn">Сегодня</button>
+                <button type="button" onclick="setDay('tomorrow')" id="btn_tomorrow" class="day-btn">Завтра</button>
+                <button type="button" onclick="setDay('custom')" id="btn_custom" class="day-btn">Выбрать дату</button>
+            </div>
 
-            <label>Время</label>
+            <div id="date_custom_wrap" style="display:none;margin-top:12px;">
+                <label>Дата</label>
+                <select id="date_custom">
+                    ${dateOptions.join('')}
+                </select>
+            </div>
+
+            <label style="margin-top:14px;">Время</label>
             <select id="when_time">
                 <option value="">— Выберите —</option>
-                <option value="Утро 9:00–12:00">Утро 9:00–12:00</option>
-                <option value="День 12:00–15:00">День 12:00–15:00</option>
-                <option value="После обеда 15:00–18:00">После обеда 15:00–18:00</option>
-                <option value="Вечер 18:00–21:00">Вечер 18:00–21:00</option>
-                <option value="Точное время уточню">Точное время уточню</option>
+                ${timeOptions.join('')}
             </select>
         </div>
 
@@ -132,7 +163,58 @@ function showNewOrder() {
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
+
+        <style>
+            .day-btn {
+                flex:1;padding:12px 8px;font-size:14px;font-weight:600;
+                background:#f0f0f0;border:2px solid #ddd;border-radius:10px;
+                cursor:pointer;transition:all 0.15s;
+            }
+            .day-btn.active {
+                background:#2481cc;color:white;border-color:#2481cc;
+            }
+        </style>
     `;
+}
+
+// ============ ВЫБОР ДНЯ ============
+
+function setDay(mode) {
+    // Сбрасываем стили кнопок
+    document.getElementById('btn_today').classList.remove('active');
+    document.getElementById('btn_tomorrow').classList.remove('active');
+    document.getElementById('btn_custom').classList.remove('active');
+
+    if (mode === 'today') {
+        document.getElementById('btn_today').classList.add('active');
+        const d = new Date();
+        orderData.when_date = d.toISOString().split('T')[0];
+        document.getElementById('date_custom_wrap').style.display = 'none';
+    } else if (mode === 'tomorrow') {
+        document.getElementById('btn_tomorrow').classList.add('active');
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        orderData.when_date = d.toISOString().split('T')[0];
+        document.getElementById('date_custom_wrap').style.display = 'none';
+    } else if (mode === 'custom') {
+        document.getElementById('btn_custom').classList.add('active');
+        document.getElementById('date_custom_wrap').style.display = 'block';
+        orderData.when_date = document.getElementById('date_custom').value;
+    }
+}
+
+// ============ ВЫБОР "ДРУГОЕ" ============
+
+function onDeviceChange() {
+    const val = document.getElementById('device').value;
+    const wrap = document.getElementById('device_custom_wrap');
+    wrap.style.display = (val === '__other__') ? 'block' : 'none';
+}
+
+function onBrandChange() {
+    const val = document.getElementById('brand').value;
+    const wrap = document.getElementById('brand_custom_wrap');
+    wrap.style.display = (val === '__other__') ? 'block' : 'none';
 }
 
 // ============ ЛОКАЦИЯ ============
@@ -142,7 +224,6 @@ function sendLocation() {
     status.textContent = '⏳ Определяем локацию...';
     status.style.color = '#888';
 
-    // Способ 1: Telegram LocationManager (правильный)
     if (tg.LocationManager && typeof tg.LocationManager.init === 'function') {
         try {
             tg.LocationManager.init(() => {
@@ -156,7 +237,6 @@ function sendLocation() {
                             `✅ ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
                         status.style.color = '#43a047';
                     } else {
-                        // Fallback на браузерный API
                         getBrowserLocation();
                     }
                 });
@@ -164,11 +244,8 @@ function sendLocation() {
             return;
         } catch (e) {
             console.error("LocationManager error:", e);
-            // Fallback
         }
     }
-
-    // Способ 2: браузерный API (если Telegram не поддерживает)
     getBrowserLocation();
 }
 
@@ -178,7 +255,7 @@ function getBrowserLocation() {
     if (!navigator.geolocation) {
         status.textContent = '❌ Геолокация не поддерживается';
         status.style.color = '#e53935';
-        showAlert('Геолокация не поддерживается на этом устройстве');
+        showAlert('Геолокация не поддерживается');
         return;
     }
 
@@ -189,7 +266,7 @@ function getBrowserLocation() {
                 lon: pos.coords.longitude,
             };
             status.textContent =
-                `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)} (точность ±${Math.round(pos.coords.accuracy)} м)`;
+                `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
             status.style.color = '#43a047';
         },
         (err) => {
@@ -204,9 +281,9 @@ function getBrowserLocation() {
             showAlert(msg);
         },
         {
-            enableHighAccuracy: true,   // Точное определение через GPS
-            timeout: 15000,              // 15 секунд
-            maximumAge: 0,               // Не использовать кэш
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
         }
     );
 }
@@ -214,11 +291,22 @@ function getBrowserLocation() {
 // ============ ОТПРАВКА ЗАЯВКИ ============
 
 function submitOrder() {
-    const device = document.getElementById('device').value;
-    const brand = document.getElementById('brand').value;
+    let device = document.getElementById('device').value;
+    let brand = document.getElementById('brand').value;
+
+    // Обработка "Другое"
+    if (device === '__other__') {
+        device = document.getElementById('device_custom').value.trim();
+        if (!device) return showAlert('Укажите вид техники');
+    }
+    if (brand === '__other__') {
+        brand = document.getElementById('brand_custom').value.trim();
+        if (!brand) return showAlert('Укажите бренд');
+    }
+
     const model = document.getElementById('model').value.trim();
     const problem = document.getElementById('problem').value.trim();
-    const when_date = document.getElementById('when_date').value;
+    const when_date = orderData.when_date;
     const when_time = document.getElementById('when_time').value;
     const house = document.getElementById('house').value.trim();
     const apartment = document.getElementById('apartment').value.trim();
@@ -228,7 +316,7 @@ function submitOrder() {
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
     if (!problem || problem.length < 5) return showAlert('Опишите проблему (минимум 5 символов)');
-    if (!when_date) return showAlert('Выберите день');
+    if (!when_date) return showAlert('Выберите день (Сегодня / Завтра / Выбрать дату)');
     if (!when_time) return showAlert('Выберите время');
     if (!house) return showAlert('Укажите номер дома');
 
