@@ -7,13 +7,13 @@
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
 
     <!-- iOS-style wheel picker -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/mobile-select@1.4.0/dist/mobile-select.min.css">
-    <script src="https://cdn.jsdelivr.net/npm/mobile-select@1.4.0/dist/mobile-select.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/mobile-select@latest/dist/style/mobile-select.css" />
+    <script type="text/javascript" src="https://unpkg.com/mobile-select@latest/dist/mobile-select.iife.min.js"></script>
 
-    <link rel="stylesheet" href="css/style.css?v=6">
+    <link rel="stylesheet" href="css/style.css?v=7">
 </head>
 <body>
-    <script src="js/common.js?v=6"></script>
+    <script src="js/common.js?v=7"></script>
     <script>
         const MASTER_ID = 450540408;
         const userId = tg.initDataUnsafe?.user?.id;
@@ -23,12 +23,12 @@
         if (userId === MASTER_ID) {
             console.log("→ Мастер");
             const s = document.createElement('script');
-            s.src = 'js/master.js?v=6';
+            s.src = 'js/master.js?v=7';
             document.body.appendChild(s);
         } else {
             console.log("→ Клиент");
             const s = document.createElement('script');
-            s.src = 'js/client.js?v=6';
+            s.src = 'js/client.js?v=7';
             document.body.appendChild(s);
         }
     </script>
