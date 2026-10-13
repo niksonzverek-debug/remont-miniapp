@@ -130,14 +130,14 @@ function submitAct() {
 
     const data = {
         event: 'create_act',
-        device,
-        brand,
-        model,
-        works,
-        price,
+        device: device,
+        brand: brand,
+        model: model,
+        works: works,
+        price: price,
         guarantee_days: guarantee,
         client_phone: cleanPhone(client_phone),
-        address,
+        address: address,
     };
 
     console.log("Отправляем данные:", data);
