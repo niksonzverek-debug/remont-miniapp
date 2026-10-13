@@ -55,7 +55,6 @@ function showNewOrder() {
         location: null,
     };
 
-    // Генерируем даты на 7 дней вперёд
     const dateOptions = [];
     const today = new Date();
     const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -69,7 +68,6 @@ function showNewOrder() {
         dateOptions.push(`<option value="${value}">${label}</option>`);
     }
 
-    // Время: с 9:00 до 21:00 (по полчаса)
     const timeOptions = [];
     for (let h = 9; h <= 21; h++) {
         timeOptions.push(`<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`);
@@ -211,7 +209,6 @@ function getBrowserLocation() {
     if (!navigator.geolocation) {
         status.textContent = '❌ Геолокация не поддерживается';
         status.style.color = '#e53935';
-        showAlert('Геолокация не поддерживается');
         return;
     }
 
@@ -226,21 +223,14 @@ function getBrowserLocation() {
             status.style.color = '#43a047';
         },
         (err) => {
-            console.error("Geolocation error:", err);
             let msg = 'Не удалось получить локацию';
-            if (err.code === 1) msg = 'Вы запретили доступ к геолокации';
+            if (err.code === 1) msg = 'Вы запретили доступ';
             else if (err.code === 2) msg = 'Локация недоступна';
             else if (err.code === 3) msg = 'Превышено время ожидания';
-
             status.textContent = `❌ ${msg}`;
             status.style.color = '#e53935';
-            showAlert(msg);
         },
-        {
-            enableHighAccuracy: true,
-            timeout: 15000,
-            maximumAge: 0,
-        }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 }
 
@@ -293,7 +283,16 @@ function submitOrder() {
     document.getElementById('submit').textContent = '⏳ Отправка...';
     document.getElementById('submit').disabled = true;
 
-    tg.sendData(JSON.stringify(data));
+    // Отправка с обработкой ошибок
+    try {
+        tg.sendData(JSON.stringify(data));
+        console.log("sendData вызван успешно");
+    } catch (e) {
+        console.error("sendData error:", e);
+        showAlert("Ошибка отправки: " + e.message);
+        document.getElementById('submit').textContent = '📤 Отправить заявку';
+        document.getElementById('submit').disabled = false;
+    }
 }
 
 // ============ МОИ АКТЫ ============
@@ -303,9 +302,7 @@ function showMyActs() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📄 Мои акты</h1>
-        <div class="empty">
-            Список актов придёт в чат бота 📩
-        </div>
+        <div class="empty">Список актов придёт в чат бота 📩</div>
     `;
 }
 
@@ -315,14 +312,11 @@ function showEnterPromo() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>🎟️ Ввести промокод</h1>
-        <p class="subtitle">Введите код и получите скидку</p>
-
         <div class="card">
             <label>Промокод</label>
             <input id="promo_code" placeholder="BLOGER10" autocapitalize="characters"
-                   style="text-transform:uppercase; font-size:20px; text-align:center; letter-spacing:2px;">
+                   style="text-transform:uppercase;font-size:20px;text-align:center;letter-spacing:2px;">
         </div>
-
         <button id="submit" onclick="submitPromo()">✅ Активировать</button>
     `;
     document.getElementById('promo_code').focus();
@@ -330,35 +324,29 @@ function showEnterPromo() {
 
 function submitPromo() {
     const code = document.getElementById('promo_code').value.trim().toUpperCase();
-    if (!code || code.length < 4) {
-        return showAlert('Введите промокод (минимум 4 символа)');
-    }
+    if (!code || code.length < 4) return showAlert('Введите промокод');
     sendToBot({ event: 'enter_promo', code: code });
 }
 
-// ============ МОЙ ПРОФИЛЬ ============
+// ============ ПРОФИЛЬ ============
 
 function showProfile() {
     sendEvent('get_profile');
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>👤 Мой профиль</h1>
-        <div class="empty">
-            Профиль придёт в чат бота 📩
-        </div>
+        <div class="empty">Профиль придёт в чат бота 📩</div>
     `;
 }
 
-// ============ ПОЗВОНИТЬ МАСТЕРУ ============
+// ============ ПОЗВОНИТЬ ============
 
 function showCallMaster() {
     sendEvent('get_master_phone');
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📞 Позвонить мастеру</h1>
-        <div class="empty">
-            Номер мастера придёт в чат бота 📩
-        </div>
+        <div class="empty">Номер мастера придёт в чат бота 📩</div>
     `;
 }
 
