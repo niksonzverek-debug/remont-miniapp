@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Панель ремонта</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=20261013f">
+    <link rel="stylesheet" href="css/style.css?v=20261013g">
 </head>
 <body>
     <script>
@@ -15,7 +15,7 @@
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/common.js?v=20261013f"></script>
+    <script src="js/common.js?v=20261013g"></script>
     <script>
         const MASTER_ID = 450540408;
         const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
@@ -23,7 +23,7 @@
         const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
             ? null : Number(rawUserId);
 
-        console.log('Mini App build 20261013f', {rawUserId, userId, roleFromUrl, launchMode});
+        console.log('Mini App build 20261013g', {rawUserId, userId, roleFromUrl, launchMode});
 
         // Telegram sendData is available only from a reply-keyboard WebApp button.
         if (launchMode !== 'keyboard') {
@@ -49,13 +49,13 @@
                     <h2>Не удалось определить аккаунт Telegram</h2>
                     <p>Закройте Mini App и откройте его заново из чата с ботом.</p>
                     <p>Если ошибка повторяется, откройте форму кнопкой в клавиатуре бота.</p>
-                    <p style="font-size:12px;opacity:.7">USER_ID_MISSING · build 20261013f</p>
+                    <p style="font-size:12px;opacity:.7">USER_ID_MISSING · build 20261013g</p>
                 </main>`;
         } else {
             const script = document.createElement('script');
             script.src = role === 'master'
-                ? 'js/master.js?v=20261013f'
-                : 'js/client.js?v=20261013f';
+                ? 'js/master.js?v=20261013g'
+                : 'js/client.js?v=20261013g';
             script.onerror = () => {
                 document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию GitHub Pages и откройте приложение повторно.</p></main>';
             };
