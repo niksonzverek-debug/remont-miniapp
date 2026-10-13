@@ -5,16 +5,14 @@ const tg = window.Telegram.WebApp;
 console.log("=== Mini App START ===");
 console.log("initData length:", tg.initData?.length || 0);
 console.log("platform:", tg.platform);
+console.log("version:", tg.version);
 console.log("user:", tg.initDataUnsafe?.user);
 
 tg.ready();
 tg.expand();
 
-// Main Mini App (через Menu Button) — sendData НЕ работает
 const isMainMiniApp = !tg.initData || tg.initData.length === 0;
-console.log("isMainMiniApp:", isMainMiniApp);
 
-// Применяем тему Telegram
 function applyTheme() {
     const root = document.documentElement;
     const params = tg.themeParams || {};
@@ -36,32 +34,23 @@ function showAlert(msg) {
     try { tg.showAlert(msg); } catch (e) { alert(msg); }
 }
 
-function showConfirm(msg, callback) {
-    try { tg.showConfirm(msg, callback); } catch (e) { callback(confirm(msg)); }
-}
-
 function sendToBot(data) {
-    console.log("sendToBot:", data);
+    console.log("sendToBot called:", data);
+    console.log("isMainMiniApp:", isMainMiniApp);
+    console.log("initData len:", tg.initData?.length);
 
     if (isMainMiniApp) {
-        showAlert(
-            "⚠️ Форма открыта не через кнопку бота.\n\n" +
-            "Закройте это окно и нажмите кнопку «📝 Создать заявку» в чате с ботом."
-        );
+        showAlert("⚠️ Открой форму через кнопку «📝 Создать заявку» в боте.");
         return false;
     }
 
     try {
         tg.sendData(JSON.stringify(data));
-        // Принудительно закрываем через 300 мс — некоторые версии Telegram
-        // не закрывают окно автоматически
-        setTimeout(() => {
-            try { tg.close(); } catch (e) {}
-        }, 300);
+        setTimeout(() => { try { tg.close(); } catch (e) {} }, 200);
         return true;
     } catch (e) {
         console.error("sendData error:", e);
-        showAlert("Ошибка отправки: " + e.message);
+        showAlert("Ошибка: " + e.message);
         return false;
     }
 }
@@ -73,7 +62,6 @@ function sendEvent(type, payload = {}) {
 function fmtPrice(n) {
     return new Intl.NumberFormat('ru-RU').format(n) + ' сум';
 }
-
 function fmtPhone(p) {
     p = (p || '').replace(/\D/g, '');
     if (p.length === 12 && p.startsWith('998')) {
@@ -81,11 +69,5 @@ function fmtPhone(p) {
     }
     return p;
 }
-
-function cleanPhone(p) {
-    return (p || '').replace(/\D/g, '');
-}
-
-function validPhone(p) {
-    return /^998\d{9}$/.test(cleanPhone(p));
-}
+function cleanPhone(p) { return (p || '').replace(/\D/g, ''); }
+function validPhone(p) { return /^998\d{9}$/.test(cleanPhone(p)); }
