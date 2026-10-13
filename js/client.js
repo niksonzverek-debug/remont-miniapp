@@ -280,18 +280,16 @@ function submitOrder() {
 
     console.log("Отправляем заявку:", data);
 
-    document.getElementById('submit').textContent = '⏳ Отправка...';
-    document.getElementById('submit').disabled = true;
+    const btn = document.getElementById('submit');
+    btn.textContent = '⏳ Отправка...';
+    btn.disabled = true;
 
-    // Отправка с обработкой ошибок
-    try {
-        tg.sendData(JSON.stringify(data));
-        console.log("sendData вызван успешно");
-    } catch (e) {
-        console.error("sendData error:", e);
-        showAlert("Ошибка отправки: " + e.message);
-        document.getElementById('submit').textContent = '📤 Отправить заявку';
-        document.getElementById('submit').disabled = false;
+    const ok = sendToBot(data);
+
+    // Если sendData не сработал (Main Mini App) — вернём кнопку
+    if (!ok) {
+        btn.textContent = '📤 Отправить заявку';
+        btn.disabled = false;
     }
 }
 
