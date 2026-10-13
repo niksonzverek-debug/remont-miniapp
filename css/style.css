@@ -1,0 +1,265 @@
+/* miniapp/css/style.css */
+:root {
+  --bg: var(--tg-theme-bg-color, #ffffff);
+  --text: var(--tg-theme-text-color, #000000);
+  --hint: var(--tg-theme-hint-color, #999999);
+  --link: var(--tg-theme-link-color, #2481cc);
+  --button: var(--tg-theme-button-color, #2481cc);
+  --button_text: var(--tg-theme-button-text-color, #ffffff);
+  --secondary_bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
+  --card_bg: var(--tg-theme-secondary-bg-color, #f7f7f7);
+  --danger: #e53935;
+  --success: #43a047;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 16px;
+  padding-bottom: 100px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+  font-weight: 700;
+}
+
+h2 {
+  font-size: 18px;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.subtitle {
+  color: var(--hint);
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: var(--card_bg);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+label {
+  display: block;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+label:first-child {
+  margin-top: 0;
+}
+
+input, select, textarea {
+  width: 100%;
+  padding: 12px;
+  font-size: 16px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--button);
+}
+
+textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23999' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+}
+
+.row > * {
+  flex: 1;
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.checks label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-weight: 400;
+  padding: 10px 12px;
+  background: var(--bg);
+  border-radius: 10px;
+  border: 1px solid rgba(0,0,0,0.1);
+  cursor: pointer;
+}
+
+.checks input[type=checkbox] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--button);
+}
+
+.checks label:has(input:checked) {
+  border-color: var(--button);
+  background: rgba(36, 129, 204, 0.08);
+}
+
+#submit {
+  position: fixed;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 600;
+  background: var(--button);
+  color: var(--button_text);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+#submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.menu-btn {
+  display: block;
+  width: 100%;
+  padding: 18px;
+  font-size: 16px;
+  font-weight: 500;
+  background: var(--card_bg);
+  color: var(--text);
+  border: none;
+  border-radius: 12px;
+  margin-bottom: 10px;
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.menu-btn:active {
+  transform: scale(0.98);
+}
+
+.menu-btn .emoji {
+  font-size: 22px;
+  margin-right: 12px;
+  vertical-align: middle;
+}
+
+.info-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+  font-size: 15px;
+}
+
+.info-line:last-child {
+  border-bottom: none;
+}
+
+.info-line .label {
+  color: var(--hint);
+  font-weight: 400;
+}
+
+.info-line .value {
+  font-weight: 600;
+  text-align: right;
+}
+
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.badge.success {
+  background: rgba(67, 160, 71, 0.15);
+  color: var(--success);
+}
+
+.badge.pending {
+  background: rgba(255, 152, 0, 0.15);
+  color: #f57c00;
+}
+
+.badge.danger {
+  background: rgba(229, 57, 53, 0.15);
+  color: var(--danger);
+}
+
+.empty {
+  text-align: center;
+  color: var(--hint);
+  padding: 40px 20px;
+  font-size: 15px;
+}
+
+.total-box {
+  background: linear-gradient(135deg, var(--button), #1a6bb0);
+  color: white;
+  padding: 20px;
+  border-radius: 12px;
+  margin-bottom: 16px;
+}
+
+.total-box .amount {
+  font-size: 28px;
+  font-weight: 700;
+  margin-top: 4px;
+}
+
+.total-box .label {
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.back-btn {
+  background: none;
+  border: none;
+  color: var(--link);
+  font-size: 16px;
+  padding: 8px 0;
+  cursor: pointer;
+  margin-bottom: 10px;
+}

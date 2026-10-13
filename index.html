@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Панель</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <link rel="stylesheet" href="css/style.css?v=20261013b">
+</head>
+<body>
+    <script>
+        const launchParams = new URLSearchParams(window.location.search);
+        window.WEBAPP_SENDDATA_SUPPORTED = launchParams.get('launch') === 'keyboard';
+    </script>
+    <script src="js/common.js?v=20261013b"></script>
+    <script>
+        const MASTER_ID = 450540408;
+        const userId = tg.initDataUnsafe?.user?.id;
+
+        console.log("Mini App build: 20261013b");
+        console.log("User ID:", userId, "Master ID:", MASTER_ID);
+
+        // Fail closed: if Telegram did not provide a user ID, do not silently
+        // show the client form. Numeric conversion also avoids string/number mismatch.
+        if (userId == null || userId === "") {
+            document.body.innerHTML = `
+                <main style="padding:24px;font:16px sans-serif;line-height:1.5">
+                    <h2>Не удалось определить аккаунт Telegram</h2>
+                    <p>Закройте Mini App и откройте его повторно из чата с ботом.</p>
+                    <p style="font-size:12px;opacity:.7">Код: USER_ID_MISSING · build 20261013b</p>
+                </main>`;
+        } else {
+            const isMaster = Number(userId) === Number(MASTER_ID);
+            console.log(isMaster ? "→ Мастер" : "→ Клиент");
+            const s = document.createElement('script');
+            s.src = isMaster ? 'js/master.js?v=20261013b' : 'js/client.js?v=20261013b';
+            s.onerror = () => {
+                document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Обновите страницу и попробуйте снова.</p></main>';
+            };
+            document.body.appendChild(s);
+        }
+    </script>
+</body>
+</html>
