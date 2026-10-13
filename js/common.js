@@ -42,7 +42,7 @@ function sendToBot(data) {
     console.log("initData len:", tg.initData?.length);
 
     if (isMainMiniApp) {
-        showAlert("⚠️ Откройте форму через кнопку в клавиатуре бота, а не через меню «Панель».");
+        showAlert("Эта форма открыта через кнопку «Открыть» в меню Telegram. В таком режиме Telegram не передаёт форму боту через sendData. Чтобы отправить данные без сервера, откройте форму кнопкой в клавиатуре чата с ботом.");
         return false;
     }
 

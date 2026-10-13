@@ -3,51 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Панель</title>
+    <title>Панель ремонта</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-
-    <link rel="stylesheet" href="css/style.css?v=20261013c">
+    <link rel="stylesheet" href="css/style.css?v=20261013d">
 </head>
 <body>
     <script>
-        const launchParams = new URLSearchParams(window.location.search);
-        window.WEBAPP_SENDDATA_SUPPORTED = launchParams.get('launch') === 'keyboard';
+        const params = new URLSearchParams(window.location.search);
+        const launchMode = params.get('launch') || 'main';
+        const roleFromUrl = params.get('role');
+        // sendData is available only when opened from a reply-keyboard WebApp button.
+        window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/common.js?v=20261013c"></script>
+    <script src="js/common.js?v=20261013d"></script>
     <script>
         const MASTER_ID = 450540408;
-        const params = new URLSearchParams(window.location.search);
-        const userId = tg.initDataUnsafe?.user?.id;
-        const roleFromButton = params.get('role');
-        const keyboardLaunch = params.get('launch') === 'keyboard';
+        const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
+            ? tg.initDataUnsafe.user.id : null;
+        const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
+            ? null : Number(rawUserId);
 
-        console.log("Mini App build: 20261013c");
-        console.log("User ID:", userId, "Master ID:", MASTER_ID,
-                    "role:", roleFromButton, "keyboard:", keyboardLaunch);
+        console.log('Mini App build 20261013d', {rawUserId, userId, roleFromUrl, launchMode});
 
-        // Reply-keyboard URL explicitly selects the form. Bot handlers still
-        // authorize actions by Telegram sender ID, so this is UI routing only.
         let role = null;
-        if (keyboardLaunch && roleFromButton === 'master') {
-            role = 'master';
-        } else if (userId !== undefined && userId !== null && userId !== '') {
-            role = Number(userId) === Number(MASTER_ID) ? 'master' : 'client';
+        // Reply-keyboard buttons include a role marker so the form still opens if Telegram's
+        // unsafe user object is temporarily unavailable. Bot handlers independently authorize actions.
+        if (launchMode === 'keyboard' && (roleFromUrl === 'master' || roleFromUrl === 'client')) {
+            role = roleFromUrl;
+        } else if (Number.isFinite(userId)) {
+            role = userId === Number(MASTER_ID) ? 'master' : 'client';
         }
 
         if (!role) {
             document.body.innerHTML = `
                 <main style="padding:24px;font:16px sans-serif;line-height:1.5">
                     <h2>Не удалось определить аккаунт Telegram</h2>
-                    <p>Закройте приложение и откройте нужную форму кнопкой в чате с ботом.</p>
-                    <p style="font-size:12px;opacity:.7">Код: USER_ID_MISSING · build 20261013c</p>
+                    <p>Закройте Mini App и откройте его заново из чата с ботом.</p>
+                    <p>Если ошибка повторяется, откройте форму кнопкой в клавиатуре бота.</p>
+                    <p style="font-size:12px;opacity:.7">USER_ID_MISSING · build 20261013d</p>
                 </main>`;
         } else {
-            const s = document.createElement('script');
-            s.src = role === 'master' ? 'js/master.js?v=20261013c' : 'js/client.js?v=20261013c';
-            s.onerror = () => {
-                document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Обновите страницу и попробуйте снова.</p></main>';
+            const script = document.createElement('script');
+            script.src = role === 'master'
+                ? 'js/master.js?v=20261013d'
+                : 'js/client.js?v=20261013d';
+            script.onerror = () => {
+                document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию GitHub Pages и откройте приложение повторно.</p></main>';
             };
-            document.body.appendChild(s);
+            document.body.appendChild(script);
         }
     </script>
 </body>
