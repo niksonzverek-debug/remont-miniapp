@@ -14,193 +14,6 @@ let orderData = {
     location: null,
 };
 
-// ============ КРАСИВЫЙ PICKER ============
-
-function openWheelPicker(title, items, selectedIndex, onSelect) {
-    // Удаляем старый пикер, если был
-    const old = document.getElementById('custom_picker');
-    if (old) old.remove();
-
-    const ITEM_HEIGHT = 44;
-    const VISIBLE = 5;
-    const CENTER_IDX = Math.floor(VISIBLE / 2);
-
-    // Создаём модальное окно
-    const modal = document.createElement('div');
-    modal.id = 'custom_picker';
-    modal.style.cssText = `
-        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5); z-index: 9999;
-        display: flex; align-items: flex-end; justify-content: center;
-        animation: fadeIn 0.2s ease;
-    `;
-
-    modal.innerHTML = `
-        <style>
-            @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-            @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-            .cp-content {
-                background: white; border-radius: 16px 16px 0 0;
-                width: 100%; max-width: 500px;
-                padding: 20px 0;
-                animation: slideUp 0.25s ease;
-                user-select: none;
-                -webkit-user-select: none;
-            }
-            .cp-header {
-                display: flex; justify-content: space-between; align-items: center;
-                padding: 0 20px 16px; border-bottom: 1px solid #eee;
-            }
-            .cp-title {
-                font-size: 17px; font-weight: 600; color: #222; flex: 1; text-align: center;
-            }
-            .cp-btn {
-                background: none; border: none; font-size: 16px; cursor: pointer;
-                padding: 8px; color: #2481cc; font-weight: 500;
-            }
-            .cp-btn.cancel { color: #888; }
-            .cp-btn.choose { color: #2481cc; font-weight: 600; }
-            .cp-wheel-wrap {
-                position: relative; height: ${ITEM_HEIGHT * VISIBLE}px; margin-top: 10px;
-                overflow: hidden;
-                -webkit-mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
-                mask-image: linear-gradient(to bottom, transparent, black 25%, black 75%, transparent);
-            }
-            .cp-wheel {
-                list-style: none; padding: 0; margin: 0;
-                transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1);
-            }
-            .cp-wheel li {
-                height: ${ITEM_HEIGHT}px; line-height: ${ITEM_HEIGHT}px;
-                text-align: center; font-size: 20px; color: #999;
-                transition: color 0.2s, font-weight 0.2s, transform 0.2s;
-            }
-            .cp-wheel li.active {
-                color: #222; font-weight: 600; transform: scale(1.1);
-            }
-            .cp-highlight {
-                position: absolute; top: ${ITEM_HEIGHT * CENTER_IDX}px; left: 20px; right: 20px;
-                height: ${ITEM_HEIGHT}px; pointer-events: none;
-                border-top: 2px solid #2481cc; border-bottom: 2px solid #2481cc;
-                background: rgba(36, 129, 204, 0.05);
-            }
-        </style>
-        <div class="cp-content">
-            <div class="cp-header">
-                <button class="cp-btn cancel" onclick="closePicker()">Отмена</button>
-                <div class="cp-title">${title}</div>
-                <button class="cp-btn choose" onclick="choosePicker()">Выбрать</button>
-            </div>
-            <div class="cp-wheel-wrap">
-                <div class="cp-highlight"></div>
-                <ul class="cp-wheel" id="cp_wheel">
-                    ${items.map((it, i) => `<li data-idx="${i}">${it}</li>`).join('')}
-                </ul>
-            </div>
-        </div>
-    `;
-
-    document.body.appendChild(modal);
-
-    // Смещение: показываем выбранное в центре
-    const wheel = document.getElementById('cp_wheel');
-    let currentIndex = selectedIndex || 0;
-    let startY = 0;
-    let startTransform = -currentIndex * ITEM_HEIGHT;
-    let currentTransform = startTransform;
-
-    function updateTransform(animate = true) {
-        wheel.style.transition = animate ? 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1)' : 'none';
-        wheel.style.transform = `translateY(${currentTransform + CENTER_IDX * ITEM_HEIGHT}px)`;
-        updateActive();
-    }
-
-    function updateActive() {
-        const items = wheel.querySelectorAll('li');
-        items.forEach((li, i) => {
-            li.classList.toggle('active', i === currentIndex);
-        });
-    }
-
-    function snapToNearest() {
-        const offset = currentTransform + CENTER_IDX * ITEM_HEIGHT;
-        currentIndex = Math.round(-currentTransform / ITEM_HEIGHT);
-        currentIndex = Math.max(0, Math.min(items.length - 1, currentIndex));
-        currentTransform = -currentIndex * ITEM_HEIGHT;
-        updateTransform(true);
-    }
-
-    updateTransform(false);
-
-    // ====== Жесты ======
-    let isDragging = false;
-    let startTouchY = 0;
-    let startMoveY = 0;
-
-    function onStart(y) {
-        isDragging = true;
-        startTouchY = y;
-        startMoveY = currentTransform;
-        wheel.style.transition = 'none';
-    }
-
-    function onMove(y) {
-        if (!isDragging) return;
-        const delta = y - startTouchY;
-        currentTransform = startMoveY + delta;
-
-        // Ограничение
-        const max = CENTER_IDX * ITEM_HEIGHT;
-        const min = -(items.length - 1 - CENTER_IDX) * ITEM_HEIGHT;
-        if (currentTransform > max) currentTransform = max + (currentTransform - max) * 0.3;
-        if (currentTransform < min) currentTransform = min + (currentTransform - min) * 0.3;
-
-        wheel.style.transition = 'none';
-        wheel.style.transform = `translateY(${currentTransform + CENTER_IDX * ITEM_HEIGHT}px)`;
-    }
-
-    function onEnd() {
-        if (!isDragging) return;
-        isDragging = false;
-        snapToNearest();
-    }
-
-    // Touch
-    wheel.parentElement.addEventListener('touchstart', (e) => onStart(e.touches[0].clientY), { passive: true });
-    wheel.parentElement.addEventListener('touchmove', (e) => { e.preventDefault(); onMove(e.touches[0].clientY); }, { passive: false });
-    wheel.parentElement.addEventListener('touchend', onEnd);
-
-    // Mouse
-    wheel.parentElement.addEventListener('mousedown', (e) => { e.preventDefault(); onStart(e.clientY); });
-    document.addEventListener('mousemove', (e) => onMove(e.clientY));
-    document.addEventListener('mouseup', onEnd);
-
-    // Клик по элементу
-    wheel.querySelectorAll('li').forEach((li) => {
-        li.addEventListener('click', (e) => {
-            const idx = parseInt(li.dataset.idx);
-            currentIndex = idx;
-            currentTransform = -idx * ITEM_HEIGHT;
-            updateTransform(true);
-        });
-    });
-
-    // Сохраняем в глобальных переменных для кнопки "Выбрать"
-    window._pickerSelect = () => {
-        onSelect(currentIndex);
-        closePicker();
-    };
-}
-
-function closePicker() {
-    const el = document.getElementById('custom_picker');
-    if (el) el.remove();
-}
-
-function choosePicker() {
-    if (window._pickerSelect) window._pickerSelect();
-}
-
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ============
 
 function renderClientMenu() {
@@ -243,8 +56,7 @@ function showNewOrder() {
     };
 
     // Генерируем даты на 7 дней вперёд
-    const dateItems = [];
-    const dateValues = [];
+    const dateOptions = [];
     const today = new Date();
     const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
     const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
@@ -254,20 +66,17 @@ function showNewOrder() {
         d.setDate(today.getDate() + i);
         const label = `${d.getDate()} ${months[d.getMonth()]}, ${days[d.getDay()]}`;
         const value = d.toISOString().split('T')[0];
-        dateItems.push(label);
-        dateValues.push(value);
+        dateOptions.push(`<option value="${value}">${label}</option>`);
     }
 
-    // Время: 09:00 – 21:00 с шагом 30 мин
-    const timeItems = [];
+    // Время: с 9:00 до 21:00 (по полчаса)
+    const timeOptions = [];
     for (let h = 9; h <= 21; h++) {
-        timeItems.push(`${String(h).padStart(2, '0')}:00`);
-        if (h < 21) timeItems.push(`${String(h).padStart(2, '0')}:30`);
+        timeOptions.push(`<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`);
+        if (h < 21) {
+            timeOptions.push(`<option value="${String(h).padStart(2, '0')}:30">${String(h).padStart(2, '0')}:30</option>`);
+        }
     }
-
-    window._dateItems = dateItems;
-    window._dateValues = dateValues;
-    window._timeItems = timeItems;
 
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
@@ -317,15 +126,15 @@ function showNewOrder() {
 
         <div class="card">
             <label>Когда удобно приехать?</label>
-
-            <button type="button" onclick="openDateWheel()" id="btn_date" class="picker-btn">
-                📅 Выберите дату
-            </button>
+            <select id="when_date">
+                ${dateOptions.join('')}
+            </select>
 
             <label style="margin-top:14px;">Время</label>
-            <button type="button" onclick="openTimeWheel()" id="btn_time" class="picker-btn">
-                ⏰ Выберите время
-            </button>
+            <select id="when_time">
+                <option value="">— Выберите —</option>
+                ${timeOptions.join('')}
+            </select>
         </div>
 
         <div class="card">
@@ -347,46 +156,7 @@ function showNewOrder() {
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
-
-        <style>
-            .picker-btn {
-                width:100%;padding:14px;font-size:16px;
-                background:white;border:2px solid #ddd;border-radius:10px;
-                cursor:pointer;text-align:left;color:#666;margin-top:8px;
-            }
-            .picker-btn.selected {
-                color:#2481cc;border-color:#2481cc;font-weight:600;
-            }
-        </style>
     `;
-}
-
-// ============ ОТКРЫТИЕ ПИКЕРОВ ============
-
-function openDateWheel() {
-    const currentIdx = orderData.when_date
-        ? window._dateValues.indexOf(orderData.when_date)
-        : 0;
-
-    openWheelPicker('Выберите дату', window._dateItems, currentIdx >= 0 ? currentIdx : 0, (idx) => {
-        orderData.when_date = window._dateValues[idx];
-        const btn = document.getElementById('btn_date');
-        btn.textContent = `📅 ${window._dateItems[idx]}`;
-        btn.classList.add('selected');
-    });
-}
-
-function openTimeWheel() {
-    const currentIdx = orderData.when_time
-        ? window._timeItems.indexOf(orderData.when_time)
-        : 0;
-
-    openWheelPicker('Выберите время', window._timeItems, currentIdx >= 0 ? currentIdx : 0, (idx) => {
-        orderData.when_time = window._timeItems[idx];
-        const btn = document.getElementById('btn_time');
-        btn.textContent = `⏰ ${window._timeItems[idx]}`;
-        btn.classList.add('selected');
-    });
 }
 
 // ============ ВЫБОР "ДРУГОЕ" ============
@@ -441,6 +211,7 @@ function getBrowserLocation() {
     if (!navigator.geolocation) {
         status.textContent = '❌ Геолокация не поддерживается';
         status.style.color = '#e53935';
+        showAlert('Геолокация не поддерживается');
         return;
     }
 
@@ -455,14 +226,21 @@ function getBrowserLocation() {
             status.style.color = '#43a047';
         },
         (err) => {
+            console.error("Geolocation error:", err);
             let msg = 'Не удалось получить локацию';
-            if (err.code === 1) msg = 'Вы запретили доступ';
+            if (err.code === 1) msg = 'Вы запретили доступ к геолокации';
             else if (err.code === 2) msg = 'Локация недоступна';
             else if (err.code === 3) msg = 'Превышено время ожидания';
+
             status.textContent = `❌ ${msg}`;
             status.style.color = '#e53935';
+            showAlert(msg);
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0,
+        }
     );
 }
 
@@ -483,18 +261,18 @@ function submitOrder() {
 
     const model = document.getElementById('model').value.trim();
     const problem = document.getElementById('problem').value.trim();
-    const when_date = orderData.when_date;
-    const when_time = orderData.when_time;
+    const when_date = document.getElementById('when_date').value;
+    const when_time = document.getElementById('when_time').value;
     const house = document.getElementById('house').value.trim();
     const apartment = document.getElementById('apartment').value.trim();
     const comment = document.getElementById('comment').value.trim();
 
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
-    if (!problem || problem.length < 5) return showAlert('Опишите проблему');
+    if (!problem || problem.length < 5) return showAlert('Опишите проблему (минимум 5 символов)');
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
-    if (!house) return showAlert('Укажите дом');
+    if (!house) return showAlert('Укажите номер дома');
 
     const data = {
         event: 'new_order',
@@ -510,8 +288,11 @@ function submitOrder() {
         location: orderData.location || null,
     };
 
+    console.log("Отправляем заявку:", data);
+
     document.getElementById('submit').textContent = '⏳ Отправка...';
     document.getElementById('submit').disabled = true;
+
     tg.sendData(JSON.stringify(data));
 }
 
@@ -522,7 +303,9 @@ function showMyActs() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📄 Мои акты</h1>
-        <div class="empty">Список актов придёт в чат бота 📩</div>
+        <div class="empty">
+            Список актов придёт в чат бота 📩
+        </div>
     `;
 }
 
@@ -532,11 +315,14 @@ function showEnterPromo() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>🎟️ Ввести промокод</h1>
+        <p class="subtitle">Введите код и получите скидку</p>
+
         <div class="card">
             <label>Промокод</label>
             <input id="promo_code" placeholder="BLOGER10" autocapitalize="characters"
-                   style="text-transform:uppercase;font-size:20px;text-align:center;letter-spacing:2px;">
+                   style="text-transform:uppercase; font-size:20px; text-align:center; letter-spacing:2px;">
         </div>
+
         <button id="submit" onclick="submitPromo()">✅ Активировать</button>
     `;
     document.getElementById('promo_code').focus();
@@ -544,29 +330,35 @@ function showEnterPromo() {
 
 function submitPromo() {
     const code = document.getElementById('promo_code').value.trim().toUpperCase();
-    if (!code || code.length < 4) return showAlert('Введите промокод');
+    if (!code || code.length < 4) {
+        return showAlert('Введите промокод (минимум 4 символа)');
+    }
     sendToBot({ event: 'enter_promo', code: code });
 }
 
-// ============ ПРОФИЛЬ ============
+// ============ МОЙ ПРОФИЛЬ ============
 
 function showProfile() {
     sendEvent('get_profile');
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>👤 Мой профиль</h1>
-        <div class="empty">Профиль придёт в чат бота 📩</div>
+        <div class="empty">
+            Профиль придёт в чат бота 📩
+        </div>
     `;
 }
 
-// ============ ПОЗВОНИТЬ ============
+// ============ ПОЗВОНИТЬ МАСТЕРУ ============
 
 function showCallMaster() {
     sendEvent('get_master_phone');
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📞 Позвонить мастеру</h1>
-        <div class="empty">Номер мастера придёт в чат бота 📩</div>
+        <div class="empty">
+            Номер мастера придёт в чат бота 📩
+        </div>
     `;
 }
 
