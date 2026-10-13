@@ -259,10 +259,10 @@ function submitOrder() {
 
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
-    if (!problem || problem.length < 5) return showAlert('Опишите проблему (минимум 5 символов)');
+    if (!problem || problem.length < 5) return showAlert('Опишите проблему');
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
-    if (!house) return showAlert('Укажите номер дома');
+    if (!house) return showAlert('Укажите дом');
 
     const data = {
         event: 'new_order',
@@ -286,7 +286,6 @@ function submitOrder() {
 
     const ok = sendToBot(data);
 
-    // Если sendData не сработал (Main Mini App) — вернём кнопку
     if (!ok) {
         btn.textContent = '📤 Отправить заявку';
         btn.disabled = false;
