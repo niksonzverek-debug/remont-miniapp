@@ -28,7 +28,7 @@ function showCreateAct() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
         <h1>📝 Новый акт</h1>
-        <p class="subtitle">Заполните данные и отправьте · версия формы 13.10.2026</p>
+        <p class="subtitle">Заполните данные и отправьте</p>
 
         <div class="card">
             <label>Вид техники</label>
@@ -113,7 +113,7 @@ function showCreateAct() {
     renderWorks();
     document.getElementById('price').addEventListener('input', e => {
         const digits = e.target.value.replace(/\D/g, '');
-        e.target.value = digits ? new Intl.NumberFormat('ru-RU').format(Number(digits)).replace(/[\u00a0\u202f]/g, ' ') : '';
+        e.target.value = digits ? new Intl.NumberFormat('ru-RU').format(Number(digits)).replace(/\u00a0/g, ' ') : '';
     });
     window._actLocation = null;
     window.getActLocation = function() {
