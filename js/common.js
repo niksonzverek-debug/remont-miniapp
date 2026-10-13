@@ -11,7 +11,9 @@ console.log("user:", tg.initDataUnsafe?.user);
 tg.ready();
 tg.expand();
 
-const isMainMiniApp = !tg.initData || tg.initData.length === 0;
+// sendData is supported for Web Apps opened from a reply-keyboard button,
+ // but not for the bot's Main Mini App/menu button.
+const isMainMiniApp = window.WEBAPP_SENDDATA_SUPPORTED !== true;
 
 function applyTheme() {
     const root = document.documentElement;
@@ -40,7 +42,7 @@ function sendToBot(data) {
     console.log("initData len:", tg.initData?.length);
 
     if (isMainMiniApp) {
-        showAlert("⚠️ Открой форму через кнопку «📝 Создать заявку» в боте.");
+        showAlert("⚠️ Откройте форму через кнопку в клавиатуре бота, а не через меню «Панель».");
         return false;
     }
 

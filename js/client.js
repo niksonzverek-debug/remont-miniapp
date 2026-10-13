@@ -64,7 +64,7 @@ function showNewOrder() {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
         const label = `${d.getDate()} ${months[d.getMonth()]}, ${days[d.getDay()]}`;
-        const value = d.toISOString().split('T')[0];
+        const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
         dateOptions.push(`<option value="${value}">${label}</option>`);
     }
 
