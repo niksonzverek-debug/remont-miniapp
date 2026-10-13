@@ -155,6 +155,11 @@ function showNewOrder() {
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
     `;
+    // Запоминаем адрес только на этом устройстве, чтобы не вводить его повторно.
+    try {
+        document.getElementById('house').value = localStorage.getItem('remont_bt_house') || '';
+        document.getElementById('apartment').value = localStorage.getItem('remont_bt_apartment') || '';
+    } catch (e) {}
 }
 
 // ============ ВЫБОР "ДРУГОЕ" ============
@@ -263,6 +268,11 @@ function submitOrder() {
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
     if (!house) return showAlert('Укажите дом');
+
+    try {
+        localStorage.setItem('remont_bt_house', house);
+        localStorage.setItem('remont_bt_apartment', apartment);
+    } catch (e) {}
 
     const data = {
         event: 'new_order',
