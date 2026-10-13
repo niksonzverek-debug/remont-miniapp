@@ -4,10 +4,15 @@ const tg = window.Telegram.WebApp;
 
 console.log("=== Mini App START ===");
 console.log("initData length:", tg.initData?.length || 0);
+console.log("platform:", tg.platform);
 console.log("user:", tg.initDataUnsafe?.user);
 
 tg.ready();
 tg.expand();
+
+// Main Mini App (через Menu Button) — sendData НЕ работает
+const isMainMiniApp = !tg.initData || tg.initData.length === 0;
+console.log("isMainMiniApp:", isMainMiniApp);
 
 // Применяем тему Telegram
 function applyTheme() {
@@ -35,19 +40,34 @@ function showConfirm(msg, callback) {
     try { tg.showConfirm(msg, callback); } catch (e) { callback(confirm(msg)); }
 }
 
-// ВАЖНО: НЕ вызываем tg.close() — Telegram сам закроет после sendData
 function sendToBot(data) {
     console.log("sendToBot:", data);
+
+    if (isMainMiniApp) {
+        showAlert(
+            "⚠️ Форма открыта не через кнопку бота.\n\n" +
+            "Закройте это окно и нажмите кнопку «📝 Создать заявку» в чате с ботом."
+        );
+        return false;
+    }
+
     try {
         tg.sendData(JSON.stringify(data));
+        // Принудительно закрываем через 300 мс — некоторые версии Telegram
+        // не закрывают окно автоматически
+        setTimeout(() => {
+            try { tg.close(); } catch (e) {}
+        }, 300);
+        return true;
     } catch (e) {
         console.error("sendData error:", e);
         showAlert("Ошибка отправки: " + e.message);
+        return false;
     }
 }
 
 function sendEvent(type, payload = {}) {
-    sendToBot({ event: type, ...payload });
+    return sendToBot({ event: type, ...payload });
 }
 
 function fmtPrice(n) {
