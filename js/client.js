@@ -259,7 +259,8 @@ function showNewOrder() {
 
         // Не скрываем поля на основании локальных данных.
         // Проверка регистрации по серверной базе требует отдельного API.
-        document.getElementById('clientIdentityCard').style.display = '';
+		document.getElementById('clientIdentityCard')
+			.style.setProperty('display', 'block', 'important');
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
