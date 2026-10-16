@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://routing-pickup-containers-shortcuts.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://barbara-regards-oriental-banner.trycloudflare.com";
