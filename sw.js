@@ -1,0 +1,18 @@
+const CACHE_NAME = 'remont-bt-miniapp-v20261016-1';
+const LOCAL_FILES = [
+  './', './index.html', './client.html', './advertiser.html',
+  './css/style.css', './js/common.js', './js/client.js', './js/master.js',
+  './js/advertiser.js', './js/advertiser-config.js', './manifest.webmanifest'
+];
+self.addEventListener('install', event => {
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(LOCAL_FILES.map(path => new Request(path, {cache: 'reload'})).filter(Boolean))).catch(() => {}).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k)))).then(() => self.clients.claim())));
+self.addEventListener('fetch', event => {
+  const request = event.request;
+  if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
+  event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(response => {
+    if (response && response.ok) { const copy = response.clone(); caches.open(CACHE_NAME).then(cache => cache.put(request, copy)); }
+    return response;
+  }).catch(() => request.mode === 'navigate' ? caches.match('./index.html') : new Response('', {status: 503, statusText: 'Offline'}))));
+});

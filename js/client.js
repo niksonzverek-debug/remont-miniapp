@@ -82,6 +82,16 @@ function showNewOrder() {
         <p class="subtitle">Заполните данные — мастер свяжется</p>
 
         <div class="card">
+            <label>Ваше имя / ФИО *</label>
+            <input id="client_name" placeholder="Как к вам обращаться" autocomplete="name">
+            <label>Номер телефона *</label>
+            <input id="client_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" autocomplete="tel">
+            <p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет сохранён на устройстве.</p>
+            <p class="subtitle">Эти данные помогают зарегистрировать клиента и восстановить связь с заказом даже после временного сбоя.</p>
+            <button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию отдельно</button>
+        </div>
+
+        <div class="card">
             <label>Вид техники</label>
             <select id="device" onchange="onDeviceChange()">
                 <option value="">— Выберите —</option>
@@ -159,7 +169,22 @@ function showNewOrder() {
     try {
         document.getElementById('house').value = localStorage.getItem('remont_bt_house') || '';
         document.getElementById('apartment').value = localStorage.getItem('remont_bt_apartment') || '';
+        document.getElementById('client_name').value = localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || '');
+        document.getElementById('client_phone').value = localStorage.getItem('remont_bt_phone') || '';
+        const regNoEl = document.getElementById('clientRegistrationNo');
+        const updateClientRegNo = () => { const phone=document.getElementById('client_phone').value; const no=getClientRegistrationNo(phone); if(regNoEl) regNoEl.textContent=(no.startsWith('CL-OFF-')?'Локальный номер синхронизации: ':'Регистрационный номер: ')+no; };
+        updateClientRegNo();
+        document.getElementById('client_phone').addEventListener('input', e => { const d=e.target.value.replace(/\D/g,'').slice(0,12); e.target.value=d.startsWith('998')?'+998'+(d.length>3?' '+d.slice(3,5):'')+(d.length>5?' '+d.slice(5,8):'')+(d.length>8?' '+d.slice(8,10):'')+(d.length>10?' '+d.slice(10):''):(d?'+'+d:''); updateClientRegNo(); });
     } catch (e) {}
+}
+
+function submitRegistration() {
+    const name = document.getElementById('client_name').value.trim();
+    const phone = cleanPhone(document.getElementById('client_phone').value);
+    if (name.length < 2) return showAlert('Введите имя клиента');
+    if (!validPhone(phone)) return showAlert('Введите номер +998XXXXXXXXX');
+    try { localStorage.setItem('remont_bt_name', name); localStorage.setItem('remont_bt_phone', phone); } catch (_) {}
+    sendEvent('register_client', {client_name: name, client_phone: phone, client_registration_id: getClientRegistrationId(phone), client_registration_no: getClientRegistrationNo(phone)});
 }
 
 // ============ ВЫБОР "ДРУГОЕ" ============
@@ -261,7 +286,11 @@ function submitOrder() {
     const house = document.getElementById('house').value.trim();
     const apartment = document.getElementById('apartment').value.trim();
     const comment = document.getElementById('comment').value.trim();
+    const client_name = document.getElementById('client_name').value.trim();
+    const client_phone = cleanPhone(document.getElementById('client_phone').value);
 
+    if (client_name.length < 2) return showAlert('Введите имя клиента');
+    if (!validPhone(client_phone)) return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
     if (!problem || problem.length < 5) return showAlert('Опишите проблему');
@@ -272,10 +301,15 @@ function submitOrder() {
     try {
         localStorage.setItem('remont_bt_house', house);
         localStorage.setItem('remont_bt_apartment', apartment);
+        localStorage.setItem('remont_bt_name', client_name);
+        localStorage.setItem('remont_bt_phone', client_phone);
     } catch (e) {}
 
     const data = {
         event: 'new_order',
+        client_name: client_name,
+        client_phone: client_phone,
+        client_registration_id: getClientRegistrationId(client_phone), client_registration_no: getClientRegistrationNo(client_phone),
         device: device,
         brand: brand,
         model: model || '—',
