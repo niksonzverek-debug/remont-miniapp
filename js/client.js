@@ -178,7 +178,7 @@ function showNewOrder() {
         const updateClientRegNo = () => { const phone=document.getElementById('client_phone').value; const no=getClientRegistrationNo(phone); if(regNoEl) regNoEl.textContent=(no.startsWith('CL-OFF-')?'Локальный номер синхронизации: ':'Регистрационный номер: ')+no; };
         if (!isNewClientFlow) updateClientRegNo();
         document.getElementById('client_phone').addEventListener('input', e => { const d=e.target.value.replace(/\D/g,'').slice(0,12); e.target.value=d.startsWith('998')?'+998'+(d.length>3?' '+d.slice(3,5):'')+(d.length>5?' '+d.slice(5,8):'')+(d.length>8?' '+d.slice(8,10):'')+(d.length>10?' '+d.slice(10):''):(d?'+'+d:''); if (!isNewClientFlow) updateClientRegNo(); });
-        if (isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1' && savedName.length >= 2 && validPhone(cleanPhone(savedPhone))) {
+        if (savedName.length >= 2 && validPhone(cleanPhone(savedPhone))) {
             document.getElementById('clientIdentityCard').style.display = 'none';
         }
     } catch (e) {}
