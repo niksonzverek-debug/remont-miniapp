@@ -14,7 +14,10 @@ let orderData = {
     location: null,
 };
 
-// ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ============
+// Отдельный сценарий только для новых клиентов, пришедших через /start.
+const isNewClientFlow = new URLSearchParams(location.search).get("new_client") === "1";
+
+// ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
 function renderClientMenu() {
     document.body.innerHTML = `
@@ -81,14 +84,12 @@ function showNewOrder() {
         <h1>📝 Новая заявка</h1>
         <p class="subtitle">Заполните данные — мастер свяжется</p>
 
-        <div class="card">
+        <div class="card" id="clientIdentityCard">
             <label>Ваше имя / ФИО *</label>
             <input id="client_name" placeholder="Как к вам обращаться" autocomplete="name">
             <label>Номер телефона *</label>
             <input id="client_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" autocomplete="tel">
-            <p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет сохранён на устройстве.</p>
-            <p class="subtitle">Эти данные помогают зарегистрировать клиента и восстановить связь с заказом даже после временного сбоя.</p>
-            <button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию отдельно</button>
+            ${isNewClientFlow ? '<p class="subtitle">Укажите данные один раз. В дальнейшем они сохранятся для ваших заявок.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить данные</button>' : '<p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет сохранён на устройстве.</p><p class="subtitle">Эти данные помогают зарегистрировать клиента и восстановить связь с заказом даже после временного сбоя.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию отдельно</button>'}
         </div>
 
         <div class="card">
@@ -169,21 +170,35 @@ function showNewOrder() {
     try {
         document.getElementById('house').value = localStorage.getItem('remont_bt_house') || '';
         document.getElementById('apartment').value = localStorage.getItem('remont_bt_apartment') || '';
-        document.getElementById('client_name').value = localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || '');
-        document.getElementById('client_phone').value = localStorage.getItem('remont_bt_phone') || '';
+        const savedName = localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || '');
+        const savedPhone = localStorage.getItem('remont_bt_phone') || '';
+        document.getElementById('client_name').value = savedName;
+        document.getElementById('client_phone').value = savedPhone;
         const regNoEl = document.getElementById('clientRegistrationNo');
         const updateClientRegNo = () => { const phone=document.getElementById('client_phone').value; const no=getClientRegistrationNo(phone); if(regNoEl) regNoEl.textContent=(no.startsWith('CL-OFF-')?'Локальный номер синхронизации: ':'Регистрационный номер: ')+no; };
-        updateClientRegNo();
-        document.getElementById('client_phone').addEventListener('input', e => { const d=e.target.value.replace(/\D/g,'').slice(0,12); e.target.value=d.startsWith('998')?'+998'+(d.length>3?' '+d.slice(3,5):'')+(d.length>5?' '+d.slice(5,8):'')+(d.length>8?' '+d.slice(8,10):'')+(d.length>10?' '+d.slice(10):''):(d?'+'+d:''); updateClientRegNo(); });
+        if (!isNewClientFlow) updateClientRegNo();
+        document.getElementById('client_phone').addEventListener('input', e => { const d=e.target.value.replace(/\D/g,'').slice(0,12); e.target.value=d.startsWith('998')?'+998'+(d.length>3?' '+d.slice(3,5):'')+(d.length>5?' '+d.slice(5,8):'')+(d.length>8?' '+d.slice(8,10):'')+(d.length>10?' '+d.slice(10):''):(d?'+'+d:''); if (!isNewClientFlow) updateClientRegNo(); });
+        if (isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1' && savedName.length >= 2 && validPhone(cleanPhone(savedPhone))) {
+            document.getElementById('clientIdentityCard').style.display = 'none';
+        }
     } catch (e) {}
 }
 
 function submitRegistration() {
-    const name = document.getElementById('client_name').value.trim();
-    const phone = cleanPhone(document.getElementById('client_phone').value);
+    const nameEl = document.getElementById('client_name');
+    const phoneEl = document.getElementById('client_phone');
+    const name = nameEl ? nameEl.value.trim() : (localStorage.getItem('remont_bt_name') || '').trim();
+    const phone = cleanPhone(phoneEl ? phoneEl.value : (localStorage.getItem('remont_bt_phone') || ''));
     if (name.length < 2) return showAlert('Введите имя клиента');
     if (!validPhone(phone)) return showAlert('Введите номер +998XXXXXXXXX');
     try { localStorage.setItem('remont_bt_name', name); localStorage.setItem('remont_bt_phone', phone); } catch (_) {}
+    if (isNewClientFlow) {
+        try { localStorage.setItem('remont_bt_identity_saved', '1'); } catch (_) {}
+        const card = document.getElementById('clientIdentityCard');
+        if (card) card.style.display = 'none';
+        showAlert('Данные сохранены. Теперь заполните заявку.');
+        return;
+    }
     sendEvent('register_client', {client_name: name, client_phone: phone, client_registration_id: getClientRegistrationId(phone), client_registration_no: getClientRegistrationNo(phone)});
 }
 
@@ -286,8 +301,10 @@ function submitOrder() {
     const house = document.getElementById('house').value.trim();
     const apartment = document.getElementById('apartment').value.trim();
     const comment = document.getElementById('comment').value.trim();
-    const client_name = document.getElementById('client_name').value.trim();
-    const client_phone = cleanPhone(document.getElementById('client_phone').value);
+    const nameInput = document.getElementById('client_name');
+    const phoneInput = document.getElementById('client_phone');
+    const client_name = (nameInput ? nameInput.value : (localStorage.getItem('remont_bt_name') || '')).trim();
+    const client_phone = cleanPhone(phoneInput ? phoneInput.value : (localStorage.getItem('remont_bt_phone') || ''));
 
     if (client_name.length < 2) return showAlert('Введите имя клиента');
     if (!validPhone(client_phone)) return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
@@ -309,7 +326,7 @@ function submitOrder() {
         event: 'new_order',
         client_name: client_name,
         client_phone: client_phone,
-        client_registration_id: getClientRegistrationId(client_phone), client_registration_no: getClientRegistrationNo(client_phone),
+        client_registration_id: getClientRegistrationId(client_phone, !isNewClientFlow), client_registration_no: getClientRegistrationNo(client_phone, !isNewClientFlow),
         device: device,
         brand: brand,
         model: model || '—',

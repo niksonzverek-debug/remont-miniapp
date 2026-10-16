@@ -143,25 +143,11 @@ function clearSubmittedQueue() {
     showAlert('Отправленные записи удалены из локальной очереди. Делайте это только после подтверждения бота в чате.');
 }
 function renderOfflineQueueBanner() {
-    const queue = getOfflineQueue();
-    let box = document.getElementById('offlineQueueBanner');
-    if (!box) {
-        box = document.createElement('section');
-        box.id = 'offlineQueueBanner';
-        box.style.cssText = 'margin:12px 0;padding:12px;border:1px solid #d5a441;border-radius:12px;background:var(--card_bg,#fff8e5);color:var(--text,#222);font:14px/1.45 sans-serif';
-        document.body.prepend(box);
-    }
-    const pending = queue.filter(x => x.local_status === 'pending' || x.local_status === 'retry').length;
-    const submitted = queue.filter(x => x.local_status === 'submitted').length;
-    if (!queue.length) { box.style.display = 'none'; return; }
-    box.style.display = 'block';
-    box.innerHTML = `<b>🔄 Локальная очередь: ${queue.length}</b><div>Ожидают отправки: ${pending} · Переданы в Telegram: ${submitted}</div>
-      ${pending && isKeyboardLaunch ? '<button type="button" id="flushOfflineBtn" style="margin-top:8px;padding:10px;border:0;border-radius:8px;background:#176b45;color:white">Передать сохранённые записи</button>' : ''}
-      ${submitted ? '<button type="button" id="retryOfflineBtn" style="margin:8px 6px 0 0;padding:8px;border-radius:8px">Повторить отправленные</button><button type="button" id="clearOfflineBtn" style="margin-top:8px;padding:8px;border-radius:8px">Очистить подтверждённые</button>' : ''}`;
-    const flush = document.getElementById('flushOfflineBtn'); if (flush) flush.onclick = flushOfflineQueue;
-    const retry = document.getElementById('retryOfflineBtn'); if (retry) retry.onclick = retrySubmittedQueue;
-    const clear = document.getElementById('clearOfflineBtn'); if (clear) clear.onclick = clearSubmittedQueue;
+    // Техническая очередь скрыта от клиента и мастера; локальное сохранение продолжает работать.
+    const existing = document.getElementById("offlineQueueBanner");
+    if (existing) existing.remove();
 }
+
 function applyTheme() {
     const root = document.documentElement;
     const params = tg.themeParams || {};
