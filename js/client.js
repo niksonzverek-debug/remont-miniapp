@@ -1,4 +1,5 @@
-// miniapp/js/client.js
+
+ // miniapp/js/client.js
 
 // ============ СОСТОЯНИЕ ============
 let orderData = {
@@ -14,8 +15,9 @@ let orderData = {
     location: null,
 };
 
-// Отдельный сценарий только для новых клиентов, пришедших через /start.
-const isNewClientFlow = new URLSearchParams(location.search).get("new_client") === "1";
+// Отдельный сценарий для новых клиентов, пришедших через /start.
+const isNewClientFlow =
+    new URLSearchParams(location.search).get("new_client") === "1";
 
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
@@ -61,21 +63,35 @@ function showNewOrder() {
     const dateOptions = [];
     const today = new Date();
     const days = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-    const months = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+    const months = [
+        'янв', 'фев', 'мар', 'апр', 'мая', 'июн',
+        'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+    ];
 
     for (let i = 0; i < 7; i++) {
         const d = new Date(today);
         d.setDate(today.getDate() + i);
-        const label = `${d.getDate()} ${months[d.getMonth()]}, ${days[d.getDay()]}`;
-        const value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        const label =
+            `${d.getDate()} ${months[d.getMonth()]}, ${days[d.getDay()]}`;
+
+        const value =
+            `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
         dateOptions.push(`<option value="${value}">${label}</option>`);
     }
 
     const timeOptions = [];
+
     for (let h = 9; h <= 21; h++) {
-        timeOptions.push(`<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`);
+        timeOptions.push(
+            `<option value="${String(h).padStart(2, '0')}:00">${String(h).padStart(2, '0')}:00</option>`
+        );
+
         if (h < 21) {
-            timeOptions.push(`<option value="${String(h).padStart(2, '0')}:30">${String(h).padStart(2, '0')}:30</option>`);
+            timeOptions.push(
+                `<option value="${String(h).padStart(2, '0')}:30">${String(h).padStart(2, '0')}:30</option>`
+            );
         }
     }
 
@@ -86,10 +102,26 @@ function showNewOrder() {
 
         <div class="card" id="clientIdentityCard">
             <label>Ваше имя / ФИО *</label>
-            <input id="client_name" placeholder="Как к вам обращаться" autocomplete="name">
+            <input
+                id="client_name"
+                placeholder="Как к вам обращаться"
+                autocomplete="name"
+            >
+
             <label>Номер телефона *</label>
-            <input id="client_phone" type="tel" inputmode="tel" placeholder="+998 90 123 45 67" autocomplete="tel">
-            ${isNewClientFlow ? '<p class="subtitle">Укажите данные один раз. В дальнейшем они сохранятся для ваших заявок.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить данные</button>' : '<p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет сохранён на устройстве.</p><p class="subtitle">Эти данные помогают зарегистрировать клиента и восстановить связь с заказом даже после временного сбоя.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию отдельно</button>'}
+            <input
+                id="client_phone"
+                type="tel"
+                inputmode="tel"
+                placeholder="+998 90 123 45 67"
+                autocomplete="tel"
+            >
+
+            ${
+                isNewClientFlow
+                    ? '<p class="subtitle">Укажите имя и телефон для регистрации. После отправки данных откройте форму заявки повторно.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Зарегистрироваться</button>'
+                    : '<p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет показан после ввода телефона.</p><p class="subtitle">Если вы ещё не зарегистрированы, сохраните данные перед созданием заявки.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию</button>'
+            }
         </div>
 
         <div class="card">
@@ -156,7 +188,10 @@ function showNewOrder() {
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
             </button>
-            <p id="location_status" style="color:#888;font-size:13px;margin-top:8px;">Локация не отправлена</p>
+
+            <p id="location_status" style="color:#888;font-size:13px;margin-top:8px;">
+                Локация не отправлена
+            </p>
         </div>
 
         <div class="card">
@@ -166,40 +201,101 @@ function showNewOrder() {
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
     `;
-    // Запоминаем адрес только на этом устройстве, чтобы не вводить его повторно.
+
     try {
-        document.getElementById('house').value = localStorage.getItem('remont_bt_house') || '';
-        document.getElementById('apartment').value = localStorage.getItem('remont_bt_apartment') || '';
-        const savedName = localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || '');
-        const savedPhone = localStorage.getItem('remont_bt_phone') || '';
+        document.getElementById('house').value =
+            localStorage.getItem('remont_bt_house') || '';
+
+        document.getElementById('apartment').value =
+            localStorage.getItem('remont_bt_apartment') || '';
+
+        // В сценарии первичной регистрации не подставляем старые данные:
+        // после очистки серверной базы localStorage не подтверждает регистрацию.
+        const savedName = isNewClientFlow
+            ? ''
+            : (localStorage.getItem('remont_bt_name') ||
+               (tg.initDataUnsafe?.user?.first_name || ''));
+
+        const savedPhone = isNewClientFlow
+            ? ''
+            : (localStorage.getItem('remont_bt_phone') || '');
+
         document.getElementById('client_name').value = savedName;
         document.getElementById('client_phone').value = savedPhone;
+
         const regNoEl = document.getElementById('clientRegistrationNo');
-        const updateClientRegNo = () => { const phone=document.getElementById('client_phone').value; const no=getClientRegistrationNo(phone); if(regNoEl) regNoEl.textContent=(no.startsWith('CL-OFF-')?'Локальный номер синхронизации: ':'Регистрационный номер: ')+no; };
-        if (!isNewClientFlow) updateClientRegNo();
-        document.getElementById('client_phone').addEventListener('input', e => { const d=e.target.value.replace(/\D/g,'').slice(0,12); e.target.value=d.startsWith('998')?'+998'+(d.length>3?' '+d.slice(3,5):'')+(d.length>5?' '+d.slice(5,8):'')+(d.length>8?' '+d.slice(8,10):'')+(d.length>10?' '+d.slice(10):''):(d?'+'+d:''); if (!isNewClientFlow) updateClientRegNo(); });
-        if (savedName.length >= 2 && validPhone(cleanPhone(savedPhone))) {
-            document.getElementById('clientIdentityCard').style.display = 'none';
+
+        const updateClientRegNo = () => {
+            const phone = document.getElementById('client_phone').value;
+            const no = getClientRegistrationNo(phone);
+
+            if (regNoEl) {
+                regNoEl.textContent =
+                    (no.startsWith('CL-OFF-')
+                        ? 'Локальный номер синхронизации: '
+                        : 'Регистрационный номер: ') + no;
+            }
+        };
+
+        if (!isNewClientFlow) {
+            updateClientRegNo();
         }
-    } catch (e) {}
+
+        document.getElementById('client_phone').addEventListener('input', e => {
+            const d = e.target.value.replace(/\D/g, '').slice(0, 12);
+
+            e.target.value = d.startsWith('998')
+                ? '+998' +
+                  (d.length > 3 ? ' ' + d.slice(3, 5) : '') +
+                  (d.length > 5 ? ' ' + d.slice(5, 8) : '') +
+                  (d.length > 8 ? ' ' + d.slice(8, 10) : '') +
+                  (d.length > 10 ? ' ' + d.slice(10) : '')
+                : (d ? '+' + d : '');
+
+            if (!isNewClientFlow) {
+                updateClientRegNo();
+            }
+        });
+
+        // Не скрываем поля на основании локальных данных.
+        // Проверка регистрации по серверной базе требует отдельного API.
+        document.getElementById('clientIdentityCard').style.display = '';
+
+    } catch (e) {
+        console.error('Ошибка инициализации формы клиента:', e);
+    }
 }
+
+// ============ РЕГИСТРАЦИЯ КЛИЕНТА ============
 
 function submitRegistration() {
     const nameEl = document.getElementById('client_name');
     const phoneEl = document.getElementById('client_phone');
-    const name = nameEl ? nameEl.value.trim() : (localStorage.getItem('remont_bt_name') || '').trim();
-    const phone = cleanPhone(phoneEl ? phoneEl.value : (localStorage.getItem('remont_bt_phone') || ''));
-    if (name.length < 2) return showAlert('Введите имя клиента');
-    if (!validPhone(phone)) return showAlert('Введите номер +998XXXXXXXXX');
-    try { localStorage.setItem('remont_bt_name', name); localStorage.setItem('remont_bt_phone', phone); } catch (_) {}
-    if (isNewClientFlow) {
-        try { localStorage.setItem('remont_bt_identity_saved', '1'); } catch (_) {}
-        const card = document.getElementById('clientIdentityCard');
-        if (card) card.style.display = 'none';
-        showAlert('Данные сохранены. Теперь заполните заявку.');
-        return;
+
+    const name = (nameEl ? nameEl.value : '').trim();
+    const phone = cleanPhone(phoneEl ? phoneEl.value : '');
+
+    if (name.length < 2) {
+        return showAlert('Введите имя клиента');
     }
-    sendEvent('register_client', {client_name: name, client_phone: phone, client_registration_id: getClientRegistrationId(phone), client_registration_no: getClientRegistrationNo(phone)});
+
+    if (!validPhone(phone)) {
+        return showAlert('Введите корректный номер +998XXXXXXXXX');
+    }
+
+    try {
+        localStorage.setItem('remont_bt_name', name);
+        localStorage.setItem('remont_bt_phone', phone);
+    } catch (_) {}
+
+    // Важно: отправляем событие серверу и в сценарии new_client=1.
+    // sendData не возвращает подтверждение регистрации в сам Mini App.
+    sendEvent('register_client', {
+        client_name: name,
+        client_phone: phone,
+        client_registration_id: getClientRegistrationId(phone),
+        client_registration_no: getClientRegistrationNo(phone)
+    });
 }
 
 // ============ ВЫБОР "ДРУГОЕ" ============
@@ -207,31 +303,36 @@ function submitRegistration() {
 function onDeviceChange() {
     const val = document.getElementById('device').value;
     const wrap = document.getElementById('device_custom_wrap');
-    wrap.style.display = (val === '__other__') ? 'block' : 'none';
+
+    wrap.style.display = val === '__other__' ? 'block' : 'none';
 }
 
 function onBrandChange() {
     const val = document.getElementById('brand').value;
     const wrap = document.getElementById('brand_custom_wrap');
-    wrap.style.display = (val === '__other__') ? 'block' : 'none';
+
+    wrap.style.display = val === '__other__' ? 'block' : 'none';
 }
 
 // ============ ЛОКАЦИЯ ============
 
 function sendLocation() {
     const status = document.getElementById('location_status');
+
     status.textContent = '⏳ Определяем локацию...';
     status.style.color = '#888';
 
-    if (tg.LocationManager && typeof tg.LocationManager.init === 'function') {
+    if (tg.LocationManager &&
+        typeof tg.LocationManager.init === 'function') {
         try {
             tg.LocationManager.init(() => {
                 tg.LocationManager.getLocation((loc) => {
-                    if (loc && loc.latitude && loc.longitude) {
+                    if (loc && loc.latitude != null && loc.longitude != null) {
                         orderData.location = {
                             lat: loc.latitude,
                             lon: loc.longitude,
                         };
+
                         status.textContent =
                             `✅ ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
                         status.style.color = '#43a047';
@@ -240,11 +341,13 @@ function sendLocation() {
                     }
                 });
             });
+
             return;
         } catch (e) {
-            console.error("LocationManager error:", e);
+            console.error('LocationManager error:', e);
         }
     }
+
     getBrowserLocation();
 }
 
@@ -263,19 +366,26 @@ function getBrowserLocation() {
                 lat: pos.coords.latitude,
                 lon: pos.coords.longitude,
             };
+
             status.textContent =
                 `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
             status.style.color = '#43a047';
         },
         (err) => {
             let msg = 'Не удалось получить локацию';
+
             if (err.code === 1) msg = 'Вы запретили доступ';
             else if (err.code === 2) msg = 'Локация недоступна';
             else if (err.code === 3) msg = 'Превышено время ожидания';
+
             status.textContent = `❌ ${msg}`;
             status.style.color = '#e53935';
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+        {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+        }
     );
 }
 
@@ -287,11 +397,18 @@ function submitOrder() {
 
     if (device === '__other__') {
         device = document.getElementById('device_custom').value.trim();
-        if (!device) return showAlert('Укажите вид техники');
+
+        if (!device) {
+            return showAlert('Укажите вид техники');
+        }
     }
+
     if (brand === '__other__') {
         brand = document.getElementById('brand_custom').value.trim();
-        if (!brand) return showAlert('Укажите бренд');
+
+        if (!brand) {
+            return showAlert('Укажите бренд');
+        }
     }
 
     const model = document.getElementById('model').value.trim();
@@ -301,16 +418,34 @@ function submitOrder() {
     const house = document.getElementById('house').value.trim();
     const apartment = document.getElementById('apartment').value.trim();
     const comment = document.getElementById('comment').value.trim();
+
     const nameInput = document.getElementById('client_name');
     const phoneInput = document.getElementById('client_phone');
-    const client_name = (nameInput ? nameInput.value : (localStorage.getItem('remont_bt_name') || '')).trim();
-    const client_phone = cleanPhone(phoneInput ? phoneInput.value : (localStorage.getItem('remont_bt_phone') || ''));
 
-    if (client_name.length < 2) return showAlert('Введите имя клиента');
-    if (!validPhone(client_phone)) return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
+    const client_name = (
+        nameInput ? nameInput.value : ''
+    ).trim();
+
+    const client_phone = cleanPhone(
+        phoneInput ? phoneInput.value : ''
+    );
+
+    // Проверяем данные для любого сценария запуска.
+    if (client_name.length < 2) {
+        return showAlert('Введите имя клиента');
+    }
+
+    if (!validPhone(client_phone)) {
+        return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
+    }
+
     if (!device) return showAlert('Выберите вид техники');
     if (!brand) return showAlert('Выберите бренд');
-    if (!problem || problem.length < 5) return showAlert('Опишите проблему');
+
+    if (!problem || problem.length < 5) {
+        return showAlert('Опишите проблему');
+    }
+
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
     if (!house) return showAlert('Укажите дом');
@@ -320,13 +455,22 @@ function submitOrder() {
         localStorage.setItem('remont_bt_apartment', apartment);
         localStorage.setItem('remont_bt_name', client_name);
         localStorage.setItem('remont_bt_phone', client_phone);
-    } catch (e) {}
+    } catch (e) {
+        console.warn('Не удалось сохранить данные локально:', e);
+    }
 
     const data = {
         event: 'new_order',
         client_name: client_name,
         client_phone: client_phone,
-        client_registration_id: getClientRegistrationId(client_phone, !isNewClientFlow), client_registration_no: getClientRegistrationNo(client_phone, !isNewClientFlow),
+        client_registration_id: getClientRegistrationId(
+            client_phone,
+            !isNewClientFlow
+        ),
+        client_registration_no: getClientRegistrationNo(
+            client_phone,
+            !isNewClientFlow
+        ),
         device: device,
         brand: brand,
         model: model || '—',
@@ -339,7 +483,7 @@ function submitOrder() {
         location: orderData.location || null,
     };
 
-    console.log("Отправляем заявку:", data);
+    console.log('Отправляем заявку:', data);
 
     const btn = document.getElementById('submit');
     btn.textContent = '⏳ Отправка...';
@@ -357,6 +501,7 @@ function submitOrder() {
 
 function showMyActs() {
     sendEvent('get_my_acts');
+
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📄 Мои акты</h1>
@@ -370,26 +515,41 @@ function showEnterPromo() {
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>🎟️ Ввести промокод</h1>
+
         <div class="card">
             <label>Промокод</label>
-            <input id="promo_code" placeholder="BLOGER10" autocapitalize="characters"
-                   style="text-transform:uppercase;font-size:20px;text-align:center;letter-spacing:2px;">
+            <input
+                id="promo_code"
+                placeholder="BLOGER10"
+                autocapitalize="characters"
+                style="text-transform:uppercase;font-size:20px;text-align:center;letter-spacing:2px;"
+            >
         </div>
+
         <button id="submit" onclick="submitPromo()">✅ Активировать</button>
     `;
+
     document.getElementById('promo_code').focus();
 }
 
 function submitPromo() {
     const code = document.getElementById('promo_code').value.trim().toUpperCase();
-    if (!code || code.length < 4) return showAlert('Введите промокод');
-    sendToBot({ event: 'enter_promo', code: code });
+
+    if (!code || code.length < 4) {
+        return showAlert('Введите промокод');
+    }
+
+    sendToBot({
+        event: 'enter_promo',
+        code: code
+    });
 }
 
 // ============ ПРОФИЛЬ ============
 
 function showProfile() {
     sendEvent('get_profile');
+
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>👤 Мой профиль</h1>
@@ -401,6 +561,7 @@ function showProfile() {
 
 function showCallMaster() {
     sendEvent('get_master_phone');
+
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📞 Позвонить мастеру</h1>
@@ -410,5 +571,5 @@ function showCallMaster() {
 
 // ============ СТАРТ ============
 
-// При открытии кнопки «Создать заявку» сразу показываем форму, без промежуточного меню.
+// При открытии Mini App сразу показываем форму новой заявки.
 showNewOrder();
