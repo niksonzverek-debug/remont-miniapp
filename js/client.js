@@ -1,5 +1,5 @@
-
- // miniapp/js/client.js
+```javascript
+// miniapp/js/client.js
 
 // ============ СОСТОЯНИЕ ============
 let orderData = {
@@ -15,7 +15,6 @@ let orderData = {
     location: null,
 };
 
-// Отдельный сценарий для новых клиентов, пришедших через /start.
 const isNewClientFlow =
     new URLSearchParams(location.search).get("new_client") === "1";
 
@@ -42,6 +41,77 @@ function renderClientMenu() {
             <span class="emoji">📞</span> Позвонить мастеру
         </button>
     `;
+}
+
+// ============ ФОРМАТИРОВАНИЕ ТЕЛЕФОНА ============
+
+function formatClientPhone(value) {
+    const d = String(value || "").replace(/\D/g, "").slice(0, 12);
+
+    if (!d) return "";
+
+    if (!d.startsWith("998")) return "+" + d;
+
+    return "+998" +
+        (d.length > 3 ? " " + d.slice(3, 5) : "") +
+        (d.length > 5 ? " " + d.slice(5, 8) : "") +
+        (d.length > 8 ? " " + d.slice(8, 10) : "") +
+        (d.length > 10 ? " " + d.slice(10) : "");
+}
+
+function attachPhoneMask(input, onInput) {
+    if (!input) return;
+
+    input.addEventListener("input", e => {
+        e.target.value = formatClientPhone(e.target.value);
+        if (onInput) onInput();
+    });
+}
+
+// ============ ПЕРВИЧНАЯ РЕГИСТРАЦИЯ ============
+
+function showRegistrationScreen() {
+    document.body.innerHTML = `
+        <h1>👤 Регистрация клиента</h1>
+        <p class="subtitle">Введите ФИО и телефон, чтобы продолжить оформление заявки.</p>
+
+        <div class="card">
+            <label>Ваше имя / ФИО *</label>
+            <input
+                id="client_name"
+                placeholder="Введите ФИО"
+                autocomplete="name"
+            >
+
+            <label>Номер телефона *</label>
+            <input
+                id="client_phone"
+                type="tel"
+                inputmode="tel"
+                placeholder="+998 90 123 45 67"
+                autocomplete="tel"
+            >
+        </div>
+
+        <button id="registrationContinue" onclick="submitRegistration()">
+            Продолжить →
+        </button>
+    `;
+
+    let savedName = "";
+    let savedPhone = "";
+
+    try {
+        savedName = localStorage.getItem("remont_bt_name") || "";
+        savedPhone = localStorage.getItem("remont_bt_phone") || "";
+    } catch (e) {
+        console.warn("Не удалось прочитать данные клиента:", e);
+    }
+
+    document.getElementById("client_name").value = savedName;
+    const phoneInput = document.getElementById("client_phone");
+    phoneInput.value = formatClientPhone(savedPhone);
+    attachPhoneMask(phoneInput);
 }
 
 // ============ НОВАЯ ЗАЯВКА ============
@@ -102,11 +172,7 @@ function showNewOrder() {
 
         <div class="card" id="clientIdentityCard">
             <label>Ваше имя / ФИО *</label>
-            <input
-                id="client_name"
-                placeholder="Как к вам обращаться"
-                autocomplete="name"
-            >
+            <input id="client_name" placeholder="Как к вам обращаться" autocomplete="name">
 
             <label>Номер телефона *</label>
             <input
@@ -119,7 +185,7 @@ function showNewOrder() {
 
             ${
                 isNewClientFlow
-                    ? '<p class="subtitle">Укажите имя и телефон для регистрации. После отправки данных откройте форму заявки повторно.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Зарегистрироваться</button>'
+                    ? '<p class="subtitle">Ваши данные сохранены.</p>'
                     : '<p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет показан после ввода телефона.</p><p class="subtitle">Если вы ещё не зарегистрированы, сохраните данные перед созданием заявки.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию</button>'
             }
         </div>
@@ -209,19 +275,16 @@ function showNewOrder() {
         document.getElementById('apartment').value =
             localStorage.getItem('remont_bt_apartment') || '';
 
-        // В сценарии первичной регистрации не подставляем старые данные:
-        // после очистки серверной базы localStorage не подтверждает регистрацию.
-        const savedName = isNewClientFlow
-            ? ''
-            : (localStorage.getItem('remont_bt_name') ||
-               (tg.initDataUnsafe?.user?.first_name || ''));
+        const savedName =
+            localStorage.getItem('remont_bt_name') ||
+            (tg.initDataUnsafe?.user?.first_name || '');
 
-        const savedPhone = isNewClientFlow
-            ? ''
-            : (localStorage.getItem('remont_bt_phone') || '');
+        const savedPhone =
+            localStorage.getItem('remont_bt_phone') || '';
 
         document.getElementById('client_name').value = savedName;
-        document.getElementById('client_phone').value = savedPhone;
+        document.getElementById('client_phone').value =
+            formatClientPhone(savedPhone);
 
         const regNoEl = document.getElementById('clientRegistrationNo');
 
@@ -237,30 +300,21 @@ function showNewOrder() {
             }
         };
 
-        if (!isNewClientFlow) {
-            updateClientRegNo();
-        }
+        if (!isNewClientFlow) updateClientRegNo();
 
-        document.getElementById('client_phone').addEventListener('input', e => {
-            const d = e.target.value.replace(/\D/g, '').slice(0, 12);
-
-            e.target.value = d.startsWith('998')
-                ? '+998' +
-                  (d.length > 3 ? ' ' + d.slice(3, 5) : '') +
-                  (d.length > 5 ? ' ' + d.slice(5, 8) : '') +
-                  (d.length > 8 ? ' ' + d.slice(8, 10) : '') +
-                  (d.length > 10 ? ' ' + d.slice(10) : '')
-                : (d ? '+' + d : '');
-
-            if (!isNewClientFlow) {
-                updateClientRegNo();
+        attachPhoneMask(
+            document.getElementById('client_phone'),
+            () => {
+                if (!isNewClientFlow) updateClientRegNo();
             }
-        });
+        );
 
-        // Не скрываем поля на основании локальных данных.
-        // Проверка регистрации по серверной базе требует отдельного API.
-		document.getElementById('clientIdentityCard')
-			.style.setProperty('display', 'block', 'important');
+        document.getElementById('clientIdentityCard')
+            .style.setProperty(
+                'display',
+                isNewClientFlow ? 'none' : 'block',
+                'important'
+            );
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
@@ -287,10 +341,18 @@ function submitRegistration() {
     try {
         localStorage.setItem('remont_bt_name', name);
         localStorage.setItem('remont_bt_phone', phone);
-    } catch (_) {}
+    } catch (e) {
+        console.warn('Не удалось сохранить данные клиента:', e);
+    }
 
-    // Важно: отправляем событие серверу и в сценарии new_client=1.
-    // sendData не возвращает подтверждение регистрации в сам Mini App.
+    // Новый клиент переходит к заказу без отправки sendData и без закрытия Mini App.
+    // Сервер зарегистрирует/обновит клиента при получении первой заявки new_order.
+    if (isNewClientFlow) {
+        showNewOrder();
+        return;
+    }
+
+    // Обычный сценарий регистрации остаётся без изменений.
     sendEvent('register_client', {
         client_name: name,
         client_phone: phone,
@@ -398,18 +460,12 @@ function submitOrder() {
 
     if (device === '__other__') {
         device = document.getElementById('device_custom').value.trim();
-
-        if (!device) {
-            return showAlert('Укажите вид техники');
-        }
+        if (!device) return showAlert('Укажите вид техники');
     }
 
     if (brand === '__other__') {
         brand = document.getElementById('brand_custom').value.trim();
-
-        if (!brand) {
-            return showAlert('Укажите бренд');
-        }
+        if (!brand) return showAlert('Укажите бренд');
     }
 
     const model = document.getElementById('model').value.trim();
@@ -423,15 +479,9 @@ function submitOrder() {
     const nameInput = document.getElementById('client_name');
     const phoneInput = document.getElementById('client_phone');
 
-    const client_name = (
-        nameInput ? nameInput.value : ''
-    ).trim();
+    const client_name = (nameInput ? nameInput.value : '').trim();
+    const client_phone = cleanPhone(phoneInput ? phoneInput.value : '');
 
-    const client_phone = cleanPhone(
-        phoneInput ? phoneInput.value : ''
-    );
-
-    // Проверяем данные для любого сценария запуска.
     if (client_name.length < 2) {
         return showAlert('Введите имя клиента');
     }
@@ -572,5 +622,9 @@ function showCallMaster() {
 
 // ============ СТАРТ ============
 
-// При открытии Mini App сразу показываем форму новой заявки.
-showNewOrder();
+if (isNewClientFlow) {
+    showRegistrationScreen();
+} else {
+    showNewOrder();
+}
+```
