@@ -219,28 +219,29 @@ else { ensureMiniLanguageButton(); translateMiniDom(); }
 try { new MutationObserver(() => { ensureMiniLanguageButton(); if (!document.getElementById('offlineQueueBanner')) renderOfflineQueueBanner(); translateMiniDom(); }).observe(document.body, {childList:true,subtree:true}); } catch (_) {}
 
 
-// Remont BT navigation guard: edge-swipe means in-app Back, never close the Mini App.
-(function installRemontBackNavigation(){
-  if (window.__remontBackNavigationInstalled) return;
-  window.__remontBackNavigationInstalled = true;
+// Унифицированный жест «назад»: свайп от левого края вправо.
+(function installEdgeSwipeBack(){
+  if (window.__remontEdgeSwipeInstalled) return;
+  window.__remontEdgeSwipeInstalled = true;
   let startX=0,startY=0,tracking=false;
-  const isEditable = el => !!(el && el.closest && el.closest('input,textarea,select,[contenteditable="true"]'));
-  function backInApp(){
-    if (typeof window.remontBackHandler === 'function') { try { window.remontBackHandler(); return; } catch(e) { console.warn('Back handler:',e); } }
-    if (typeof window.showMasterOrders === 'function' && document.querySelector('.master-app')) { window.renderMasterMenu?.(); return; }
-    if (typeof window.renderClientMenu === 'function') { window.renderClientMenu(); return; }
-    if (history.state && history.state.remontInAppPage && history.length > 1) { history.back(); return; }
-    // No previous in-app page: remain here instead of calling Telegram.WebApp.close().
-  }
-  document.addEventListener('touchstart', e=>{const t=e.touches&&e.touches[0]; if(!t)return; startX=t.clientX;startY=t.clientY;tracking=startX<=28&&!isEditable(e.target);},{passive:true});
-  document.addEventListener('touchend', e=>{if(!tracking)return;tracking=false;const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-startX,dy=t.clientY-startY;if(dx>85&&Math.abs(dy)<70)backInApp();},{passive:true});
-  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!isEditable(e.target)){backInApp();}});
-  try {
-    if (window.Telegram?.WebApp?.BackButton) {
-      const bb=window.Telegram.WebApp.BackButton;
-      bb.onClick(backInApp);
-      // Keep Telegram's back affordance visible only when there is an app-level back target.
-      bb.hide();
-    }
-  } catch(_) {}
+  document.addEventListener('touchstart',e=>{
+    if(!e.touches||e.touches.length!==1)return;
+    const t=e.touches[0]; startX=t.clientX; startY=t.clientY;
+    tracking=startX<=28;
+  },{passive:true});
+  document.addEventListener('touchend',e=>{
+    if(!tracking||!e.changedTouches||!e.changedTouches.length)return;
+    tracking=false; const t=e.changedTouches[0]; const dx=t.clientX-startX,dy=t.clientY-startY;
+    if(dx<75||Math.abs(dy)>Math.max(65,dx*.65))return;
+    const target=e.target;
+    if(target&&target.closest&&target.closest('input,textarea,select,[contenteditable="true"],.leaflet-container,canvas'))return;
+    const back=document.querySelector('.back-btn,[data-action="back"],.back-button,button[aria-label="Назад"]');
+    if(back){back.click();return;}
+    const role=new URLSearchParams(location.search).get('role')||'';
+    if(role==='client'&&typeof renderClientMenu==='function'){renderClientMenu();return;}
+    if(role==='master'&&typeof renderMasterMenu==='function'){renderMasterMenu();return;}
+    if(role==='master'&&typeof showMasterDashboard==='function'){showMasterDashboard();return;}
+    if(role==='master'&&typeof renderMasterHome==='function'){renderMasterHome();return;}
+    if(role==='advertiser'){try{history.back()}catch(_){} }
+  },{passive:true});
 })();
