@@ -53,6 +53,15 @@ function getOfflineQueue() {
         return Array.isArray(raw) ? raw : [];
     } catch (_) { return []; }
 }
+function currentQueueOwnerId() {
+    const id = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
+    return id === null || id === undefined || id === '' ? '' : String(id);
+}
+function isQueueItemForCurrentUser(item) {
+    const uid = currentQueueOwnerId();
+    return Boolean(uid) && String(item && item.telegram_user_id || '') === uid &&
+        (!item.launch_role || item.launch_role === 'client');
+}
 function saveOfflineQueue(queue) {
     try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(-100))); } catch (e) {
         console.error('Не удалось сохранить очередь локально', e);
@@ -104,9 +113,16 @@ function flushOfflineQueue() {
         return false;
     }
     const queue = getOfflineQueue();
-    const pending = queue.filter(x => x.local_status === 'pending' || x.local_status === 'retry');
+    if (!currentQueueOwnerId()) {
+        showAlert('Не удалось определить аккаунт Telegram. Закройте приложение и откройте его из чата с ботом.');
+        return false;
+    }
+    const pending = queue.filter(x => isQueueItemForCurrentUser(x) && (x.local_status === 'pending' || x.local_status === 'retry'));
     if (!pending.length) {
-        showAlert('Новых записей в очереди нет. Если отправка ранее не подтвердилась, выберите запись и повторите её отправку.');
+        const unownedLegacyItems = queue.some(x => !x.telegram_user_id && (x.local_status === 'pending' || x.local_status === 'retry'));
+        showAlert(unownedLegacyItems
+            ? 'В очереди остались записи старой версии без ID владельца. Они не отправлены автоматически, чтобы не передать данные другого клиента. Проверьте их вручную перед повторной отправкой.'
+            : 'Новых записей в очереди этого аккаунта нет. Если отправка ранее не подтвердилась, повторите её из этого же аккаунта.');
         return false;
     }
     const batch = [];
@@ -135,14 +151,15 @@ function flushOfflineQueue() {
     }
 }
 function retrySubmittedQueue() {
-    const queue = getOfflineQueue().map(x => x.local_status === 'submitted' ? { ...x, local_status: 'retry' } : x);
+    const queue = getOfflineQueue().map(x => isQueueItemForCurrentUser(x) && x.local_status === 'submitted'
+        ? { ...x, local_status: 'retry' } : x);
     saveOfflineQueue(queue);
     flushOfflineQueue();
 }
 function clearSubmittedQueue() {
-    const queue = getOfflineQueue().filter(x => x.local_status !== 'submitted');
+    const queue = getOfflineQueue().filter(x => !(isQueueItemForCurrentUser(x) && x.local_status === 'submitted'));
     saveOfflineQueue(queue);
-    showAlert('Отправленные записи удалены из локальной очереди. Делайте это только после подтверждения бота в чате.');
+    showAlert('Отправленные записи этого аккаунта удалены из локальной очереди. Делайте это только после подтверждения бота в чате.');
 }
 function renderOfflineQueueBanner() {
     // Техническая очередь скрыта от клиента и мастера; локальное сохранение продолжает работать.
@@ -163,7 +180,7 @@ function applyTheme() {
 }
 applyTheme();
 try { tg.ready(); tg.expand(); tg.onEvent('themeChanged', applyTheme); } catch (_) {}
-try { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js').catch(() => {}); } catch (_) {}
+try { if ('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('./sw.js?v=20261018fresh1').then(reg => reg.update()).catch(() => {}); } catch (_) {}
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderOfflineQueueBanner);
 else renderOfflineQueueBanner();
 function fmtPrice(n) { return new Intl.NumberFormat('ru-RU').format(n) + ' сум'; }
