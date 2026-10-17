@@ -88,7 +88,8 @@ function sendToBot(data) {
         const queue = getOfflineQueue().map(item => item.operation_id === op.operation_id
             ? { ...item, local_status: 'submitted', submitted_at: new Date().toISOString() } : item);
         saveOfflineQueue(queue);
-        setTimeout(() => { try { tg.close(); } catch (_) {} }, 250);
+        // Telegram сам закрывает Web App после sendData. Не вызываем close() повторно:
+        // это может опередить ответ бота с восстановленной reply-клавиатурой.
         return true;
     } catch (e) {
         console.error('sendData error:', e);
@@ -123,7 +124,8 @@ function flushOfflineQueue() {
         const sentIds = new Set(batch.map(x => x.operation_id));
         saveOfflineQueue(queue.map(x => sentIds.has(x.operation_id)
             ? { ...x, local_status: 'submitted', submitted_at: new Date().toISOString() } : x));
-        setTimeout(() => { try { tg.close(); } catch (_) {} }, 250);
+        // Telegram сам закрывает Web App после sendData. Не вызываем close() повторно:
+        // это может опередить ответ бота с восстановленной reply-клавиатурой.
         return true;
     } catch (e) {
         saveOfflineQueue(queue.map(x => pending.some(p => p.operation_id === x.operation_id)

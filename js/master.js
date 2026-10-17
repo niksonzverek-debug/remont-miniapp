@@ -264,6 +264,7 @@ function submitAct() {
 
     const data = {
         event: 'offline_create_act',
+        order_id: new URLSearchParams(location.search).get('order_id') || null,
         client_name: client_name,
         client_registration_id: getClientRegistrationId(client_phone, false),
         client_registration_no: getClientRegistrationNo(client_phone, false),
