@@ -66,6 +66,11 @@ self.addEventListener('fetch', event => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
+  /* REMONT_BT_ADVERTISER_CONFIG_NETWORK_FIRST */
+  if (request.method === 'GET' && new URL(request.url).pathname.endsWith('/js/advertiser-config.js')) {
+    event.respondWith(fetch(new Request(request, { cache: 'no-store' })));
+    return;
+  }
   const path = url.pathname.toLowerCase();
   if (path.includes('/api/')) return; // never cache API responses
 
