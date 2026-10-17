@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://shepherd-groups-beverly-velvet.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://filling-performing-has-coordination.trycloudflare.com";
