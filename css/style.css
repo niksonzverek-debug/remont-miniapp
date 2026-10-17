@@ -336,3 +336,20 @@ input, select, textarea { background: #0d1728 !important; color: #f4f7fb !import
 button, .menu-btn { background: #f28b32; color: #101827; border: 0; }
 .back-btn { background: #1a2a42; color: #f4f7fb; border: 1px solid #344760; }
 .subtitle, .hint { color: #a7b4c8 !important; }
+
+/* Client portal: keep the same premium navy background as the administrator panel. */
+html, body {
+  background-color: #0b1020 !important;
+  color: #eef3ff !important;
+}
+body {
+  background-image: radial-gradient(ellipse at 75% -10%, #1a3157 0, transparent 42%) !important;
+}
+.portal-head, .client-home-grid .menu-btn, .card, form, .notice {
+  background-color: #121a2d;
+  border-color: #26334b;
+  color: #eef3ff;
+}
+.client-home-grid .menu-btn, button {
+  color: #eef3ff;
+}

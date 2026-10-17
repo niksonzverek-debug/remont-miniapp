@@ -32,7 +32,7 @@ function renderClientMenu() {
     document.body.innerHTML = `
         <header class="portal-head"><h1>Remont BT</h1><p>Ваш ремонт — под контролем</p></header>
         <h2>👋 Личный кабинет</h2>
-        <p class="subtitle">Здравствуйте, ${tg.initDataUnsafe?.user?.first_name || 'друг'}!</p>
+        <p class="subtitle">Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</span>!</p>
         <div class="client-home-grid">
           <button class="menu-btn" onclick="showNewOrder()"><span class="emoji">📝</span> Создать заявку</button>
           <button class="menu-btn" onclick="showMyOrders()"><span class="emoji">📋</span> Мои заявки и статусы</button>
@@ -43,18 +43,32 @@ function renderClientMenu() {
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
+    // Use the authoritative profile name from the database, not Telegram's optional first_name.
+    clientApi('/api/client/profile').then(d => {
+        const name = String(d.profile?.name || '').trim();
+        const node = document.getElementById('clientWelcomeName');
+        if (node && name) node.textContent = name;
+    }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
 }
 
 async function clientApi(path, method='GET', body=null) {
     // Telegram may restore the Mini App after navigation; initialise the SDK before requests.
     try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
     const initData = String(window.Telegram?.WebApp?.initData || '');
-    if (!initData) throw new Error('Telegram не передал данные авторизации. Закройте приложение и откройте его кнопкой из чата бота.');
+    const query = new URLSearchParams(window.location.search);
+    const sessionUid = query.get('session_uid') || '';
+    const sessionExp = query.get('session_exp') || '';
+    const sessionSig = query.get('session_sig') || '';
+    const signedSession = sessionUid && sessionExp && sessionSig ? `${sessionUid}:${sessionExp}:${sessionSig}` : '';
+    if (!initData && !signedSession) throw new Error('Telegram не передал данные авторизации. Нажмите /start в чате с ботом, чтобы обновить кнопку приложения.');
     const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/, '');
     if (!base) throw new Error('API временно недоступен. Откройте приложение позже.');
+    const headers = {'Content-Type':'application/json'};
+    if (initData) headers['X-Telegram-Init-Data'] = initData;
+    if (signedSession) headers['X-Remont-Session'] = signedSession;
     const res = await fetch(base + path, {
         method,
-        headers: {'Content-Type':'application/json', 'X-Telegram-Init-Data': initData},
+        headers,
         body: body ? JSON.stringify(body) : undefined,
         cache: 'no-store'
     });
