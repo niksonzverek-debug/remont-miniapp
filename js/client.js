@@ -14,8 +14,14 @@ let orderData = {
     location: null,
 };
 
-const isNewClientFlow =
-    new URLSearchParams(location.search).get("new_client") === "1";
+const clientUrlParams = new URLSearchParams(location.search);
+const isNewClientFlow = clientUrlParams.get("new_client") === "1";
+// Регистрационный номер в ссылке добавляет бот только для уже зарегистрированного клиента.
+const isKnownRegisteredClient = !isNewClientFlow && (
+    clientUrlParams.get("registered") === "1" ||
+    /^CL-[A-Z0-9-]{6,38}$/.test(clientUrlParams.get("registration_no") || "") ||
+    localStorage.getItem("remont_bt_registered") === "1"
+);
 
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
@@ -310,10 +316,11 @@ function showNewOrder() {
             }
         );
 
-        // Не скрываем карточку с ФИО и телефоном: новый клиент должен
-        // видеть и иметь возможность изменить эти поля прямо в форме заявки.
-        document.getElementById('clientIdentityCard')
-            .style.setProperty('display', 'block', 'important');
+        // Зарегистрированному клиенту не нужно повторно вводить ФИО и телефон:
+        // сервер возьмёт их из базы по Telegram user_id. Новая регистрация
+        // (new_client=1) всегда показывает поля.
+        const identityCard = document.getElementById('clientIdentityCard');
+        identityCard.style.display = isKnownRegisteredClient ? 'none' : 'block';
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
@@ -482,12 +489,9 @@ function submitOrder() {
     const client_name = (nameInput ? nameInput.value : '').trim();
     const client_phone = cleanPhone(phoneInput ? phoneInput.value : '');
 
-    if (client_name.length < 2) {
-        return showAlert('Введите имя клиента');
-    }
-
-    if (!validPhone(client_phone)) {
-        return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
+    if (!isKnownRegisteredClient) {
+        if (client_name.length < 2) return showAlert('Введите имя клиента');
+        if (!validPhone(client_phone)) return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
     }
 
     if (!device) return showAlert('Выберите вид техники');
@@ -505,7 +509,7 @@ function submitOrder() {
         localStorage.setItem('remont_bt_house', house);
         localStorage.setItem('remont_bt_apartment', apartment);
         localStorage.setItem('remont_bt_name', client_name);
-        localStorage.setItem('remont_bt_phone', client_phone);
+        if (client_phone) localStorage.setItem('remont_bt_phone', client_phone);
     } catch (e) {
         console.warn('Не удалось сохранить данные локально:', e);
     }
@@ -541,6 +545,9 @@ function submitOrder() {
     btn.disabled = true;
 
     const ok = sendToBot(data);
+    if (ok) {
+        try { localStorage.setItem('remont_bt_registered', '1'); } catch (_) {}
+    }
 
     if (!ok) {
         btn.textContent = '📤 Отправить заявку';

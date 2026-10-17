@@ -32,6 +32,7 @@
  async function load() { try { setStatus(t('loading')); const data=await api('/api/advertiser/dashboard'); render(data); } catch(e) { if(String(window.REMONT_ADVERTISER_API_BASE||'').trim()==='') { $('setup').classList.remove('hidden'); setStatus(t('setup'),true); } else setStatus(t('error')+': '+e.message,true); } }
  $('langBtn').addEventListener('click',()=>setLang(lang==='ru'?'uz':'ru'));
  $('refreshBtn').addEventListener('click',load);
+ $('newCard').addEventListener('input',()=>{const digits=$('newCard').value.replace(/\D/g,'').slice(0,19);$('newCard').value=digits.match(/.{1,4}/g)?.join(' ')||'';});
  $('requestCardBtn').addEventListener('click',async()=>{const card=$('newCard').value.replace(/\D/g,'');try{const r=await api('/api/advertiser/card-request','POST',{card_number:card});setStatus(r.message||t('cardSent'));$('newCard').value='';}catch(e){setStatus(t('error')+': '+e.message,true);}});
  $('payouts').addEventListener('click',async e=>{const b=e.target.closest('[data-decision]');if(!b)return;let note='';if(b.dataset.decision==='disputed'){note=prompt(t('disputePrompt'))||'';if(!note)return;}try{const r=await api(`/api/advertiser/payouts/${encodeURIComponent(b.dataset.id)}/decision`,'POST',{decision:b.dataset.decision,note});setStatus(r.message||t('connected'));await load();}catch(err){setStatus(t('error')+': '+err.message,true);}});
  try { if(tg){tg.ready();tg.expand();} } catch(_) {}

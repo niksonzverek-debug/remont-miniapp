@@ -13,13 +13,88 @@ function renderMasterMenu() {
         <button class="menu-btn" onclick="sendEvent('get_stats')">
             <span class="emoji">📊</span> Моя статистика
         </button>
+        <button class="menu-btn" onclick="showCreatePromoForm()">
+            <span class="emoji">➕</span> Создать промокод
+        </button>
         <button class="menu-btn" onclick="sendEvent('get_promos')">
-            <span class="emoji">🎟️</span> Промокоды
+            <span class="emoji">🎟️</span> Промокоды и статистика
         </button>
         <button class="menu-btn" onclick="sendEvent('get_clients')">
             <span class="emoji">👥</span> Клиенты
         </button>
     `;
+}
+
+
+// ============ СОЗДАНИЕ ПРОМОКОДА ЕДИНОЙ ФОРМОЙ ============
+function showCreatePromoForm() {
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + 30);
+    const expiryValue = `${expiry.getFullYear()}-${String(expiry.getMonth()+1).padStart(2,'0')}-${String(expiry.getDate()).padStart(2,'0')}`;
+    document.body.innerHTML = `
+        <button class="back-btn" onclick="renderMasterMenu()">← Назад</button>
+        <h1>🎟️ Создать промокод</h1>
+        <p class="subtitle">Заполните все данные на одной странице и отправьте форму.</p>
+        <div class="card">
+            <label>Код промокода *</label>
+            <input id="promo_code" maxlength="20" placeholder="BLOGER10" autocapitalize="characters" autocomplete="off">
+            <label>Имя партнёра *</label>
+            <input id="promo_partner_name" maxlength="150" placeholder="Например, Блогер Ахмед" autocomplete="off">
+            <label>Контакт партнёра *</label>
+            <input id="promo_partner_contact" maxlength="150" placeholder="@username или телефон" autocomplete="off">
+            <label>Номер карты для выплат *</label>
+            <input id="promo_partner_card" inputmode="numeric" autocomplete="off" maxlength="23" placeholder="8600 1234 5678 9012">
+            <p class="subtitle">Цифры автоматически группируются по 4. Номер карты должен содержать 16–19 цифр.</p>
+        </div>
+        <div class="card">
+            <label>Скидка клиенту, % *</label>
+            <input id="promo_discount" type="number" min="1" max="50" value="5" inputmode="numeric">
+            <label>Вознаграждение партнёру, % *</label>
+            <input id="promo_reward" type="number" min="0" max="30" value="5" inputmode="decimal">
+            <label>Сколько раз один клиент может использовать скидку? *</label>
+            <input id="promo_max_act" type="number" min="1" max="100" value="1" inputmode="numeric">
+            <label>Действует до *</label>
+            <input id="promo_expiry" type="date" value="${expiryValue}">
+        </div>
+        <button id="promo_submit" onclick="submitCreatePromo()">✅ Создать промокод</button>
+        <p class="subtitle" id="promo_form_status" role="status"></p>
+    `;
+    const code = document.getElementById('promo_code');
+    code.addEventListener('input', () => { code.value = code.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0,20); });
+    const card = document.getElementById('promo_partner_card');
+    card.addEventListener('input', () => {
+        const digits = card.value.replace(/\D/g, '').slice(0,19);
+        card.value = digits.match(/.{1,4}/g)?.join(' ') || '';
+    });
+}
+
+function submitCreatePromo() {
+    const get = id => document.getElementById(id).value.trim();
+    const code = get('promo_code').toUpperCase();
+    const partner_name = get('promo_partner_name');
+    const partner_contact = get('promo_partner_contact');
+    const partner_card = get('promo_partner_card').replace(/\D/g, '');
+    const discount_percent = Number(get('promo_discount'));
+    const reward_percent = Number(get('promo_reward'));
+    const max_act = Number(get('promo_max_act'));
+    const expiry_date = get('promo_expiry');
+    if (!/^[A-Z0-9_-]{4,20}$/.test(code)) return showAlert('Код: 4–20 символов A-Z, 0-9, _ или -.');
+    if (partner_name.length < 2) return showAlert('Укажите имя партнёра.');
+    if (!partner_contact) return showAlert('Укажите контакт партнёра.');
+    if (partner_card.length < 16 || partner_card.length > 19) return showAlert('Номер карты должен содержать 16–19 цифр.');
+    if (!(discount_percent >= 1 && discount_percent <= 50)) return showAlert('Скидка должна быть от 1 до 50%.');
+    if (!(reward_percent >= 0 && reward_percent <= 30)) return showAlert('Вознаграждение должно быть от 0 до 30%.');
+    if (!(Number.isInteger(max_act) && max_act >= 1 && max_act <= 100)) return showAlert('Лимит должен быть от 1 до 100.');
+    if (!expiry_date || expiry_date < new Date().toISOString().slice(0,10)) return showAlert('Выберите сегодняшнюю или будущую дату окончания.');
+    const btn = document.getElementById('promo_submit');
+    btn.disabled = true;
+    btn.textContent = '⏳ Отправляем…';
+    const ok = sendEvent('create_promo_form', {
+        code, partner_name, partner_contact, partner_card,
+        discount_percent, reward_percent, max_act,
+        expires_at: `${expiry_date}T23:59:59`
+    });
+    if (!ok) { btn.disabled = false; btn.textContent = '✅ Создать промокод'; }
 }
 
 // ============ СОЗДАНИЕ АКТА ============
@@ -213,5 +288,6 @@ function submitAct() {
 }
 
 // ============ СТАРТ ============
-
-renderMasterMenu();
+const masterScreen = new URLSearchParams(location.search).get('screen');
+if (masterScreen === 'promo_create') showCreatePromoForm();
+else renderMasterMenu();
