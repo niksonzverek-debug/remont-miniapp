@@ -1,4 +1,4 @@
-const CACHE_NAME = 'remont-bt-miniapp-v20261016-2';
+const CACHE_NAME = 'remont-bt-miniapp-v20261017-2';
 const LOCAL_FILES = [
   './', './index.html', './client.html', './advertiser.html',
   './css/style.css', './js/common.js', './js/client.js', './js/master.js',

@@ -79,7 +79,9 @@ function showRegistrationScreen() {
             <input
                 id="client_name"
                 placeholder="Введите ФИО"
-                autocomplete="name"
+                autocomplete="off"
+                autocapitalize="words"
+                spellcheck="false"
             >
 
             <label>Номер телефона *</label>
@@ -88,7 +90,9 @@ function showRegistrationScreen() {
                 type="tel"
                 inputmode="tel"
                 placeholder="+998 90 123 45 67"
-                autocomplete="tel"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
             >
         </div>
 
@@ -97,19 +101,12 @@ function showRegistrationScreen() {
         </button>
     `;
 
-    let savedName = "";
-    let savedPhone = "";
-
-    try {
-        savedName = localStorage.getItem("remont_bt_name") || "";
-        savedPhone = localStorage.getItem("remont_bt_phone") || "";
-    } catch (e) {
-        console.warn("Не удалось прочитать данные клиента:", e);
-    }
-
-    document.getElementById("client_name").value = savedName;
+    // Это экран первичной регистрации из /start: поля всегда пустые.
+    // Не используем localStorage/автозаполнение браузера, чтобы на общем или
+    // тестовом телефоне данные предыдущего клиента не попали в новую заявку.
     const phoneInput = document.getElementById("client_phone");
-    phoneInput.value = formatClientPhone(savedPhone);
+    document.getElementById("client_name").value = "";
+    phoneInput.value = "";
     attachPhoneMask(phoneInput);
 }
 
@@ -171,7 +168,7 @@ function showNewOrder() {
 
         <div class="card" id="clientIdentityCard">
             <label>Ваше имя / ФИО *</label>
-            <input id="client_name" placeholder="Как к вам обращаться" autocomplete="name">
+            <input id="client_name" placeholder="Введите ФИО" autocomplete="off" autocapitalize="words" spellcheck="false">
 
             <label>Номер телефона *</label>
             <input
@@ -179,12 +176,14 @@ function showNewOrder() {
                 type="tel"
                 inputmode="tel"
                 placeholder="+998 90 123 45 67"
-                autocomplete="tel"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
             >
 
             ${
                 isNewClientFlow
-                    ? '<p class="subtitle">Ваши данные сохранены.</p>'
+                    ? '<p class="subtitle">Введите ФИО и телефон нового клиента.</p>'
                     : '<p class="subtitle" id="clientRegistrationNo">Регистрационный номер будет показан после ввода телефона.</p><p class="subtitle">Если вы ещё не зарегистрированы, сохраните данные перед созданием заявки.</p><button type="button" class="secondary" onclick="submitRegistration()">💾 Сохранить регистрацию</button>'
             }
         </div>
@@ -245,10 +244,10 @@ function showNewOrder() {
 
         <div class="card">
             <label>Дом (номер дома) *</label>
-            <input id="house" placeholder="Например: 15А" autocomplete="off">
+            <input id="house" name="remont_address_house_entry" placeholder="Например: 15А" autocomplete="new-password" autocorrect="off" spellcheck="false" data-form-type="other" readonly onpointerdown="this.removeAttribute('readonly')" onkeydown="this.removeAttribute('readonly')">
 
             <label>Квартира (необязательно)</label>
-            <input id="apartment" placeholder="Например: 42" autocomplete="off">
+            <input id="apartment" name="remont_address_apartment_entry" placeholder="Например: 42" autocomplete="new-password" autocorrect="off" spellcheck="false" data-form-type="other" readonly onpointerdown="this.removeAttribute('readonly')" onkeydown="this.removeAttribute('readonly')">
 
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
@@ -268,18 +267,21 @@ function showNewOrder() {
     `;
 
     try {
-        document.getElementById('house').value =
-            localStorage.getItem('remont_bt_house') || '';
+        document.getElementById('house').value = isNewClientFlow
+            ? '' : (localStorage.getItem('remont_bt_house') || '');
 
-        document.getElementById('apartment').value =
-            localStorage.getItem('remont_bt_apartment') || '';
+        document.getElementById('apartment').value = isNewClientFlow
+            ? '' : (localStorage.getItem('remont_bt_apartment') || '');
 
-        const savedName =
-            localStorage.getItem('remont_bt_name') ||
-            (tg.initDataUnsafe?.user?.first_name || '');
+        const hasNewClientIdentity = isNewClientFlow &&
+            localStorage.getItem('remont_bt_identity_saved') === '1';
+        const savedName = isNewClientFlow
+            ? (hasNewClientIdentity ? (localStorage.getItem('remont_bt_name') || '') : '')
+            : (localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || ''));
 
-        const savedPhone =
-            localStorage.getItem('remont_bt_phone') || '';
+        const savedPhone = isNewClientFlow
+            ? (hasNewClientIdentity ? (localStorage.getItem('remont_bt_phone') || '') : '')
+            : (localStorage.getItem('remont_bt_phone') || '');
 
         document.getElementById('client_name').value = savedName;
         document.getElementById('client_phone').value =
@@ -308,12 +310,10 @@ function showNewOrder() {
             }
         );
 
+        // Не скрываем карточку с ФИО и телефоном: новый клиент должен
+        // видеть и иметь возможность изменить эти поля прямо в форме заявки.
         document.getElementById('clientIdentityCard')
-            .style.setProperty(
-                'display',
-                isNewClientFlow ? 'none' : 'block',
-                'important'
-            );
+            .style.setProperty('display', 'block', 'important');
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
@@ -340,6 +340,7 @@ function submitRegistration() {
     try {
         localStorage.setItem('remont_bt_name', name);
         localStorage.setItem('remont_bt_phone', phone);
+        if (isNewClientFlow) localStorage.setItem('remont_bt_identity_saved', '1');
     } catch (e) {
         console.warn('Не удалось сохранить данные клиента:', e);
     }

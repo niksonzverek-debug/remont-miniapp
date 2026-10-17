@@ -13,28 +13,25 @@
 
             if (isNewClient) {
                 try {
-                    // Удаляем только данные Remont BT.
+                    // Удаляем только поля автозаполнения, которые могли принадлежать
+                    // предыдущему тестовому клиенту. Очередь офлайн-записей, язык,
+                    // локальный ID регистрации и остальные данные не трогаем.
+                    const staleFormKeys = [
+                        'remont_bt_name', 'remont_bt_phone', 'remont_bt_house',
+                        'remont_bt_apartment', 'remont_bt_identity_saved'
+                    ];
                     for (const storage of [localStorage, sessionStorage]) {
-                        const keys = [];
-
-                        for (let i = 0; i < storage.length; i++) {
-                            const key = storage.key(i);
-                            if (key && key.startsWith('remont_bt_')) {
-                                keys.push(key);
-                            }
-                        }
-
-                        keys.forEach(key => storage.removeItem(key));
+                        staleFormKeys.forEach(key => storage.removeItem(key));
                     }
 
-                    console.log('Remont BT: локальные данные очищены');
+                    console.log('Remont BT: очищены только старые поля формы');
                 } catch (e) {
                     console.error('Ошибка очистки локальных данных:', e);
                 }
             }
         })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261016d">
+    <link rel="stylesheet" href="css/style.css?v=20261017b">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
@@ -43,8 +40,8 @@
         window.WEBAPP_SENDDATA_SUPPORTED = params.get('launch') === 'keyboard';
 
         document.write(
-            '<script src="js/common.js?v=20261016d"><\/script>' +
-            '<script src="js/client.js?v=20261016d"><\/script>'
+            '<script src="js/common.js?v=20261017b"><\/script>' +
+            '<script src="js/client.js?v=20261017b"><\/script>'
         );
     </script>
 </body>
