@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Панель ремонта</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link rel="stylesheet" href="css/style.css?v=20261017masterfix1">
+    <link rel="stylesheet" href="css/style.css?v=20261017masterorder2">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
@@ -16,8 +16,8 @@
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/advertiser-config.js?v=20261017masterfix1"></script>
-    <script src="js/common.js?v=20261017masterfix1"></script>
+    <script src="js/advertiser-config.js?v=20261017masterorder2"></script>
+    <script src="js/common.js?v=20261017masterorder2"></script>
     <script>
         const MASTER_ID = 450540408;
         const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
@@ -25,7 +25,7 @@
         const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
             ? null : Number(rawUserId);
 
-        console.log('Mini App build 20261017masterfix1', {rawUserId, userId, roleFromUrl, launchMode});
+        console.log('Mini App build 20261017masterorder2', {rawUserId, userId, roleFromUrl, launchMode});
 
         // Telegram sendData is available only from a reply-keyboard WebApp button.
         let role = null;
@@ -36,7 +36,7 @@
             document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт</h2><p>Откройте приложение из Telegram. Вне Telegram отправка данных боту недоступна.</p></main>`;
         } else {
             const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261017masterfix1' : 'js/client.js?v=20261017masterfix1';
+            script.src = role === 'master' ? 'js/master.js?v=20261017masterorder2' : 'js/client.js?v=20261017masterorder2';
             script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
             document.body.appendChild(script);
         }
