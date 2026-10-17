@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://naval-tables-contributions-achieving.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://marathon-holdem-measuring-burner.trycloudflare.com";
