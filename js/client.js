@@ -18,26 +18,6 @@ let orderData = {
 
 const clientUrlParams = new URLSearchParams(location.search);
 const isNewClientFlow = clientUrlParams.get("new_client") === "1";
-// localStorage is shared by WebViews on the same origin. Do not reuse a previous
-// Telegram account's identity/autofill when another account opens the client app.
-try {
-    const currentTelegramUserId = String(tg.initDataUnsafe?.user?.id || '');
-    const ownerKey = 'remont_bt_client_storage_owner';
-    const previousOwner = localStorage.getItem(ownerKey) || '';
-    if (currentTelegramUserId) {
-        if (previousOwner && previousOwner !== currentTelegramUserId) {
-            [
-                'remont_bt_name', 'remont_bt_phone', 'remont_bt_house',
-                'remont_bt_apartment', 'remont_bt_identity_saved', 'remont_bt_registered'
-            ].forEach(key => localStorage.removeItem(key));
-            [
-                'remont_bt_name', 'remont_bt_phone', 'remont_bt_house',
-                'remont_bt_apartment', 'remont_bt_identity_saved', 'remont_bt_registered'
-            ].forEach(key => sessionStorage.removeItem(key));
-        }
-        localStorage.setItem(ownerKey, currentTelegramUserId);
-    }
-} catch (_) {}
 // Регистрационный номер в ссылке добавляет бот только для уже зарегистрированного клиента.
 const hasJustRegisteredLocally = isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1';
 const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow && (
@@ -60,6 +40,7 @@ function renderClientMenu() {
           <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
           <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
           <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
+          ${isKnownRegisteredClient ? '<button class="menu-btn" onclick="requestMasterRole()"><span class="emoji">🧑‍🔧</span> Стать мастером</button>' : ''}
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
@@ -69,6 +50,12 @@ function renderClientMenu() {
         const node = document.getElementById('clientWelcomeName');
         if (node && name) node.textContent = name;
     }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
+}
+
+function requestMasterRole() {
+    if (!isKnownRegisteredClient) return showAlert('Сначала сохраните ФИО и номер телефона в профиле.');
+    const ok = sendEvent('request_master', {});
+    if (!ok) showAlert('Не удалось отправить запрос. Откройте приложение кнопкой из чата с ботом и повторите.');
 }
 
 async function clientApi(path, method='GET', body=null) {
