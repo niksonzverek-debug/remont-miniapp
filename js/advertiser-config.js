@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://alexandria-relate-alive-receivers.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://painting-recognized-unsigned-publishers.trycloudflare.com";
