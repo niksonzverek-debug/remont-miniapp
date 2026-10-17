@@ -33,6 +33,9 @@ function renderClientMenu() {
         <button class="menu-btn" onclick="showNewOrder()">
             <span class="emoji">📝</span> Создать заявку
         </button>
+        <button class="menu-btn" onclick="showMyOrders()">
+            <span class="emoji">📋</span> Мои заявки и статусы
+        </button>
         <button class="menu-btn" onclick="showMyActs()">
             <span class="emoji">📄</span> Мои акты
         </button>
@@ -557,6 +560,15 @@ function submitOrder() {
 
 // ============ МОИ АКТЫ ============
 
+function showMyOrders() {
+    sendEvent('get_my_orders');
+    document.body.innerHTML = `
+        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
+        <h1>📋 Мои заявки</h1>
+        <div class="empty">Список и актуальные статусы отправлены в чат бота 📩</div>
+    `;
+}
+
 function showMyActs() {
     sendEvent('get_my_acts');
 
@@ -606,13 +618,63 @@ function submitPromo() {
 // ============ ПРОФИЛЬ ============
 
 function showProfile() {
-    sendEvent('get_profile');
-
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>👤 Мой профиль</h1>
-        <div class="empty">Профиль придёт в чат бота 📩</div>
+        <h1>👤 Настройки профиля</h1>
+        <p class="subtitle">Изменения проверяются и сохраняются в вашей карточке клиента.</p>
+        <div class="card">
+            <button class="menu-btn" onclick="showProfileEdit('name')"><span class="emoji">👤</span>Изменить имя / ФИО</button>
+            <button class="menu-btn" onclick="showProfileEdit('phone')"><span class="emoji">📞</span>Изменить номер телефона</button>
+            <button class="menu-btn" onclick="showProfileEdit('identity')"><span class="emoji">🪪</span>Изменить пол, дату рождения и ПИНФЛ</button>
+        </div>
+        <p class="subtitle">Если есть активная рассрочка, редактирование будет заблокировано до полного погашения.</p>
+        <button class="menu-btn" onclick="sendEvent('get_profile')"><span class="emoji">📋</span>Показать текущие данные в чате</button>
     `;
+}
+
+function showProfileEdit(field) {
+    const back = `<button class="back-btn" onclick="showProfile()">← Назад к профилю</button>`;
+    if (field === 'name') {
+        document.body.innerHTML = `${back}<h1>👤 Изменить имя</h1><div class="card"><label>Новое имя / ФИО</label><input id="profileValue" maxlength="150" autocomplete="off" placeholder="Введите ФИО"></div><button id="submit" onclick="submitProfileEdit('name')">Сохранить</button>`;
+        return;
+    }
+    if (field === 'phone') {
+        document.body.innerHTML = `${back}<h1>📞 Изменить телефон</h1><div class="card"><label>Новый номер телефона</label><input id="profileValue" type="tel" inputmode="tel" autocomplete="off" placeholder="+998 90 123 45 67"></div><button id="submit" onclick="submitProfileEdit('phone')">Сохранить</button>`;
+        attachPhoneMask(document.getElementById('profileValue'));
+        return;
+    }
+    document.body.innerHTML = `${back}<h1>🪪 Личные данные</h1><div class="card"><label>Пол</label><select id="profileGender"><option value="">Выберите пол</option><option value="M">Мужской</option><option value="F">Женский</option></select><label>Дата рождения</label><input id="profileBirth" placeholder="ДД.ММ.ГГГГ" inputmode="numeric" autocomplete="off"><label>ПИНФЛ (14 цифр)</label><input id="profilePinfl" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="Введите ПИНФЛ"></div><button id="submit" onclick="submitProfileEdit('identity')">Сохранить</button>`;
+}
+
+function submitProfileEdit(field) {
+    if (field === 'name' || field === 'phone') {
+        const value = document.getElementById('profileValue').value.trim();
+        if (field === 'name' && value.length < 2) return showAlert('Введите имя / ФИО');
+        if (field === 'phone' && !validPhone(cleanPhone(value))) return showAlert('Введите номер +998XXXXXXXXX');
+        sendProfileUpdate({ field, value });
+        return;
+    }
+    const gender = document.getElementById('profileGender').value;
+    const birth_date = document.getElementById('profileBirth').value.trim();
+    const pinfl = document.getElementById('profilePinfl').value.replace(/\D/g, '');
+    if (!gender) return showAlert('Выберите пол');
+    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(birth_date)) return showAlert('Введите дату в формате ДД.ММ.ГГГГ');
+    if (!/^\d{14}$/.test(pinfl)) return showAlert('ПИНФЛ должен содержать 14 цифр');
+    sendProfileUpdate({ field: 'identity', gender, birth_date, pinfl });
+}
+
+// Персональные данные не помещаем в локальную офлайн-очередь браузера.
+function sendProfileUpdate(payload) {
+    if (!isKeyboardLaunch) {
+        return showAlert('Для безопасного изменения профиля откройте кабинет кнопкой из чата с ботом.');
+    }
+    try {
+        tg.sendData(JSON.stringify({ event: 'update_profile', ...payload }));
+        setTimeout(() => { try { tg.close(); } catch (_) {} }, 250);
+    } catch (e) {
+        console.error('profile update send error:', e);
+        showAlert('Не удалось отправить изменения. Откройте кабинет через кнопку в чате и повторите.');
+    }
 }
 
 // ============ ПОЗВОНИТЬ ============

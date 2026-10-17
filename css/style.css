@@ -1,15 +1,18 @@
 /* miniapp/css/style.css */
 :root {
-  --bg: var(--tg-theme-bg-color, #ffffff);
-  --text: var(--tg-theme-text-color, #000000);
-  --hint: var(--tg-theme-hint-color, #999999);
-  --link: var(--tg-theme-link-color, #2481cc);
-  --button: var(--tg-theme-button-color, #2481cc);
-  --button_text: var(--tg-theme-button-text-color, #ffffff);
-  --secondary_bg: var(--tg-theme-secondary-bg-color, #f0f0f0);
-  --card_bg: var(--tg-theme-secondary-bg-color, #f7f7f7);
-  --danger: #e53935;
-  --success: #43a047;
+  --bg: #f3f5f9;
+  --text: #172033;
+  --hint: #687386;
+  --link: #d97719;
+  --button: #ee861f;
+  --button_text: #ffffff;
+  --secondary_bg: #e9edf4;
+  --card_bg: #ffffff;
+  --danger: #bd3434;
+  --success: #247747;
+  --navy: #172033;
+  --line: #e4e8ef;
+  color-scheme: light;
 }
 
 * {
@@ -21,18 +24,20 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg);
+  background: radial-gradient(ellipse at top, #ffffff 0%, var(--bg) 68%);
   color: var(--text);
-  padding: 16px;
+  padding: 18px;
   padding-bottom: 100px;
   font-size: 16px;
   line-height: 1.4;
 }
 
 h1 {
-  font-size: 22px;
-  margin-bottom: 4px;
-  font-weight: 700;
+  font-size: 24px;
+  letter-spacing: -0.45px;
+  margin-bottom: 6px;
+  font-weight: 800;
+  color: var(--navy);
 }
 
 h2 {
@@ -49,9 +54,11 @@ h2 {
 
 .card {
   background: var(--card_bg);
-  border-radius: 12px;
-  padding: 16px;
-  margin-bottom: 12px;
+  border: 1px solid rgba(23, 32, 51, 0.055);
+  border-radius: 18px;
+  padding: 18px;
+  margin-bottom: 14px;
+  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.055);
 }
 
 label {
@@ -70,8 +77,8 @@ input, select, textarea {
   width: 100%;
   padding: 12px;
   font-size: 16px;
-  border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 10px;
+  border: 1px solid #dfe4ec;
+  border-radius: 12px;
   background: var(--bg);
   color: var(--text);
   font-family: inherit;
@@ -82,6 +89,7 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   outline: none;
   border-color: var(--button);
+  box-shadow: 0 0 0 3px rgba(238, 134, 31, 0.12);
 }
 
 textarea {
@@ -144,10 +152,10 @@ select {
   padding: 16px;
   font-size: 17px;
   font-weight: 600;
-  background: var(--button);
+  background: linear-gradient(135deg, #f29a37, #e87916);
   color: var(--button_text);
   border: none;
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
@@ -165,16 +173,18 @@ select {
   font-weight: 500;
   background: var(--card_bg);
   color: var(--text);
-  border: none;
-  border-radius: 12px;
-  margin-bottom: 10px;
+  border: 1px solid rgba(23, 32, 51, 0.06);
+  border-radius: 16px;
+  margin-bottom: 11px;
+  box-shadow: 0 5px 18px rgba(23, 32, 51, 0.045);
   text-align: left;
   cursor: pointer;
-  transition: transform 0.1s;
+  transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 .menu-btn:active {
-  transform: scale(0.98);
+  transform: translateY(1px) scale(0.99);
+  box-shadow: 0 2px 8px rgba(23, 32, 51, 0.04);
 }
 
 .menu-btn .emoji {
@@ -187,7 +197,7 @@ select {
   display: flex;
   justify-content: space-between;
   padding: 10px 0;
-  border-bottom: 1px solid rgba(0,0,0,0.06);
+  border-bottom: 1px solid var(--line);
   font-size: 15px;
 }
 
@@ -236,10 +246,11 @@ select {
 }
 
 .total-box {
-  background: linear-gradient(135deg, var(--button), #1a6bb0);
+  background: linear-gradient(135deg, #172033, #283955);
   color: white;
-  padding: 20px;
-  border-radius: 12px;
+  padding: 22px;
+  border-radius: 18px;
+  box-shadow: 0 12px 28px rgba(23, 32, 51, 0.16);
   margin-bottom: 16px;
 }
 
@@ -263,3 +274,10 @@ select {
   cursor: pointer;
   margin-bottom: 10px;
 }
+/* Premium mobile-first layout refinements */
+button { font-family: inherit; }
+.subtitle { line-height: 1.55; }
+.card label { color: #46536a; }
+.back-btn { font-weight: 650; }
+.badge { letter-spacing: .1px; }
+@media (max-width: 380px) { body { padding: 14px; } h1 { font-size: 22px; } .card { padding: 15px; } }
