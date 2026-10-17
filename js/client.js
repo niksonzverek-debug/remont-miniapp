@@ -1,4 +1,3 @@
-```javascript
 // miniapp/js/client.js
 
 // ============ СОСТОЯНИЕ ============
@@ -627,4 +626,3 @@ if (isNewClientFlow) {
 } else {
     showNewOrder();
 }
-```
