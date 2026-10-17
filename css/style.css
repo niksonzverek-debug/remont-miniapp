@@ -281,3 +281,14 @@ button { font-family: inherit; }
 .back-btn { font-weight: 650; }
 .badge { letter-spacing: .1px; }
 @media (max-width: 380px) { body { padding: 14px; } h1 { font-size: 22px; } .card { padding: 15px; } }
+
+
+/* Remont BT client/advertiser WebApp navigation — 2026-10-17 */
+.portal-head{background:linear-gradient(135deg,#14213d,#243b65);color:#fff;padding:20px;border-radius:20px;margin:8px 0 18px}
+.portal-head h1{margin:0 0 6px;color:#fff}
+.portal-head p{margin:0;color:#e5eaf4}
+.client-home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:14px 0}
+.client-home-grid .menu-btn{min-height:88px;text-align:left;padding:16px;background:#fff;border:1px solid #dfe5ef;border-radius:16px;color:#17233d;box-shadow:0 4px 14px #14213d0b}
+.client-home-grid .menu-btn .emoji{display:block;font-size:24px;margin-bottom:8px}
+.subtitle{color:#68738a;line-height:1.5}
+@media(max-width:420px){.client-home-grid{grid-template-columns:1fr 1fr}.client-home-grid .menu-btn{padding:13px;min-height:82px}}

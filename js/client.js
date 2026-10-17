@@ -27,29 +27,122 @@ const isKnownRegisteredClient = !isNewClientFlow && (
 
 function renderClientMenu() {
     document.body.innerHTML = `
-        <h1>👤 Личный кабинет</h1>
+        <header class="portal-head"><h1>Remont BT</h1><p>Ваш ремонт — под контролем</p></header>
+        <h2>👋 Личный кабинет</h2>
         <p class="subtitle">Здравствуйте, ${tg.initDataUnsafe?.user?.first_name || 'друг'}!</p>
-
-        <button class="menu-btn" onclick="showNewOrder()">
-            <span class="emoji">📝</span> Создать заявку
-        </button>
-        <button class="menu-btn" onclick="showMyOrders()">
-            <span class="emoji">📋</span> Мои заявки и статусы
-        </button>
-        <button class="menu-btn" onclick="showMyActs()">
-            <span class="emoji">📄</span> Мои акты
-        </button>
-        <button class="menu-btn" onclick="showEnterPromo()">
-            <span class="emoji">🎟️</span> Ввести промокод
-        </button>
-        <button class="menu-btn" onclick="showProfile()">
-            <span class="emoji">👤</span> Мой профиль
-        </button>
-        <button class="menu-btn" onclick="showCallMaster()">
-            <span class="emoji">📞</span> Позвонить мастеру
-        </button>
+        <div class="client-home-grid">
+          <button class="menu-btn" onclick="showNewOrder()"><span class="emoji">📝</span> Создать заявку</button>
+          <button class="menu-btn" onclick="showMyOrders()"><span class="emoji">📋</span> Мои заявки и статусы</button>
+          <button class="menu-btn" onclick="showMyActs()"><span class="emoji">📄</span> Акты и документы</button>
+          <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
+          <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
+          <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
+        </div>
+        <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
 }
+
+async function clientApi(path, method='GET', body=null) {
+    const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/, '');
+    if (!base) throw new Error('API временно недоступен. Откройте приложение позже.');
+    const res = await fetch(base + path, {
+        method,
+        headers: {'Content-Type':'application/json', 'X-Telegram-Init-Data': tg.initData || ''},
+        body: body ? JSON.stringify(body) : undefined,
+        cache: 'no-store'
+    });
+    let data = {};
+    try { data = await res.json(); } catch (_) {}
+    if (!res.ok) throw new Error(data.error || `Ошибка запроса (${res.status})`);
+    return data;
+}
+
+function setPage(title, body) {
+    document.body.innerHTML = `<button class="back-btn" onclick="renderClientMenu()">← Главная</button><h1>${title}</h1>${body}`;
+}
+
+async function showMyOrders() {
+    setPage('📋 Мои заявки', '<p class="subtitle">Загружаем ваши заявки…</p>');
+    try {
+        const d = await clientApi('/api/client/dashboard');
+        const rows = d.orders || [];
+        const status = {new:'Новая — ждёт мастера', accepted:'Мастер принял', in_progress:'В работе', act_issued:'Акт выдан — ожидает подтверждения', act_pending:'Ожидает подтверждения акта', completed:'Завершена', closed:'Завершена', cancelled:'Отменена'};
+        const content = rows.length ? rows.map(o => `<article class="card"><b>${escapeClient(o.id || 'Заявка')}</b><p>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' '))}</p><p>${escapeClient(o.problem || '')}</p><p><b>Статус:</b> ${escapeClient(status[o.status] || o.status || 'На обработке')}</p><p class="subtitle">${escapeClient(o.created_at || '')}</p>${o.promocode ? `<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>` : ''}${o.status === 'act_issued' ? `<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button><p class="subtitle">Если не подтвердить, акт автоматически подтвердится через 5 минут после выдачи.</p>` : ''}</article>`).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
+        setPage('📋 Мои заявки', content);
+    } catch (e) { setPage('📋 Мои заявки', `<div class="card error">${escapeClient(e.message)}</div>`); }
+}
+
+
+async function confirmClientAct(orderId) {
+    if (tg && typeof tg.showConfirm === 'function') {
+        tg.showConfirm('Подтверждаете, что работы выполнены?', async yes => {
+            if (yes) await confirmClientActRequest(orderId);
+        });
+        return;
+    }
+    if (confirm('Подтверждаете, что работы выполнены?')) await confirmClientActRequest(orderId);
+}
+async function confirmClientActRequest(orderId) {
+    try {
+        const r = await clientApi('/api/client/confirm-act', 'POST', {order_id: orderId});
+        if (tg && typeof tg.showAlert === 'function') tg.showAlert(r.message || 'Заявка закрыта.');
+        await showMyOrders();
+    } catch (e) { showAlert(e.message); }
+}
+
+async function showMyActs() {
+    setPage('📄 Акты и документы', '<p class="subtitle">Загружаем документы…</p>');
+    try {
+        const d = await clientApi('/api/client/dashboard');
+        const rows = d.acts || [];
+        const content = rows.length ? rows.map(a => `<article class="card"><b>Акт ${escapeClient(a.number || '—')}</b><p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p>Стоимость: ${escapeClient(String(a.final_price ?? a.price ?? '—'))} сум</p><p>Гарантия: ${escapeClient(a.guarantee_text || '—')} · до ${escapeClient(a.guarantee_until || '—')}</p><p>Статус: ${escapeClient(a.status || '—')}</p></article>`).join('') : '<div class="card">Актов пока нет.</div>';
+        setPage('📄 Акты и документы', content);
+    } catch (e) { setPage('📄 Акты и документы', `<div class="card error">${escapeClient(e.message)}</div>`); }
+}
+
+function showEnterPromo() {
+    setPage('🎟️ Промокод', '<div class="card"><label>Введите промокод</label><input id="promo_code" placeholder="REMONT10" maxlength="64" autocapitalize="characters"><button id="promoSubmit" onclick="submitPromoFromApp()">Активировать</button><p id="promoStatus" class="subtitle"></p></div>');
+}
+async function submitPromoFromApp() {
+    const code = (document.getElementById('promo_code')?.value || '').trim().toUpperCase();
+    const status = document.getElementById('promoStatus');
+    if (!code) { status.textContent = 'Введите промокод.'; return; }
+    try { const r = await clientApi('/api/client/promo', 'POST', {code}); status.textContent = r.message || 'Промокод активирован.'; status.className = 'notice'; }
+    catch (e) { status.textContent = e.message; status.className = 'error'; }
+}
+
+async function showProfile() {
+    setPage('👤 Профиль', '<p class="subtitle">Загружаем профиль…</p>');
+    try {
+        const d = await clientApi('/api/client/profile'); const p = d.profile || {};
+        setPage('👤 Профиль', `<form id="profileForm" class="card"><label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
+        document.getElementById('profileForm').addEventListener('submit', saveClientProfile);
+    } catch (e) { setPage('👤 Профиль', `<div class="card error">${escapeClient(e.message)}</div>`); }
+}
+async function saveClientProfile(event) {
+    event.preventDefault(); const f = new FormData(event.currentTarget); const status = document.getElementById('profileStatus');
+    const data = Object.fromEntries(f.entries());
+    try { const r = await clientApi('/api/client/profile', 'POST', data); status.textContent = r.message || 'Профиль сохранён.'; status.className = 'notice'; }
+    catch (e) { status.textContent = e.message; status.className = 'error'; }
+}
+
+async function showMessages() {
+    setPage('💬 Написать мастеру', '<p class="subtitle">Загружаем переписку…</p>');
+    let history = '';
+    try {
+        const d = await clientApi('/api/client/dashboard');
+        const rows = d.messages || [];
+        history = rows.length ? rows.map(m => `<article class="card"><p><b>${String(m.from_id) === String(tg.initDataUnsafe?.user?.id) ? 'Вы' : 'Мастер'}</b> <span class="subtitle">${escapeClient(m.created_at || '')}</span></p><p>${escapeClient(m.text || (m.type === 'photo' ? 'Фото' : m.type === 'video' ? 'Видео' : 'Сообщение'))}</p></article>`).join('') : '<div class="card">Сообщений пока нет.</div>';
+    } catch (e) { history = `<div class="card error">${escapeClient(e.message)}</div>`; }
+    setPage('💬 Написать мастеру', `${history}<div class="card"><p>Напишите мастеру по вашей заявке.</p><textarea id="masterMessage" maxlength="1500" placeholder="Ваше сообщение"></textarea><button onclick="sendClientMessage()">Отправить сообщение</button><p id="messageStatus" class="subtitle"></p></div>`);
+}
+async function sendClientMessage() {
+    const field = document.getElementById('masterMessage'); const status = document.getElementById('messageStatus');
+    try { const r = await clientApi('/api/client/message', 'POST', {text:field.value}); status.textContent = r.message || 'Сообщение отправлено.'; status.className='notice'; field.value=''; }
+    catch (e) { status.textContent = e.message; status.className='error'; }
+}
+function escapeClient(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
 
 // ============ ФОРМАТИРОВАНИЕ ТЕЛЕФОНА ============
 
@@ -272,6 +365,12 @@ function showNewOrder() {
             <textarea id="comment" placeholder="Любая дополнительная информация" maxlength="300"></textarea>
         </div>
 
+        <div class="card">
+            <label>Промокод (если есть, необязательно)</label>
+            <input id="order_promo_code" placeholder="Например, REMONT10" maxlength="64" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase">
+            <p class="subtitle">Если промокод действующий, он будет проверен при отправке заявки.</p>
+        </div>
+
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
     `;
 
@@ -491,6 +590,7 @@ function submitOrder() {
 
     const client_name = (nameInput ? nameInput.value : '').trim();
     const client_phone = cleanPhone(phoneInput ? phoneInput.value : '');
+    const order_promo_code = (document.getElementById('order_promo_code')?.value || '').trim().toUpperCase();
 
     if (!isKnownRegisteredClient) {
         if (client_name.length < 2) return showAlert('Введите имя клиента');
@@ -538,6 +638,7 @@ function submitOrder() {
         house: house,
         apartment: apartment,
         comment: comment,
+        promo_code: order_promo_code,
         location: orderData.location || null,
     };
 
@@ -558,141 +659,23 @@ function submitOrder() {
     }
 }
 
-// ============ МОИ АКТЫ ============
-
-function showMyOrders() {
-    sendEvent('get_my_orders');
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>📋 Мои заявки</h1>
-        <div class="empty">Список и актуальные статусы отправлены в чат бота 📩</div>
-    `;
-}
-
-function showMyActs() {
-    sendEvent('get_my_acts');
-
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>📄 Мои акты</h1>
-        <div class="empty">Список актов придёт в чат бота 📩</div>
-    `;
-}
-
-// ============ ВВОД ПРОМОКОДА ============
-
-function showEnterPromo() {
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>🎟️ Ввести промокод</h1>
-
-        <div class="card">
-            <label>Промокод</label>
-            <input
-                id="promo_code"
-                placeholder="BLOGER10"
-                autocapitalize="characters"
-                style="text-transform:uppercase;font-size:20px;text-align:center;letter-spacing:2px;"
-            >
-        </div>
-
-        <button id="submit" onclick="submitPromo()">✅ Активировать</button>
-    `;
-
-    document.getElementById('promo_code').focus();
-}
-
-function submitPromo() {
-    const code = document.getElementById('promo_code').value.trim().toUpperCase();
-
-    if (!code || code.length < 4) {
-        return showAlert('Введите промокод');
-    }
-
-    sendToBot({
-        event: 'enter_promo',
-        code: code
-    });
-}
-
-// ============ ПРОФИЛЬ ============
-
-function showProfile() {
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>👤 Настройки профиля</h1>
-        <p class="subtitle">Изменения проверяются и сохраняются в вашей карточке клиента.</p>
-        <div class="card">
-            <button class="menu-btn" onclick="showProfileEdit('name')"><span class="emoji">👤</span>Изменить имя / ФИО</button>
-            <button class="menu-btn" onclick="showProfileEdit('phone')"><span class="emoji">📞</span>Изменить номер телефона</button>
-            <button class="menu-btn" onclick="showProfileEdit('identity')"><span class="emoji">🪪</span>Изменить пол, дату рождения и ПИНФЛ</button>
-        </div>
-        <p class="subtitle">Если есть активная рассрочка, редактирование будет заблокировано до полного погашения.</p>
-        <button class="menu-btn" onclick="sendEvent('get_profile')"><span class="emoji">📋</span>Показать текущие данные в чате</button>
-    `;
-}
-
-function showProfileEdit(field) {
-    const back = `<button class="back-btn" onclick="showProfile()">← Назад к профилю</button>`;
-    if (field === 'name') {
-        document.body.innerHTML = `${back}<h1>👤 Изменить имя</h1><div class="card"><label>Новое имя / ФИО</label><input id="profileValue" maxlength="150" autocomplete="off" placeholder="Введите ФИО"></div><button id="submit" onclick="submitProfileEdit('name')">Сохранить</button>`;
-        return;
-    }
-    if (field === 'phone') {
-        document.body.innerHTML = `${back}<h1>📞 Изменить телефон</h1><div class="card"><label>Новый номер телефона</label><input id="profileValue" type="tel" inputmode="tel" autocomplete="off" placeholder="+998 90 123 45 67"></div><button id="submit" onclick="submitProfileEdit('phone')">Сохранить</button>`;
-        attachPhoneMask(document.getElementById('profileValue'));
-        return;
-    }
-    document.body.innerHTML = `${back}<h1>🪪 Личные данные</h1><div class="card"><label>Пол</label><select id="profileGender"><option value="">Выберите пол</option><option value="M">Мужской</option><option value="F">Женский</option></select><label>Дата рождения</label><input id="profileBirth" placeholder="ДД.ММ.ГГГГ" inputmode="numeric" autocomplete="off"><label>ПИНФЛ (14 цифр)</label><input id="profilePinfl" inputmode="numeric" maxlength="14" autocomplete="off" placeholder="Введите ПИНФЛ"></div><button id="submit" onclick="submitProfileEdit('identity')">Сохранить</button>`;
-}
-
-function submitProfileEdit(field) {
-    if (field === 'name' || field === 'phone') {
-        const value = document.getElementById('profileValue').value.trim();
-        if (field === 'name' && value.length < 2) return showAlert('Введите имя / ФИО');
-        if (field === 'phone' && !validPhone(cleanPhone(value))) return showAlert('Введите номер +998XXXXXXXXX');
-        sendProfileUpdate({ field, value });
-        return;
-    }
-    const gender = document.getElementById('profileGender').value;
-    const birth_date = document.getElementById('profileBirth').value.trim();
-    const pinfl = document.getElementById('profilePinfl').value.replace(/\D/g, '');
-    if (!gender) return showAlert('Выберите пол');
-    if (!/^\d{2}\.\d{2}\.\d{4}$/.test(birth_date)) return showAlert('Введите дату в формате ДД.ММ.ГГГГ');
-    if (!/^\d{14}$/.test(pinfl)) return showAlert('ПИНФЛ должен содержать 14 цифр');
-    sendProfileUpdate({ field: 'identity', gender, birth_date, pinfl });
-}
-
-// Персональные данные не помещаем в локальную офлайн-очередь браузера.
-function sendProfileUpdate(payload) {
-    if (!isKeyboardLaunch) {
-        return showAlert('Для безопасного изменения профиля откройте кабинет кнопкой из чата с ботом.');
-    }
-    try {
-        tg.sendData(JSON.stringify({ event: 'update_profile', ...payload }));
-        setTimeout(() => { try { tg.close(); } catch (_) {} }, 250);
-    } catch (e) {
-        console.error('profile update send error:', e);
-        showAlert('Не удалось отправить изменения. Откройте кабинет через кнопку в чате и повторите.');
-    }
-}
-
 // ============ ПОЗВОНИТЬ ============
 
-function showCallMaster() {
-    sendEvent('get_master_phone');
-
-    document.body.innerHTML = `
-        <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
-        <h1>📞 Позвонить мастеру</h1>
-        <div class="empty">Номер мастера придёт в чат бота 📩</div>
-    `;
+async function showCallMaster() {
+    setPage('📞 Контакты мастера', '<p class="subtitle">Загружаем контакты…</p>');
+    try {
+        const d = await clientApi('/api/client/dashboard');
+        const phone = String(d.master?.phone || '').trim();
+        setPage('📞 Контакты мастера', phone ? `<div class="card"><p>${escapeClient(d.master?.name || 'Ваш мастер')}</p><a class="menu-btn" href="tel:${escapeClient(phone)}">Позвонить: ${escapeClient(phone)}</a></div>` : '<div class="card">Номер мастера пока не указан. Напишите мастеру через раздел сообщений.</div>');
+    } catch (e) { setPage('📞 Контакты мастера', `<div class="card error">${escapeClient(e.message)}</div>`); }
 }
 
 // ============ СТАРТ ============
 
 if (isNewClientFlow) {
     showRegistrationScreen();
+} else if (isKnownRegisteredClient) {
+    renderClientMenu();
 } else {
     showNewOrder();
 }
