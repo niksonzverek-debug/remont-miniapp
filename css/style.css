@@ -301,3 +301,38 @@ button { font-family: inherit; }
 .portal-head h1 { color: #eef3ff; }
 button, .menu-btn { transition: filter .15s ease, transform .15s ease; }
 button:active { filter: brightness(1.12); }
+
+
+/* Remont BT client premium navy theme — final overrides */
+html, body { background: #0b1020 !important; color: #eef3ff !important; color-scheme: dark; }
+body { background-image: radial-gradient(ellipse at 75% -10%, #1a3157 0, transparent 42%) !important; }
+.portal-head { background: linear-gradient(135deg, #14213d, #243b65) !important; color: #fff !important; border: 1px solid #33445f; }
+.portal-head h1, .portal-head p { color: #fff !important; }
+.client-home-grid .menu-btn, .menu-btn { background: linear-gradient(145deg, #172742, #121a2d) !important; color: #eef3ff !important; border: 1px solid #33445f !important; box-shadow: 0 8px 22px #0005 !important; }
+.card, .section, .metric { background: #121a2d !important; color: #eef3ff !important; border-color: #26334b !important; }
+.card label, label { color: #dce8ff; }
+input, select, textarea { background-color: #0b1323 !important; color: #eef3ff !important; border-color: #33445f !important; }
+.promo-card { background: linear-gradient(145deg, #172742, #121a2d) !important; border-color: #638ce4 !important; }
+
+
+/* Remont BT Premium dark client theme v4 — intentionally independent of Telegram theme. */
+:root {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --text: #f4f7fb;
+  --hint: #a7b4c8;
+  --link: #7db7ff;
+  --button: #f28b32;
+  --button_text: #101827;
+  --secondary_bg: #121d30;
+  --card_bg: #142137;
+  --danger: #ff6868;
+  --success: #53d69a;
+}
+html, body { min-height: 100%; background: #0b1220 !important; color: #f4f7fb !important; }
+body { background-image: radial-gradient(ellipse at top, #182944 0%, #0b1220 62%) !important; }
+.card, .client-home-grid, .portal-head { background-color: #142137 !important; color: #f4f7fb !important; border: 1px solid #263852; }
+input, select, textarea { background: #0d1728 !important; color: #f4f7fb !important; border: 1px solid #344760 !important; }
+button, .menu-btn { background: #f28b32; color: #101827; border: 0; }
+.back-btn { background: #1a2a42; color: #f4f7fb; border: 1px solid #344760; }
+.subtitle, .hint { color: #a7b4c8 !important; }
