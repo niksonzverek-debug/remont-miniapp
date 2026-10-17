@@ -180,38 +180,7 @@ function applyTheme() {
 }
 applyTheme();
 try { tg.ready(); tg.expand(); tg.onEvent('themeChanged', applyTheme); } catch (_) {}
-// Versioned cache cleanup and forced Service Worker update. User data is not cleared.
-const REMONT_RELEASE = '20261018-audit3';
-const REMONT_CACHE_PREFIX = 'remont-bt-miniapp-';
-const REMONT_CACHE_NAME = `${REMONT_CACHE_PREFIX}${REMONT_RELEASE}`;
-try {
-    if ('caches' in window) {
-        const marker = `remont_bt_cache_cleanup_${REMONT_RELEASE}`;
-        if (localStorage.getItem(marker) !== '1') {
-            caches.keys().then(keys => Promise.all(keys
-                .filter(key => key.startsWith(REMONT_CACHE_PREFIX) && key !== REMONT_CACHE_NAME)
-                .map(key => caches.delete(key))))
-                .then(() => { try { localStorage.setItem(marker, '1'); } catch (_) {} })
-                .catch(() => {});
-        }
-    }
-} catch (_) {}
-try {
-    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-        navigator.serviceWorker.register('./sw.js?v=20261018-audit3', {updateViaCache: 'none'}).then(reg => {
-            reg.update().catch(() => {});
-            if (reg.waiting) reg.waiting.postMessage({type: 'SKIP_WAITING'});
-        }).catch(() => {});
-        navigator.serviceWorker.addEventListener('controllerchange', () => {
-            const marker = `remont_bt_sw_reloaded_${REMONT_RELEASE}`;
-            try {
-                if (sessionStorage.getItem(marker) === '1') return;
-                sessionStorage.setItem(marker, '1');
-                location.reload();
-            } catch (_) {}
-        });
-    }
-} catch (_) {}
+// Service Worker registration is centralized in index.html; errors are logged there.
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', renderOfflineQueueBanner);
 else renderOfflineQueueBanner();
 function fmtPrice(n) { return new Intl.NumberFormat('ru-RU').format(n) + ' сум'; }
