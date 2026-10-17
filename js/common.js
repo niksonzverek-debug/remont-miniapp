@@ -217,3 +217,30 @@ function ensureMiniLanguageButton() {
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensureMiniLanguageButton(); translateMiniDom(); });
 else { ensureMiniLanguageButton(); translateMiniDom(); }
 try { new MutationObserver(() => { ensureMiniLanguageButton(); if (!document.getElementById('offlineQueueBanner')) renderOfflineQueueBanner(); translateMiniDom(); }).observe(document.body, {childList:true,subtree:true}); } catch (_) {}
+
+
+// Remont BT navigation guard: edge-swipe means in-app Back, never close the Mini App.
+(function installRemontBackNavigation(){
+  if (window.__remontBackNavigationInstalled) return;
+  window.__remontBackNavigationInstalled = true;
+  let startX=0,startY=0,tracking=false;
+  const isEditable = el => !!(el && el.closest && el.closest('input,textarea,select,[contenteditable="true"]'));
+  function backInApp(){
+    if (typeof window.remontBackHandler === 'function') { try { window.remontBackHandler(); return; } catch(e) { console.warn('Back handler:',e); } }
+    if (typeof window.showMasterOrders === 'function' && document.querySelector('.master-app')) { window.renderMasterMenu?.(); return; }
+    if (typeof window.renderClientMenu === 'function') { window.renderClientMenu(); return; }
+    if (history.state && history.state.remontInAppPage && history.length > 1) { history.back(); return; }
+    // No previous in-app page: remain here instead of calling Telegram.WebApp.close().
+  }
+  document.addEventListener('touchstart', e=>{const t=e.touches&&e.touches[0]; if(!t)return; startX=t.clientX;startY=t.clientY;tracking=startX<=28&&!isEditable(e.target);},{passive:true});
+  document.addEventListener('touchend', e=>{if(!tracking)return;tracking=false;const t=e.changedTouches&&e.changedTouches[0];if(!t)return;const dx=t.clientX-startX,dy=t.clientY-startY;if(dx>85&&Math.abs(dy)<70)backInApp();},{passive:true});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!isEditable(e.target)){backInApp();}});
+  try {
+    if (window.Telegram?.WebApp?.BackButton) {
+      const bb=window.Telegram.WebApp.BackButton;
+      bb.onClick(backInApp);
+      // Keep Telegram's back affordance visible only when there is an app-level back target.
+      bb.hide();
+    }
+  } catch(_) {}
+})();
