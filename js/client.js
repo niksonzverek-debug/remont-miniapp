@@ -1,5 +1,7 @@
 // miniapp/js/client.js
 
+try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
+
 // ============ СОСТОЯНИЕ ============
 let orderData = {
     device: "",
@@ -17,11 +19,12 @@ let orderData = {
 const clientUrlParams = new URLSearchParams(location.search);
 const isNewClientFlow = clientUrlParams.get("new_client") === "1";
 // Регистрационный номер в ссылке добавляет бот только для уже зарегистрированного клиента.
-const isKnownRegisteredClient = !isNewClientFlow && (
+const hasJustRegisteredLocally = isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1';
+const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow && (
     clientUrlParams.get("registered") === "1" ||
     /^CL-[A-Z0-9-]{6,38}$/.test(clientUrlParams.get("registration_no") || "") ||
     localStorage.getItem("remont_bt_registered") === "1"
-);
+));
 
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
@@ -43,11 +46,15 @@ function renderClientMenu() {
 }
 
 async function clientApi(path, method='GET', body=null) {
+    // Telegram may restore the Mini App after navigation; initialise the SDK before requests.
+    try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
+    const initData = String(window.Telegram?.WebApp?.initData || '');
+    if (!initData) throw new Error('Telegram не передал данные авторизации. Закройте приложение и откройте его кнопкой из чата бота.');
     const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/, '');
     if (!base) throw new Error('API временно недоступен. Откройте приложение позже.');
     const res = await fetch(base + path, {
         method,
-        headers: {'Content-Type':'application/json', 'X-Telegram-Init-Data': tg.initData || ''},
+        headers: {'Content-Type':'application/json', 'X-Telegram-Init-Data': initData},
         body: body ? JSON.stringify(body) : undefined,
         cache: 'no-store'
     });
@@ -365,10 +372,10 @@ function showNewOrder() {
             <textarea id="comment" placeholder="Любая дополнительная информация" maxlength="300"></textarea>
         </div>
 
-        <div class="card">
-            <label>Промокод (если есть, необязательно)</label>
+        <div class="card promo-card" id="orderPromoCard">
+            <label>🎟️ Промокод (необязательно)</label>
             <input id="order_promo_code" placeholder="Например, REMONT10" maxlength="64" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase">
-            <p class="subtitle">Если промокод действующий, он будет проверен при отправке заявки.</p>
+            <p class="subtitle">Есть промокод? Введите его здесь — проверим при отправке первой заявки.</p>
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
@@ -422,7 +429,8 @@ function showNewOrder() {
         // сервер возьмёт их из базы по Telegram user_id. Новая регистрация
         // (new_client=1) всегда показывает поля.
         const identityCard = document.getElementById('clientIdentityCard');
-        identityCard.style.display = isKnownRegisteredClient ? 'none' : 'block';
+        // После успешного шага регистрации ФИО/телефон уже введены; не просим повторно в форме заявки.
+        identityCard.style.display = (isKnownRegisteredClient || (isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1')) ? 'none' : 'block';
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);

@@ -1,18 +1,18 @@
 /* miniapp/css/style.css */
 :root {
-  --bg: #f3f5f9;
-  --text: #172033;
-  --hint: #687386;
-  --link: #d97719;
-  --button: #ee861f;
+  --bg: #0b1020;
+  --text: #eef3ff;
+  --hint: #91a0ba;
+  --link: #8bb6ff;
+  --button: #638ce4;
   --button_text: #ffffff;
-  --secondary_bg: #e9edf4;
-  --card_bg: #ffffff;
-  --danger: #bd3434;
-  --success: #247747;
-  --navy: #172033;
-  --line: #e4e8ef;
-  color-scheme: light;
+  --secondary_bg: #172238;
+  --card_bg: #121a2d;
+  --danger: #fb7185;
+  --success: #4adea2;
+  --navy: #eef3ff;
+  --line: #26334b;
+  color-scheme: dark;
 }
 
 * {
@@ -24,7 +24,7 @@
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: radial-gradient(ellipse at top, #ffffff 0%, var(--bg) 68%);
+  background: radial-gradient(ellipse at 75% -10%, #1a3157 0, transparent 42%), var(--bg);
   color: var(--text);
   padding: 18px;
   padding-bottom: 100px;
@@ -54,11 +54,11 @@ h2 {
 
 .card {
   background: var(--card_bg);
-  border: 1px solid rgba(23, 32, 51, 0.055);
+  border: 1px solid var(--line);
   border-radius: 18px;
   padding: 18px;
   margin-bottom: 14px;
-  box-shadow: 0 8px 24px rgba(23, 32, 51, 0.055);
+  box-shadow: 0 12px 30px #00000020;
 }
 
 label {
@@ -77,9 +77,9 @@ input, select, textarea {
   width: 100%;
   padding: 12px;
   font-size: 16px;
-  border: 1px solid #dfe4ec;
+  border: 1px solid #33445f;
   border-radius: 12px;
-  background: var(--bg);
+  background: #0b1323;
   color: var(--text);
   font-family: inherit;
   -webkit-appearance: none;
@@ -152,7 +152,7 @@ select {
   padding: 16px;
   font-size: 17px;
   font-weight: 600;
-  background: linear-gradient(135deg, #f29a37, #e87916);
+  background: linear-gradient(135deg, #638ce4, #4f6fca);
   color: var(--button_text);
   border: none;
   border-radius: 14px;
@@ -171,9 +171,9 @@ select {
   padding: 18px;
   font-size: 16px;
   font-weight: 500;
-  background: var(--card_bg);
+  background: linear-gradient(155deg, #151f34, #11192a);
   color: var(--text);
-  border: 1px solid rgba(23, 32, 51, 0.06);
+  border: 1px solid var(--line);
   border-radius: 16px;
   margin-bottom: 11px;
   box-shadow: 0 5px 18px rgba(23, 32, 51, 0.045);
@@ -292,3 +292,12 @@ button { font-family: inherit; }
 .client-home-grid .menu-btn .emoji{display:block;font-size:24px;margin-bottom:8px}
 .subtitle{color:#68738a;line-height:1.5}
 @media(max-width:420px){.client-home-grid{grid-template-columns:1fr 1fr}.client-home-grid .menu-btn{padding:13px;min-height:82px}}
+
+/* Promo field stays visually distinct and follows the administrator's dark navy theme. */
+.promo-card { border-color: #405578; background: linear-gradient(145deg, #172742, #121a2d); }
+.promo-card label { color: #dce8ff; }
+.promo-card input { border-color: #405578; background: #0b1323; }
+.portal-head { padding: 18px; margin: -18px -18px 18px; border-bottom: 1px solid #26334b; background: linear-gradient(120deg,#172742,#0e1628); border-radius: 0 0 18px 18px; }
+.portal-head h1 { color: #eef3ff; }
+button, .menu-btn { transition: filter .15s ease, transform .15s ease; }
+button:active { filter: brightness(1.12); }
