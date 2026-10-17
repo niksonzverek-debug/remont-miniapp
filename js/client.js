@@ -476,10 +476,23 @@ function submitRegistration() {
         console.warn('Не удалось сохранить данные клиента:', e);
     }
 
-    // Новый клиент переходит к заказу без отправки sendData и без закрытия Mini App.
-    // Сервер зарегистрирует/обновит клиента при получении первой заявки new_order.
+    // Первичный профиль сначала синхронизируется с ботом. Telegram закрывает Mini App
+    // после sendData, а бот показывает правильную клавиатуру: клиента или приглашённого мастера.
     if (isNewClientFlow) {
-        showNewOrder();
+        const ok = sendEvent('register_client', {
+            client_name: name,
+            client_phone: phone,
+            client_registration_id: getClientRegistrationId(phone),
+            client_registration_no: getClientRegistrationNo(phone)
+        });
+        if (ok) {
+            try {
+                localStorage.setItem('remont_bt_name', name);
+                localStorage.setItem('remont_bt_phone', phone);
+                localStorage.setItem('remont_bt_identity_saved', '1');
+                localStorage.setItem('remont_bt_registered', '1');
+            } catch (e) { console.warn('Не удалось сохранить локальный профиль:', e); }
+        }
         return;
     }
 
