@@ -220,7 +220,7 @@ function showRegistrationScreen() {
         </div>
 
         <button id="registrationContinue" onclick="submitRegistration()">
-            Продолжить →
+            Сохранить
         </button>
     `;
 
