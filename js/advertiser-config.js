@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://shape-right-regards-hitting.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://quarters-individually-noted-soap.trycloudflare.com";
