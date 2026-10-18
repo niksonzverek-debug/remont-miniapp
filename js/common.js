@@ -55,7 +55,23 @@ function getOfflineQueue() {
 }
 function currentQueueOwnerId() {
     const id = tg && tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user.id : null;
-    return id === null || id === undefined || id === '' ? '' : String(id);
+    if (id !== null && id !== undefined && id !== '') return String(id);
+    // Signed personal launch URL is used only to partition local queue entries.
+    // The backend independently verifies Telegram initData/session before data access.
+    const params=new URLSearchParams(location.search);
+    const signedUid=params.get('session_uid')||params.get('master_uid');
+    return /^\d{1,20}$/.test(signedUid||'')?signedUid:'';
+}
+function clientLocalStorageKey(key) {
+    const owner=currentQueueOwnerId() || 'local';
+    return `remont_bt_user_${owner}_${String(key||'').replace(/[^a-z0-9_-]/gi,'_')}`;
+}
+function getClientLocal(key) {
+    try { return localStorage.getItem(clientLocalStorageKey(key)) || ''; } catch (_) { return ''; }
+}
+function setClientLocal(key, value) {
+    try { localStorage.setItem(clientLocalStorageKey(key), String(value ?? '')); return true; }
+    catch (e) { console.warn('Не удалось сохранить локальные данные клиента:', e); return false; }
 }
 function isQueueItemForCurrentUser(item) {
     const uid = currentQueueOwnerId();
@@ -75,7 +91,7 @@ function queueOperation(data) {
     op.operation_id = String(op.operation_id || uuidV4());
     op.local_registration_id = String(op.local_registration_id || getLocalRegistrationId());
     op.queued_at = op.queued_at || new Date().toISOString();
-    op.telegram_user_id = tg.initDataUnsafe && tg.initDataUnsafe.user ? String(tg.initDataUnsafe.user.id) : null;
+    op.telegram_user_id = currentQueueOwnerId() || null;
     op.launch_role = new URLSearchParams(location.search).get('role') || null;
     if (!queue.some(x => x.operation_id === op.operation_id)) queue.push({ ...op, local_status: 'pending' });
     saveOfflineQueue(queue);
@@ -162,9 +178,20 @@ function clearSubmittedQueue() {
     showAlert('Отправленные записи этого аккаунта удалены из локальной очереди. Делайте это только после подтверждения бота в чате.');
 }
 function renderOfflineQueueBanner() {
-    // Техническая очередь скрыта от клиента и мастера; локальное сохранение продолжает работать.
-    const existing = document.getElementById("offlineQueueBanner");
-    if (existing) existing.remove();
+    const existing=document.getElementById('offlineQueueBanner');
+    const queue=getOfflineQueue();
+    const owned=queue.filter(isQueueItemForCurrentUser);
+    const pending=owned.filter(x=>x.local_status==='pending'||x.local_status==='retry').length;
+    const submitted=owned.filter(x=>x.local_status==='submitted').length;
+    if(!pending&&!submitted){if(existing)existing.remove();return;}
+    const host=document.body;if(!host)return;
+    const banner=existing||document.createElement('section');banner.id='offlineQueueBanner';
+    banner.style.cssText='position:sticky;bottom:0;z-index:9999;margin:12px 0 0;padding:12px;border-radius:12px;background:var(--card_bg,#fff);border:1px solid var(--button,#888);box-shadow:0 -2px 12px rgba(0,0,0,.12);color:var(--text,#222)';
+    banner.innerHTML=`<b>📦 Локальные записи: ${pending} ожидают отправки${submitted?`, ${submitted} уже переданы`:''}</b><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">${pending?'<button type="button" id="offlineQueueSend">Передать сохранённые записи</button>':''}${submitted?'<button type="button" id="offlineQueueRetry">Повторить отправленные</button><button type="button" id="offlineQueueClear">Очистить переданные</button>':''}</div><small style="display:block;margin-top:6px">Переданные записи считаются принятыми только после ответа бота в чате.</small>`;
+    if(!existing)host.appendChild(banner);
+    banner.querySelector('#offlineQueueSend')?.addEventListener('click',flushOfflineQueue);
+    banner.querySelector('#offlineQueueRetry')?.addEventListener('click',retrySubmittedQueue);
+    banner.querySelector('#offlineQueueClear')?.addEventListener('click',clearSubmittedQueue);
 }
 
 function applyTheme() {

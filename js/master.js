@@ -1,19 +1,16 @@
-/* Remont BT — мастерский WebApp. Telegram используется для уведомлений и доставки сообщений/PDF. Build: 20261018-act-launch-authfix6. */
+/* Remont BT — мастерский WebApp. Login-code redesign 20261018. */
 const masterApiBase = window.REMONT_ADVERTISER_API_BASE || 'http://127.0.0.1:8767';
 let masterCache = {orders:[], clients:[], messages:[], acts:[], promos:[], stats:{}};
 let activeChatClientId = null;
-const masterQuery = new URLSearchParams(location.search);
-const masterHash = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
-const masterLaunchParam = name => masterQuery.get(name) || masterHash.get(name) || '';
-const masterCurrentUserId = String(tg?.initDataUnsafe?.user?.id || masterLaunchParam('master_uid') || '');
+let masterCurrentUserId = String(tg?.initDataUnsafe?.user?.id || (localStorage.getItem('remontBT.master.session.v1') || '').split(':')[0] || '');
 const masterEsc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function masterAuthHeaders() {
   const headers = {};
   const initData = String((tg && tg.initData) || '').trim();
   if (initData) headers['X-Telegram-Init-Data'] = initData;
-  const suid=masterLaunchParam('master_uid')||'', sexp=masterLaunchParam('master_exp')||'', ssig=masterLaunchParam('master_sig')||'';
-  if (suid && sexp && ssig) headers['X-Remont-Session'] = `${suid}:${sexp}:${ssig}`;
-  if (!initData && !headers['X-Remont-Session']) throw new Error('Не найдена авторизация мастера: нет Telegram initData и подписанной сессии в ссылке. Закройте кабинет, отправьте /start боту и откройте его новой кнопкой.');
+  const savedSession = String(localStorage.getItem('remontBT.master.session.v1') || '');
+  if (savedSession) headers['X-Remont-Session'] = savedSession;
+  if (!initData && !savedSession) throw new Error('Нужен одноразовый код из Telegram.');
   return headers;
 }
 function masterApi(path, method='GET', payload=null) {
@@ -47,6 +44,32 @@ function masterShell(title, body) {
   document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="eyebrow">REMONT BT · WORKSPACE</div><h1>👨‍🔧 ${masterEsc(title)}</h1><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button onclick="showMasterMessages()"><span>▤</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
 }
 function masterToast(message, error=false) { const e=document.getElementById('masterToast'); if(e){e.textContent=message;e.className=error?'error':'notice';} else showAlert(message); }
+function showMasterLogin(message='') {
+  masterShell('Вход мастера', `<article class="card"><h2>🔐 Вход в кабинет</h2><p>Вход не зависит от параметров ссылки и initData Telegram.</p><ol><li>Вернитесь в чат с ботом Remont BT.</li><li>Отправьте команду <b>/cabinetcode</b>.</li><li>Введите полученный 8-значный код. Он действует 3 минуты и используется один раз.</li></ol><form onsubmit="event.preventDefault(); submitMasterLogin()"><label for="masterLoginCode">Одноразовый код</label><input id="masterLoginCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" required placeholder="12345678"><button id="masterLoginButton" type="submit">Войти в кабинет</button><p id="masterLoginStatus" class="${message?'error':'subtitle'}" role="status">${masterEsc(message)}</p></form></article>`);
+}
+async function submitMasterLogin() {
+  const field=document.getElementById('masterLoginCode'), status=document.getElementById('masterLoginStatus'), button=document.getElementById('masterLoginButton');
+  if(!field||!status||!button)return;
+  button.disabled=true; status.textContent='Проверяем код…'; status.className='subtitle';
+  try {
+    const response=await fetch(masterApiBase+'/api/master/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:field.value.trim()}),cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||`Ошибка входа (${response.status})`);
+    if(!data.session||!data.user_id)throw new Error('Сервер не выдал сессию. Запросите новый код.');
+    localStorage.setItem('remontBT.master.session.v1',data.session);
+    masterCurrentUserId=String(data.user_id);
+    await loadMasterData(); await renderMasterMenu();
+  } catch(e) { status.textContent=e.message||'Не удалось войти.'; status.className='error'; button.disabled=false; }
+}
+async function bootMasterApp() {
+  const saved=String(localStorage.getItem('remontBT.master.session.v1')||'');
+  if(!String(tg?.initData||'')&&!saved) return showMasterLogin();
+  try { await loadMasterData(); await renderMasterMenu(); }
+  catch(e) {
+    if(saved && !String(tg?.initData||'')) localStorage.removeItem('remontBT.master.session.v1');
+    showMasterLogin(e.message||'Сессия не принята. Запросите новый код в боте.');
+  }
+}
 async function masterRefresh() { try { await loadMasterData(); renderMasterMenu(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}<p>Откройте WebApp из Telegram и попробуйте обновить.</p></article>`); } }
 async function loadMasterData() {
   const [dash,orders,clients,messages,acts,promos]=await Promise.all([
@@ -87,7 +110,7 @@ async function submitMasterPromo(){const btn=document.getElementById('promoSubmi
 function showCreateAct(){const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}
 function showCreatePromoForm(){showCreateMasterPromo();}
 function sendEvent(){showAlert('Это действие теперь выполняется в мастерской панели. Выберите раздел в меню.');return false;}
-(async()=>{try{await loadMasterData();renderMasterMenu();}catch(e){masterShell('Панель мастера',`<article class="card error"><h2>Не удалось подключить панель</h2><p>${masterEsc(e.message)}</p><p>Откройте приложение из Telegram и убедитесь, что API запущен и доступен через HTTPS.</p><button onclick="masterRefresh()">Повторить</button></article>`);}})();
+bootMasterApp();
 
 async function showMasterProfile(){try{await loadMasterData()}catch(e){return masterShell('Настройки профиля',`<article class="card error">${masterEsc(e.message)}</article>`)}const p=masterCache.profile||{},r=p.referral_settings||{};masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Настройки сохраняются в текущем профиле, данные заказов не изменяются.</p></article><form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()"><article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"></article><article class="card"><h2>Отзывы</h2><p class="subtitle">Разрешить показ отзывов в публичном профиле, если он подключён.</p><label class="toggle-row"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${p.show_reviews!==false?'checked':''}></label></article><article class="card"><h2>Реферальная программа</h2><p class="subtitle">Ссылка приглашения формируется для каждого клиента отдельно. Здесь можно включать программу и менять условия.</p><label class="toggle-row"><span>Реферальная программа включена</span><input id="masterReferralEnabled" type="checkbox" ${r.enabled!==false?'checked':''}></label><label>Скидка новому клиенту, %</label><input id="masterReferralDiscount" type="number" min="0" max="100" step="0.5" value="${Number(r.new_client_discount_percent??5)}"><label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}"><label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}"><p class="subtitle">Клиенты получают свою ссылку через команду /referral. Глобальное отключение программы администратором имеет приоритет.</p></article><article class="card"><button id="masterSettingsSave" type="submit">Сохранить настройки</button><p id="masterSettingsStatus" class="subtitle" role="status"></p></article></form>`)}
 async function saveMasterSettings(){const btn=document.getElementById('masterSettingsSave'),st=document.getElementById('masterSettingsStatus');btn.disabled=true;st.textContent='Сохраняем…';try{const r=await masterApi('/api/master/settings','POST',{name:document.getElementById('masterProfileName').value.trim(),phone:document.getElementById('masterProfilePhone').value.trim(),show_reviews:document.getElementById('masterShowReviews').checked,referral_settings:{enabled:document.getElementById('masterReferralEnabled').checked,new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)}});st.textContent=r.message;await loadMasterData();masterCache.profile.name=document.getElementById('masterProfileName').value.trim();masterCache.profile.phone=document.getElementById('masterProfilePhone').value.trim();masterCache.profile.show_reviews=document.getElementById('masterShowReviews').checked;masterCache.profile.referral_settings={enabled:document.getElementById('masterReferralEnabled').checked,new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)};masterToast(r.message)}catch(e){st.textContent=e.message;st.className='error'}finally{btn.disabled=false}}
