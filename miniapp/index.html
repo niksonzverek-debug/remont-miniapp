@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Панель ремонта</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+      // Register the actual worker filename used by this project (sw.js).
+      // This must be served over HTTPS (or localhost).
+      (function () {
+        if (!('serviceWorker' in navigator)) return;
+        window.addEventListener('load', async function () {
+          try {
+            const workerUrl = new URL('./sw.js?release=20261018-integrated-act-authdiag', document.baseURI);
+            const scopeUrl = new URL('./', document.baseURI);
+            const registration = await navigator.serviceWorker.register(workerUrl.href, {
+              scope: scopeUrl.pathname,
+              updateViaCache: 'none'
+            });
+            await registration.update();
+            console.info('[Remont BT] SW registered:', registration.scope);
+          } catch (error) {
+            console.error('[Remont BT] SW registration failed:', error);
+          }
+        }, { once: true });
+      })();
+    </script>
+    <link rel="stylesheet" href="css/style.css?v=20261018-integrated-act-authdiag">
+    <link rel="manifest" href="manifest.webmanifest">
+</head>
+<body>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        // Some Telegram WebViews rewrite the query string. The bot duplicates the
+        // signed master session in the fragment as a fallback; never trust unsigned IDs.
+        const hashParams = new URLSearchParams(String(window.location.hash || '').replace(/^#/, ''));
+        const launchParam = (name) => params.get(name) || hashParams.get(name) || '';
+        const launchMode = launchParam('launch') || 'main';
+        const roleFromUrl = launchParam('role');
+        // sendData is available only when opened from a reply-keyboard WebApp button.
+        window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
+    </script>
+    <script src="js/advertiser-config.js?v=20261018-integrated-act-authdiag"></script>
+    <script src="js/common.js?v=20261018-integrated-act-authdiag"></script>
+    <script>
+        const MASTER_ID = 450540408;
+        const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
+            ? tg.initDataUnsafe.user.id : null;
+        const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
+            ? null : Number(rawUserId);
+        const hasMasterSession = Boolean(launchParam('master_uid') && launchParam('master_exp') && launchParam('master_sig'));
+        const hasTelegramInitData = Boolean(String(tg && tg.initData || '').trim());
+
+        console.info('[Remont BT] Mini App build 20261018-integrated-act-authdiag', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession, hasTelegramInitData, queryKeys:[...params.keys()], hashKeys:[...hashParams.keys()]});
+
+        // The master URL is signed server-side and checked by the API. Never invent an identity client-side.
+        let role = null;
+        if (roleFromUrl === 'master' && (hasMasterSession || (hasTelegramInitData && Number.isFinite(userId)))) role = 'master';
+        else if (roleFromUrl === 'client' && hasTelegramInitData && Number.isFinite(userId)) role = 'client';
+        else if (hasTelegramInitData && Number.isFinite(userId)) role = userId === Number(MASTER_ID) ? 'master' : 'client';
+
+        if (!role) {
+            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Кнопка запуска не передала авторизацию мастера. Это не ошибка PDF. Проверьте, что нажата новая кнопка «🧰 Открыть кабинет мастера · v6».</p><p style="opacity:.7">Диагностика: build=20261018-integrated-act-authdiag; path=${String(location.pathname)}; role=${String(roleFromUrl || 'нет')}; signed_session=${hasMasterSession ? 'да' : 'нет'}; initData=${hasTelegramInitData ? 'да' : 'нет'}; query_keys=${[...params.keys()].join(',') || 'нет'}; hash_keys=${[...hashParams.keys()].join(',') || 'нет'}.</p><p>Если ошибка повторится, пришлите этот экран целиком. Значения подписи и токены здесь не показываются.</p></main>`;
+        } else {
+            const script = document.createElement('script');
+            script.src = role === 'master' ? 'js/master.js?v=20261018-integrated-act-authdiag' : 'js/client.js?v=20261018-integrated-act-authdiag';
+            script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
+            document.body.appendChild(script);
+        }
+    </script>
+</body>
+</html>
