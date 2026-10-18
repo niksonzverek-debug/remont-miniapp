@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://titled-acid-converted-attribute.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://modify-reno-violin-focuses.trycloudflare.com";
