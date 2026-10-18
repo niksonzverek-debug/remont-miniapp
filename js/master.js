@@ -1,15 +1,17 @@
-/* Remont BT — мастерский WebApp. Telegram используется для уведомлений и доставки сообщений/PDF. Build: 20261018-master-actfix3. */
+/* Remont BT — мастерский WebApp. Telegram используется для уведомлений и доставки сообщений/PDF. Build: 20261018-act-save-authfix5. */
 const masterApiBase = window.REMONT_ADVERTISER_API_BASE || 'http://127.0.0.1:8767';
 let masterCache = {orders:[], clients:[], messages:[], acts:[], promos:[], stats:{}};
 let activeChatClientId = null;
-const masterCurrentUserId = String(tg?.initDataUnsafe?.user?.id || new URLSearchParams(location.search).get('master_uid') || '');
+const masterQuery = new URLSearchParams(location.search);
+const masterHash = new URLSearchParams(String(location.hash || '').replace(/^#/, ''));
+const masterLaunchParam = name => masterQuery.get(name) || masterHash.get(name) || '';
+const masterCurrentUserId = String(tg?.initDataUnsafe?.user?.id || masterLaunchParam('master_uid') || '');
 const masterEsc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function masterAuthHeaders() {
   const headers = {};
   const initData = String((tg && tg.initData) || '').trim();
   if (initData) headers['X-Telegram-Init-Data'] = initData;
-  const q = new URLSearchParams(location.search);
-  const suid=q.get('master_uid')||'', sexp=q.get('master_exp')||'', ssig=q.get('master_sig')||'';
+  const suid=masterLaunchParam('master_uid')||'', sexp=masterLaunchParam('master_exp')||'', ssig=masterLaunchParam('master_sig')||'';
   if (suid && sexp && ssig) headers['X-Remont-Session'] = `${suid}:${sexp}:${ssig}`;
   if (!initData && !headers['X-Remont-Session']) throw new Error('Не найдена авторизация мастера: нет Telegram initData и подписанной сессии в ссылке. Закройте кабинет, отправьте /start боту и откройте его новой кнопкой.');
   return headers;

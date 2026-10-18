@@ -15,7 +15,7 @@
         if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', async function () {
           try {
-            const workerUrl = new URL('./sw.js?release=20261018-master-actfix3', document.baseURI);
+            const workerUrl = new URL('./sw.js?release=20261018-act-save-authfix5', document.baseURI);
             const scopeUrl = new URL('./', document.baseURI);
             const registration = await navigator.serviceWorker.register(workerUrl.href, {
               scope: scopeUrl.pathname,
@@ -29,29 +29,33 @@
         }, { once: true });
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261018-master-actfix3">
+    <link rel="stylesheet" href="css/style.css?v=20261018-act-save-authfix5">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
     <script>
         const params = new URLSearchParams(window.location.search);
-        const launchMode = params.get('launch') || 'main';
-        const roleFromUrl = params.get('role');
+        // Some Telegram WebViews rewrite the query string. The bot duplicates the
+        // signed master session in the fragment as a fallback; never trust unsigned IDs.
+        const hashParams = new URLSearchParams(String(window.location.hash || '').replace(/^#/, ''));
+        const launchParam = (name) => params.get(name) || hashParams.get(name) || '';
+        const launchMode = launchParam('launch') || 'main';
+        const roleFromUrl = launchParam('role');
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/advertiser-config.js?v=20261018-master-actfix3"></script>
-    <script src="js/common.js?v=20261018-master-actfix3"></script>
+    <script src="js/advertiser-config.js?v=20261018-act-save-authfix5"></script>
+    <script src="js/common.js?v=20261018-act-save-authfix5"></script>
     <script>
         const MASTER_ID = 450540408;
         const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
             ? tg.initDataUnsafe.user.id : null;
         const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
             ? null : Number(rawUserId);
-        const hasMasterSession = Boolean(params.get('master_uid') && params.get('master_exp') && params.get('master_sig'));
+        const hasMasterSession = Boolean(launchParam('master_uid') && launchParam('master_exp') && launchParam('master_sig'));
         const hasTelegramInitData = Boolean(String(tg && tg.initData || '').trim());
 
-        console.log('Mini App build 20261018-master-actfix3', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession, hasTelegramInitData});
+        console.info('[Remont BT] Mini App build 20261018-act-save-authfix5', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession, hasTelegramInitData, queryKeys:[...params.keys()], hashKeys:[...hashParams.keys()]});
 
         // The master URL is signed server-side and checked by the API. Never invent an identity client-side.
         let role = null;
@@ -60,10 +64,10 @@
         else if (hasTelegramInitData && Number.isFinite(userId)) role = userId === Number(MASTER_ID) ? 'master' : 'client';
 
         if (!role) {
-            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте Mini App. В чате с ботом отправьте /start и откройте приложение новой кнопкой «Открыть кабинет мастера». Если кнопки нет, перезапустите бота. Не открывайте обычную HTTPS-ссылку.</p><p style="opacity:.7">Техническая причина: отсутствуют оба допустимых способа авторизации — подписанная сессия мастера в ссылке и проверяемые данные Telegram initData. Не открывайте сохранённую старую ссылку: отправьте /start боту и нажмите новую кнопку.</p></main>`;
+            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Кнопка запуска не передала авторизацию мастера. Это не ошибка PDF. Проверьте, что нажата новая кнопка «🧰 Открыть кабинет мастера · v5».</p><p style="opacity:.7">Диагностика: role=${String(roleFromUrl || 'нет')}; signed_session=${hasMasterSession ? 'да' : 'нет'}; initData=${hasTelegramInitData ? 'да' : 'нет'}; query_keys=${[...params.keys()].join(',') || 'нет'}; hash_keys=${[...hashParams.keys()].join(',') || 'нет'}.</p><p>Если ошибка повторится, пришлите этот экран целиком. Значения подписи и токены здесь не показываются.</p></main>`;
         } else {
             const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261018-master-actfix3' : 'js/client.js?v=20261018-master-actfix3';
+            script.src = role === 'master' ? 'js/master.js?v=20261018-act-save-authfix5' : 'js/client.js?v=20261018-act-save-authfix5';
             script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
             document.body.appendChild(script);
         }
