@@ -12,7 +12,7 @@
         if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', async function () {
           try {
-            const workerUrl = new URL('./sw.js?release=20261018-swfix2', document.baseURI);
+            const workerUrl = new URL('./sw.js?release=20261018-initdata-hotfix1', document.baseURI);
             const scopeUrl = new URL('./', document.baseURI);
             const registration = await navigator.serviceWorker.register(workerUrl.href, {
               scope: scopeUrl.pathname,
@@ -26,7 +26,7 @@
         }, { once: true });
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261018-swfix2">
+    <link rel="stylesheet" href="css/style.css?v=20261018-initdata-hotfix1">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
@@ -37,12 +37,17 @@
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/advertiser-config.js?v=20261018-swfix2"></script>
-    <script src="js/common.js?v=20261018-swfix2"></script>
+    <script src="js/advertiser-config.js?v=20261018-initdata-hotfix1"></script>
+    <script src="js/common.js?v=20261018-initdata-hotfix1"></script>
     <script>
         const MASTER_ID = 450540408;
-        const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
-            ? tg.initDataUnsafe.user.id : null;
+        // Some Telegram WebView builds expose initData before initDataUnsafe.user.
+        // Parse the signed initData payload as a compatibility fallback; never trust URL user IDs.
+        let initDataUser = tg.initDataUnsafe && tg.initDataUnsafe.user ? tg.initDataUnsafe.user : null;
+        if (!initDataUser && tg.initData) {
+            try { const p = new URLSearchParams(tg.initData); const raw = p.get('user'); if (raw) initDataUser = JSON.parse(raw); } catch (e) { console.warn('Cannot parse Telegram initData user', e); }
+        }
+        const rawUserId = initDataUser ? initDataUser.id : null;
         const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
             ? null : Number(rawUserId);
 
@@ -54,10 +59,10 @@
         else if (Number.isFinite(userId)) role = userId === Number(MASTER_ID) ? 'master' : 'client';
 
         if (!role) {
-            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт</h2><p>Откройте приложение из Telegram. Вне Telegram отправка данных боту недоступна.</p></main>`;
+            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте это окно и откройте Mini App кнопкой в чате с ботом. Если вы уже открыли его из Telegram, полностью закройте Mini App и запустите снова. Не открывайте обычную HTTPS-ссылку в браузере.</p><p style="font-size:12px;opacity:.7">Техническая причина: Telegram не передал user в initData. Перезапуск и обновление приложения могут устранить устаревший кеш.</p></main>`;
         } else {
             const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261018-swfix2' : 'js/client.js?v=20261018-swfix2';
+            script.src = role === 'master' ? 'js/master.js?v=20261018-initdata-hotfix1' : 'js/client.js?v=20261018-initdata-hotfix1';
             script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
             document.body.appendChild(script);
         }
