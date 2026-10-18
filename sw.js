@@ -1,8 +1,8 @@
-/* Remont BT Service Worker — 20261018-actsubmit2
+/* Remont BT Service Worker — 20261018-master-actfix3
  * Network-first for navigation and static assets; cache is only an offline fallback.
  * Only this app's own caches are cleaned. API and user-specific requests are never cached.
  */
-const RELEASE = '20261018-actsubmit2';
+const RELEASE = '20261018-master-actfix3';
 const CACHE_NAME = `remont-bt-miniapp-${RELEASE}`;
 const CACHE_PREFIX = 'remont-bt-miniapp-';
 const STATIC_ASSETS = [
@@ -75,7 +75,7 @@ self.addEventListener('fetch', event => {
   if (path.includes('/api/')) return; // never cache API responses
 
   const isNavigation = request.mode === 'navigate' || request.destination === 'document';
-  const isStatic = /\\.(html|js|css|webmanifest)$/.test(path);
+  const isStatic = /\.(html|js|css|webmanifest)$/.test(path);
   if (!isNavigation && !isStatic) return;
 
   event.respondWith((async () => {
