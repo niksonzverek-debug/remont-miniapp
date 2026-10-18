@@ -1,4 +1,4 @@
-/* Remont BT — мастерский WebApp. Telegram используется для уведомлений и доставки сообщений/PDF. Build: 20261018-act-save-authfix5. */
+/* Remont BT — мастерский WebApp. Telegram используется для уведомлений и доставки сообщений/PDF. Build: 20261018-act-launch-authfix6. */
 const masterApiBase = window.REMONT_ADVERTISER_API_BASE || 'http://127.0.0.1:8767';
 let masterCache = {orders:[], clients:[], messages:[], acts:[], promos:[], stats:{}};
 let activeChatClientId = null;
