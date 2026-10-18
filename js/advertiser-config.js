@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://keeps-authentic-cradle-giants.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://stable-techniques-book-grey.trycloudflare.com";
