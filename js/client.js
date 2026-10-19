@@ -91,7 +91,7 @@ function showExistingMasterHelp(message='') {
       if(!validPhone(phone)){status.textContent='Введите корректный номер +998XXXXXXXXX.';status.className='error';return;}
       const initData=String(window.Telegram?.WebApp?.initData || '');
       const query=new URLSearchParams(location.search);
-      const sessionUid=query.get('session_uid')||'';const sessionExp=query.get('session_exp')||'';const sessionSig=query.get('session_sig')||'';
+      const sessionUid=query.get('session_uid')||query.get('master_uid')||'';const sessionExp=query.get('session_exp')||query.get('master_exp')||'';const sessionSig=query.get('session_sig')||query.get('master_sig')||'';
       const signedSession=sessionUid&&sessionExp&&sessionSig?`${sessionUid}:${sessionExp}:${sessionSig}`:String(localStorage.getItem('remontBT.master.session.v1')||'');
       if(!initData&&!signedSession){status.textContent='Откройте приложение кнопкой из чата с ботом Telegram. Обычная HTTPS-ссылка не подтверждает ваш Telegram ID.';status.className='error';return;}
       const apiBase=String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/,'');
@@ -153,12 +153,15 @@ async function submitMasterApplication(form){
       if(result.already_master) showExistingMasterHelp('Кабинет мастера уже зарегистрирован. Подтвердите телефон для входа.');
       else if(button){button.textContent='✓ Заявка отправлена';}
     } catch(err) {
-      if(err.status && err.status !== 401 && err.status < 500){
+      if(err.status === 401){
+        if(status){status.textContent='Telegram не подтвердил ваш аккаунт. Закройте Mini App и откройте его заново кнопкой из чата с ботом. Заявка не отправлена и не помещена в очередь.';status.className='error';}
+        if(button){button.textContent='Повторить после повторного открытия';button.disabled=false;}
+      } else if(err.status && err.status < 500){
         if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные.';status.className='error';}
         if(button){button.textContent='Исправить данные и повторить';button.disabled=false;}
       } else if(typeof queueOperation==='function'){
         queueOperation(data);
-        if(status){status.textContent='Сервер сейчас недоступен или не подтвердил Telegram. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
+        if(status){status.textContent='Сервер временно недоступен. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
         if(button){button.textContent='📦 Заявка сохранена в очереди';button.disabled=false;}
       } else {if(status){status.textContent='Не удалось отправить заявку. Проверьте связь и повторите.';status.className='error';} if(button)button.disabled=false;}
     }
@@ -169,9 +172,11 @@ async function clientApi(path, method='GET', body=null) {
     try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
     const initData = String(window.Telegram?.WebApp?.initData || '');
     const query = new URLSearchParams(window.location.search);
-    const sessionUid = query.get('session_uid') || '';
-    const sessionExp = query.get('session_exp') || '';
-    const sessionSig = query.get('session_sig') || '';
+    // The /start application buttons use session_*; the dedicated master button
+    // uses master_* for the same signed session format.
+    const sessionUid = query.get('session_uid') || query.get('master_uid') || '';
+    const sessionExp = query.get('session_exp') || query.get('master_exp') || '';
+    const sessionSig = query.get('session_sig') || query.get('master_sig') || '';
     const signedSession = sessionUid && sessionExp && sessionSig ? `${sessionUid}:${sessionExp}:${sessionSig}` : '';
     if (!initData && !signedSession) throw new Error('Telegram не передал данные авторизации. Нажмите /start в чате с ботом, чтобы обновить кнопку приложения.');
     const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/, '');
