@@ -466,3 +466,17 @@ label,.subtitle,.muted,.hint,small{color:var(--rb-muted)}
 /* PATCH 2026-10-17: keep client menu in a two-column grid on every viewport */
 .client-home-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:10px!important}
 @media(max-width:360px){.client-home-grid .menu-btn{padding:10px!important;font-size:13px!important;overflow-wrap:anywhere}}
+
+
+/* Master entry/application forms: separate actions, no glued buttons. */
+.master-choice-card,.master-auth-card{display:flex;flex-direction:column;gap:14px;padding:18px!important}
+.master-choice-actions{display:grid;grid-template-columns:1fr;gap:12px;margin-top:8px}
+.master-choice-btn{display:flex!important;align-items:center;gap:13px!important;width:100%;min-height:76px!important;padding:15px!important;text-align:left!important;white-space:normal!important;line-height:1.35!important}
+.master-choice-btn>span:first-child{flex:0 0 38px;font-size:25px;text-align:center}
+.master-choice-btn>span:last-child{display:flex;flex-direction:column;gap:5px;min-width:0}
+.master-choice-btn b{font-size:15px;white-space:normal}
+.master-choice-btn small{font-size:12px;line-height:1.4;color:#c3d1e6;white-space:normal;font-weight:400}
+.master-auth-card label{display:block;margin:4px 0 2px}
+.master-auth-card input{width:100%;box-sizing:border-box;margin:0 0 7px}
+.master-auth-card button{width:100%;margin-top:6px;white-space:normal;line-height:1.35;min-height:48px}
+.master-auth-card p{line-height:1.5;overflow-wrap:anywhere}

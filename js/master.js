@@ -10,7 +10,7 @@ function masterAuthHeaders() {
   if (initData) headers['X-Telegram-Init-Data'] = initData;
   const savedSession = String(localStorage.getItem('remontBT.master.session.v1') || '');
   if (savedSession) headers['X-Remont-Session'] = savedSession;
-  if (!initData && !savedSession) throw new Error('Нужен одноразовый код из Telegram.');
+  if (!initData && !savedSession) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
   return headers;
 }
 function masterApi(path, method='GET', payload=null) {
@@ -45,29 +45,36 @@ function masterShell(title, body) {
 }
 function masterToast(message, error=false) { const e=document.getElementById('masterToast'); if(e){e.textContent=message;e.className=error?'error':'notice';} else showAlert(message); }
 function showMasterLogin(message='') {
-  masterShell('Вход мастера', `<article class="card"><h2>🔐 Вход в кабинет</h2><p>Вход не зависит от параметров ссылки и initData Telegram.</p><ol><li>Вернитесь в чат с ботом Remont BT.</li><li>Отправьте команду <b>/cabinetcode</b>.</li><li>Введите полученный 8-значный код. Он действует 3 минуты и используется один раз.</li></ol><form onsubmit="event.preventDefault(); submitMasterLogin()"><label for="masterLoginCode">Одноразовый код</label><input id="masterLoginCode" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" required placeholder="12345678"><button id="masterLoginButton" type="submit">Войти в кабинет</button><p id="masterLoginStatus" class="${message?'error':'subtitle'}" role="status">${masterEsc(message)}</p></form></article>`);
+  masterShell('Вход мастера', `<article class="card master-auth-card"><h2>🔐 Вход в кабинет</h2><p>Введите номер телефона, привязанный к вашему кабинету. Сервер дополнительно проверит Telegram ID — одного номера недостаточно.</p><form id="masterLoginForm" onsubmit="event.preventDefault(); submitMasterLogin()"><label for="masterLoginPhone">Номер телефона</label><input id="masterLoginPhone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+998 90 123 45 67"><button id="masterLoginButton" type="submit">Проверить и войти</button><p id="masterLoginStatus" class="${message?'error':'subtitle'}" role="status">${masterEsc(message)}</p></form></article>`);
 }
 async function submitMasterLogin() {
-  const field=document.getElementById('masterLoginCode'), status=document.getElementById('masterLoginStatus'), button=document.getElementById('masterLoginButton');
+  const field=document.getElementById('masterLoginPhone'), status=document.getElementById('masterLoginStatus'), button=document.getElementById('masterLoginButton');
   if(!field||!status||!button)return;
-  button.disabled=true; status.textContent='Проверяем код…'; status.className='subtitle';
+  const initData=String(tg?.initData||'');
+  const qp=new URLSearchParams(location.search);
+  if(!initData && !(qp.get('master_uid')&&qp.get('master_exp')&&qp.get('master_sig'))){status.textContent='Откройте кабинет кнопкой, которую бот прислал после одобрения. Обычная HTTPS-ссылка не подтверждает Telegram ID.';status.className='error';return;}
+  const digits=String(field.value||'').replace(/\D/g,'');
+  const phone=digits.startsWith('998')&&digits.length===12?'+'+digits:(digits.length===9?'+998'+digits:'+'+digits);
+  if(!/^\+998\d{9}$/.test(phone)){status.textContent='Введите корректный номер +998XXXXXXXXX.';status.className='error';return;}
+  button.disabled=true; status.textContent='Проверяем номер и Telegram ID…'; status.className='subtitle';
   try {
-    const response=await fetch(masterApiBase+'/api/master/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({code:field.value.trim()}),cache:'no-store'});
+    const response=await fetch(masterApiBase+'/api/master/login',{method:'POST',headers:{'Content-Type':'application/json',...(initData?{'X-Telegram-Init-Data':initData}:{})},body:JSON.stringify({phone,master_uid:qp.get('master_uid'),master_exp:qp.get('master_exp'),master_sig:qp.get('master_sig')}),cache:'no-store'});
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||`Ошибка входа (${response.status})`);
-    if(!data.session||!data.user_id)throw new Error('Сервер не выдал сессию. Запросите новый код.');
+    if(!data.session||!data.user_id)throw new Error('Сервер не выдал сессию.');
     localStorage.setItem('remontBT.master.session.v1',data.session);
     masterCurrentUserId=String(data.user_id);
     await loadMasterData(); await renderMasterMenu();
   } catch(e) { status.textContent=e.message||'Не удалось войти.'; status.className='error'; button.disabled=false; }
 }
+
 async function bootMasterApp() {
   const saved=String(localStorage.getItem('remontBT.master.session.v1')||'');
   if(!String(tg?.initData||'')&&!saved) return showMasterLogin();
   try { await loadMasterData(); await renderMasterMenu(); }
   catch(e) {
     if(saved && !String(tg?.initData||'')) localStorage.removeItem('remontBT.master.session.v1');
-    showMasterLogin(e.message||'Сессия не принята. Запросите новый код в боте.');
+    showMasterLogin(e.message||'Сессия не принята. Проверьте номер телефона и откройте приложение из Telegram.');
   }
 }
 async function masterRefresh() { try { await loadMasterData(); renderMasterMenu(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}<p>Откройте WebApp из Telegram и попробуйте обновить.</p></article>`); } }

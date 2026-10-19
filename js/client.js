@@ -19,11 +19,11 @@ let orderData = {
 const clientUrlParams = new URLSearchParams(location.search);
 const isNewClientFlow = clientUrlParams.get("new_client") === "1";
 // Регистрационный номер в ссылке добавляет бот только для уже зарегистрированного клиента.
-const hasJustRegisteredLocally = isNewClientFlow && getClientLocal('identity_saved') === '1';
+const hasJustRegisteredLocally = isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1';
 const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow && (
     clientUrlParams.get("registered") === "1" ||
     /^CL-[A-Z0-9-]{6,38}$/.test(clientUrlParams.get("registration_no") || "") ||
-    getClientLocal('registered') === "1"
+    localStorage.getItem("remont_bt_registered") === "1"
 ));
 
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
@@ -32,7 +32,7 @@ function renderClientMenu() {
     document.body.innerHTML = `
         <header class="portal-head"><h1>Remont BT</h1><p>Ваш ремонт — под контролем</p></header>
         <h2>👋 Личный кабинет</h2>
-        <p class="subtitle">Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || getClientLocal('name') || 'клиент')}</span>!</p>
+        <p class="subtitle">Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</span>!</p>
         <div class="client-home-grid">
           <button class="menu-btn" onclick="showNewOrder()"><span class="emoji">📝</span> Создать заявку</button>
           <button class="menu-btn" onclick="showMyOrders()"><span class="emoji">📋</span> Мои заявки и статусы</button>
@@ -56,59 +56,91 @@ function renderClientMenu() {
 function requestMasterRole() { showMasterChoice(); }
 
 function showMasterChoice() {
-    setPage('🧑‍🔧 Кабинет мастера', `<div class="card"><p>Выберите нужный вариант.</p><button onclick="showExistingMasterHelp()">Я уже мастер</button><button onclick="showMasterApplicationForm()">Я хочу стать мастером</button></div>`);
+    setPage('🧑‍🔧 Кабинет мастера', `<div class="card master-choice-card">
+      <p>Выберите действие:</p>
+      <div class="master-choice-actions">
+        <button class="master-choice-btn" type="button" onclick="showExistingMasterHelp()"><span>🔐</span><span><b>Я уже мастер</b><small>Войти в свой кабинет</small></span></button>
+        <button class="master-choice-btn" type="button" onclick="showMasterApplicationForm()"><span>🧑‍🔧</span><span><b>Я хочу стать мастером</b><small>Отправить заявку администратору</small></span></button>
+      </div>
+    </div>`);
 }
-function showExistingMasterHelp() {
-    setPage('🔐 Вход мастера', `<div class="card"><p>Если администратор уже одобрил вашу заявку, откройте чат с ботом и отправьте команду <b>/cabinetcode</b>. Бот выдаст одноразовый код для входа в кабинет.</p><p class="subtitle">Код действует ограниченное время. Не передавайте его другим людям.</p></div>`);
+
+function showExistingMasterHelp(message='') {
+    setPage('🔐 Вход мастера', `<form id="masterPhoneLoginForm" class="card master-auth-card">
+      <p>Введите номер телефона, который привязан к вашему кабинету мастера.</p>
+      <label for="masterPhoneLogin">Номер телефона</label>
+      <input id="masterPhoneLogin" name="phone" type="tel" inputmode="tel" autocomplete="tel" required placeholder="+998 90 123 45 67" value="${escapeClient(localStorage.getItem('remont_bt_phone') || '')}">
+      <button id="masterPhoneLoginButton" type="submit">Проверить и войти</button>
+      <p id="masterPhoneLoginStatus" class="${message?'error':'subtitle'}" role="status">${escapeClient(message || 'Доступ проверяется по вашему Telegram ID и номеру телефона.')}</p>
+    </form>`);
+    const form=document.getElementById('masterPhoneLoginForm');
+    form?.addEventListener('submit', async e => {
+      e.preventDefault();
+      const field=document.getElementById('masterPhoneLogin');
+      const status=document.getElementById('masterPhoneLoginStatus');
+      const button=document.getElementById('masterPhoneLoginButton');
+      const phone=cleanPhone(field?.value || '');
+      if(!validPhone(phone)){status.textContent='Введите корректный номер +998XXXXXXXXX.';status.className='error';return;}
+      const initData=String(window.Telegram?.WebApp?.initData || '');
+      const query=new URLSearchParams(location.search);
+      const sessionUid=query.get('session_uid')||'';const sessionExp=query.get('session_exp')||'';const sessionSig=query.get('session_sig')||'';
+      const signedSession=sessionUid&&sessionExp&&sessionSig?`${sessionUid}:${sessionExp}:${sessionSig}`:String(localStorage.getItem('remontBT.master.session.v1')||'');
+      if(!initData&&!signedSession){status.textContent='Откройте приложение кнопкой из чата с ботом Telegram. Обычная HTTPS-ссылка не подтверждает ваш Telegram ID.';status.className='error';return;}
+      const apiBase=String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/,'');
+      if(!apiBase){status.textContent='API не настроен. Сообщите администратору.';status.className='error';return;}
+      button.disabled=true;status.textContent='Проверяем номер и Telegram ID…';status.className='subtitle';
+      try{
+        const response=await fetch(apiBase+'/api/master/login',{method:'POST',headers:{'Content-Type':'application/json',...(initData?{'X-Telegram-Init-Data':initData}:{}),...(signedSession?{'X-Remont-Session':signedSession}:{})},body:JSON.stringify({phone,master_uid:query.get('master_uid'),master_exp:query.get('master_exp'),master_sig:query.get('master_sig')}),cache:'no-store'});
+        const data=await response.json().catch(()=>({}));
+        if(!response.ok)throw new Error(data.error || `Ошибка входа (${response.status})`);
+        if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
+        localStorage.setItem('remontBT.master.session.v1',data.session);
+        localStorage.setItem('remont_bt_phone',phone);
+        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261019-masterpinfl1');
+        status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
+        location.href=target.href;
+      }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
+    });
 }
+
 function showMasterApplicationForm() {
     let saved = {};
-    try { saved = JSON.parse(getClientLocal('master_application') || '{}') || {}; } catch (_) {}
-    setPage('🧑‍🔧 Заявка мастера', `<p class="subtitle">Заполните данные. Заявка будет привязана к Telegram-аккаунту, который передаст её боту. Доступ появится только после одобрения администратором.</p>
-      <form id="masterApplicationForm" class="card">
-        <label>ФИО *</label><input name="name" required minlength="2" maxlength="150" value="${escapeClient(saved.name || getClientLocal('name') || '')}">
-        <label>Телефон *</label><input name="phone" required type="tel" placeholder="+998 90 123 45 67" value="${escapeClient(saved.phone || getClientLocal('phone') || '')}">
-        <label>Пол *</label><select name="gender" required><option value="">Выберите</option><option value="Мужской" ${saved.gender==='Мужской'?'selected':''}>Мужской</option><option value="Женский" ${saved.gender==='Женский'?'selected':''}>Женский</option></select>
-        <label>Дата рождения (ДД.ММ.ГГГГ) *</label><input name="birth_date" required placeholder="25.04.1995" value="${escapeClient(saved.birth_date || '')}">
-        <label>ПИНФЛ (14 цифр) *</label><input name="pinfl" required inputmode="numeric" maxlength="14" pattern="[0-9]{14}" value="${escapeClient(saved.pinfl || '')}">
-        <p id="pinflCheck" class="subtitle">Введите пол, дату рождения и ПИНФЛ для проверки соответствия.</p>
-        <button type="submit">Отправить заявку на проверку</button><p id="masterApplicationStatus" class="subtitle"></p>
+    try { saved = JSON.parse(localStorage.getItem('remont_bt_master_application') || '{}') || {}; } catch (_) {}
+    setPage('🧑‍🔧 Заявка мастера', `<p class="subtitle">Укажите ФИО, телефон и данные для проверки ПИНФЛ. Пол и дата рождения сверяются с первыми цифрами ПИНФЛ. После проверки заявка уйдёт администратору; доступ выдаётся только после одобрения и привязывается к вашему Telegram ID.</p>
+      <form id="masterApplicationForm" class="card master-auth-card">
+        <label for="masterApplicationName">ФИО *</label><input id="masterApplicationName" name="name" required minlength="2" maxlength="150" autocomplete="name" value="${escapeClient(saved.name || localStorage.getItem('remont_bt_name') || '')}">
+        <label for="masterApplicationPhone">Телефон *</label><input id="masterApplicationPhone" name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="+998 90 123 45 67" value="${escapeClient(saved.phone || localStorage.getItem('remont_bt_phone') || '')}">
+        <label for="masterApplicationGender">Пол *</label><select id="masterApplicationGender" name="gender" required><option value="">Выберите пол</option><option value="Мужской" ${saved.gender==='Мужской'?'selected':''}>Мужской</option><option value="Женский" ${saved.gender==='Женский'?'selected':''}>Женский</option></select>
+        <label for="masterApplicationBirthDate">Дата рождения *</label><input id="masterApplicationBirthDate" name="birth_date" required inputmode="numeric" placeholder="ДД.ММ.ГГГГ" pattern="[0-9]{2}\.[0-9]{2}\.[0-9]{4}" value="${escapeClient(saved.birth_date || '')}">
+        <label for="masterApplicationPinfl">ПИНФЛ (14 цифр) *</label><input id="masterApplicationPinfl" name="pinfl" required inputmode="numeric" autocomplete="off" minlength="14" maxlength="14" pattern="[0-9]{14}" placeholder="14 цифр" value="${escapeClient(saved.pinfl || '')}">
+        <button type="submit">Проверить данные и отправить заявку</button><p id="masterApplicationStatus" class="subtitle" role="status"></p>
       </form>`);
     const form=document.getElementById('masterApplicationForm');
-    const check=()=>{
-      const d=new FormData(form); const result=checkPinflConsistency(String(d.get('pinfl')||''),String(d.get('gender')||''),String(d.get('birth_date')||''));
-      const node=document.getElementById('pinflCheck'); if(node){node.textContent=result.ok?'✓ ПИНФЛ соответствует указанным полу и дате рождения.':('✕ '+result.error);node.style.color=result.ok?'#16803d':'#b42318';}
-      return result.ok;
-    };
-    form.querySelectorAll('[name="gender"],[name="birth_date"],[name="pinfl"]').forEach(el=>el.addEventListener('input',check));
-    form.addEventListener('submit',e=>{e.preventDefault();if(!check())return;submitMasterApplication(form);});
+    form?.addEventListener('submit',e=>{e.preventDefault();submitMasterApplication(form);});
 }
-function checkPinflConsistency(pinfl,gender,birthDate){
-    const digits=String(pinfl||'').replace(/\D/g,'');
-    if(digits.length!==14)return {ok:false,error:'ПИНФЛ должен содержать ровно 14 цифр.'};
-    const first=Number(digits[0]); const mapping={3:['Мужской',1900],4:['Женский',1900],5:['Мужской',2000],6:['Женский',2000]};
-    if(!mapping[first])return {ok:false,error:'Первая цифра ПИНФЛ должна быть 3, 4, 5 или 6.'};
-    const day=Number(digits.slice(1,3)),month=Number(digits.slice(3,5)),year=mapping[first][1]+Number(digits.slice(5,7));
-    const dt=new Date(year,month-1,day);
-    if(dt.getFullYear()!==year||dt.getMonth()!==month-1||dt.getDate()!==day)return {ok:false,error:'Дата в ПИНФЛ некорректна.'};
-    const pad=n=>String(n).padStart(2,'0'); const encoded=`${pad(day)}.${pad(month)}.${year}`;
-    const input=String(birthDate||'').trim();
-    if(mapping[first][0]!==gender)return {ok:false,error:'Пол не совпадает с данными ПИНФЛ.'};
-    if(encoded!==input)return {ok:false,error:'Дата рождения не совпадает с данными ПИНФЛ.'};
-    return {ok:true};
-}
+
 function submitMasterApplication(form){
     const data=Object.fromEntries(new FormData(form).entries());
-    data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone);
-    data.pinfl=String(data.pinfl||'').replace(/\D/g,''); data.event='submit_master_application';
+    data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone); data.gender=String(data.gender||'').trim(); data.birth_date=String(data.birth_date||'').trim(); data.pinfl=String(data.pinfl||'').replace(/\D/g,''); data.event='submit_master_application';
     if(data.name.length<2)return showAlert('Введите ФИО.');
     if(!validPhone(data.phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
-    try{setClientLocal('master_application',JSON.stringify(data));}catch(_){}
+    if(!['Мужской','Женский'].includes(data.gender))return showAlert('Выберите пол.');
+    const birthMatch=data.birth_date.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+    if(!birthMatch)return showAlert('Введите дату рождения в формате ДД.ММ.ГГГГ.');
+    const day=Number(birthMatch[1]), month=Number(birthMatch[2]), year=Number(birthMatch[3]);
+    const date=new Date(year,month-1,day);
+    if(date.getFullYear()!==year||date.getMonth()!==month-1||date.getDate()!==day||date>new Date()||year<1900)return showAlert('Указана некорректная дата рождения.');
+    if(!/^\d{14}$/.test(data.pinfl))return showAlert('ПИНФЛ должен содержать ровно 14 цифр.');
+    const first=Number(data.pinfl[0]); const map={3:['Мужской',1900],4:['Женский',1900],5:['Мужской',2000],6:['Женский',2000]}; const pin=map[first];
+    if(!pin)return showAlert('Первая цифра ПИНФЛ не соответствует допустимому формату.');
+    const pinDate=`${data.pinfl.slice(1,3)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(5,7))}`;
+    if(pin[0]!==data.gender||pinDate!==data.birth_date)return showAlert(`Проверьте данные: по ПИНФЛ указаны пол ${pin[0]} и дата рождения ${pinDate}.`);
+    try{localStorage.setItem('remont_bt_master_application',JSON.stringify(data));}catch(_){}
     if(typeof queueOperation==='function'){
       queueOperation(data);
       const status=document.getElementById('masterApplicationStatus');
-      if(status){status.textContent='Заявка сохранена на устройстве. Нажмите «Передать сохранённые записи» внизу приложения, чтобы отправить её боту. После передачи заявка появится у администратора.';status.className='notice';}
-    }else showAlert('Локальная очередь недоступна. Обновите приложение из Telegram и повторите.');
+      if(status){status.textContent='Данные проверены и заявка поставлена в очередь отправки. Статус отправки отобразится после синхронизации.';status.className='notice';}
+    }else showAlert('Локальная очередь недоступна. Откройте приложение из Telegram и повторите.');
 }
 
 async function clientApi(path, method='GET', body=null) {
@@ -199,7 +231,7 @@ async function showProfile() {
         setPage('👤 Профиль', `<form id="profileForm" class="card"><label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
         document.getElementById('profileForm').addEventListener('submit', saveClientProfile);
     } catch (e) {
-        let p={}; try{p={name:getClientLocal('name')||'',phone:getClientLocal('phone')||''};}catch(_){}
+        let p={}; try{p={name:localStorage.getItem('remont_bt_name')||'',phone:localStorage.getItem('remont_bt_phone')||''};}catch(_){}
         renderLocalProfile(p, 'Данные сохранены локально, сервер пока недоступен.');
     }
 }
@@ -211,7 +243,7 @@ async function saveClientProfile(event) {
     event.preventDefault(); const f = new FormData(event.currentTarget); const status = document.getElementById('profileStatus');
     const data = Object.fromEntries(f.entries()); data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone);
     if(data.name.length<2||!validPhone(data.phone)){status.textContent='Проверьте ФИО и номер +998XXXXXXXXX.';status.className='error';return;}
-    try { setClientLocal('name',data.name); setClientLocal('phone',data.phone); } catch(_){}
+    try { localStorage.setItem('remont_bt_name',data.name); localStorage.setItem('remont_bt_phone',data.phone); } catch(_){}
     try {
       const r = await clientApi('/api/client/profile', 'POST', data); status.textContent = r.message || 'Профиль сохранён на сервере.'; status.className = 'notice';
     } catch (e) {
@@ -297,13 +329,12 @@ function showRegistrationScreen() {
         </button>
     `;
 
-    // Локальные данные разделены по Telegram ID (или подписанному ID кнопки).
-    // Для нового аккаунта поля остаются пустыми; повторное открытие своего кабинета
-    // сохраняет введённые ранее данные даже при временном отсутствии сети.
+    // Это экран первичной регистрации из /start: поля всегда пустые.
+    // Не используем localStorage/автозаполнение браузера, чтобы на общем или
+    // тестовом телефоне данные предыдущего клиента не попали в новую заявку.
     const phoneInput = document.getElementById("client_phone");
-    const hasSaved = getClientLocal('identity_saved') === '1' || getClientLocal('registered') === '1';
-    document.getElementById("client_name").value = hasSaved ? getClientLocal('name') : "";
-    phoneInput.value = hasSaved ? formatClientPhone(getClientLocal('phone')) : "";
+    document.getElementById("client_name").value = "";
+    phoneInput.value = "";
     attachPhoneMask(phoneInput);
 }
 
@@ -471,20 +502,20 @@ function showNewOrder() {
 
     try {
         document.getElementById('house').value = isNewClientFlow
-            ? '' : (getClientLocal('house') || '');
+            ? '' : (localStorage.getItem('remont_bt_house') || '');
 
         document.getElementById('apartment').value = isNewClientFlow
-            ? '' : (getClientLocal('apartment') || '');
+            ? '' : (localStorage.getItem('remont_bt_apartment') || '');
 
         const hasNewClientIdentity = isNewClientFlow &&
-            getClientLocal('identity_saved') === '1';
+            localStorage.getItem('remont_bt_identity_saved') === '1';
         const savedName = isNewClientFlow
-            ? (hasNewClientIdentity ? (getClientLocal('name') || '') : '')
-            : (getClientLocal('name') || (tg.initDataUnsafe?.user?.first_name || ''));
+            ? (hasNewClientIdentity ? (localStorage.getItem('remont_bt_name') || '') : '')
+            : (localStorage.getItem('remont_bt_name') || (tg.initDataUnsafe?.user?.first_name || ''));
 
         const savedPhone = isNewClientFlow
-            ? (hasNewClientIdentity ? (getClientLocal('phone') || '') : '')
-            : (getClientLocal('phone') || '');
+            ? (hasNewClientIdentity ? (localStorage.getItem('remont_bt_phone') || '') : '')
+            : (localStorage.getItem('remont_bt_phone') || '');
 
         document.getElementById('client_name').value = savedName;
         document.getElementById('client_phone').value =
@@ -518,7 +549,7 @@ function showNewOrder() {
         // (new_client=1) всегда показывает поля.
         const identityCard = document.getElementById('clientIdentityCard');
         // После успешного шага регистрации ФИО/телефон уже введены; не просим повторно в форме заявки.
-        identityCard.style.display = (isKnownRegisteredClient || (isNewClientFlow && getClientLocal('identity_saved') === '1')) ? 'none' : 'block';
+        identityCard.style.display = (isKnownRegisteredClient || (isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1')) ? 'none' : 'block';
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
@@ -532,7 +563,7 @@ function submitRegistration() {
     const name=(nameEl?nameEl.value:'').trim(), phone=cleanPhone(phoneEl?phoneEl.value:'');
     if(name.length<2)return showAlert('Введите ФИО не короче 2 символов.');
     if(!validPhone(phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
-    try{setClientLocal('name',name);setClientLocal('phone',phone);setClientLocal('identity_saved','1');}catch(_){}
+    try{localStorage.setItem('remont_bt_name',name);localStorage.setItem('remont_bt_phone',phone);localStorage.setItem('remont_bt_identity_saved','1');}catch(_){}
     if(typeof queueOperation==='function'){
       queueOperation({event:'register_client',client_name:name,client_phone:phone,client_registration_id:getClientRegistrationId(phone),client_registration_no:getClientRegistrationNo(phone)});
       renderClientMenu();
@@ -679,10 +710,10 @@ function submitOrder() {
     if (!house) return showAlert('Укажите дом');
 
     try {
-        setClientLocal('house', house);
-        setClientLocal('apartment', apartment);
-        setClientLocal('name', client_name);
-        if (client_phone) setClientLocal('phone', client_phone);
+        localStorage.setItem('remont_bt_house', house);
+        localStorage.setItem('remont_bt_apartment', apartment);
+        localStorage.setItem('remont_bt_name', client_name);
+        if (client_phone) localStorage.setItem('remont_bt_phone', client_phone);
     } catch (e) {
         console.warn('Не удалось сохранить данные локально:', e);
     }
@@ -720,7 +751,7 @@ function submitOrder() {
 
     const ok = sendToBot(data);
     if (ok) {
-        try { setClientLocal('registered', '1'); } catch (_) {}
+        try { localStorage.setItem('remont_bt_registered', '1'); } catch (_) {}
     }
 
     if (!ok) {

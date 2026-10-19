@@ -15,7 +15,7 @@
         if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', async function () {
           try {
-            const workerUrl = new URL('./sw.js?release=20261018-registrationflow2', document.baseURI);
+            const workerUrl = new URL('./sw.js?release=20261019-masterpinfl1', document.baseURI);
             const scopeUrl = new URL('./', document.baseURI);
             const registration = await navigator.serviceWorker.register(workerUrl.href, {
               scope: scopeUrl.pathname,
@@ -29,38 +29,43 @@
         }, { once: true });
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261018-registrationflow2">
+    <link rel="stylesheet" href="css/style.css?v=20261019-masterpinfl1">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
     <script>
         const params = new URLSearchParams(window.location.search);
-        // Master authentication no longer depends on query or fragment credentials.
-        const hashParams = new URLSearchParams(String(window.location.hash || '').replace(/^#/, ''));
-        const launchParam = (name) => params.get(name) || hashParams.get(name) || '';
-        const launchMode = launchParam('launch') || 'main';
-        const roleFromUrl = launchParam('role');
+        const launchMode = params.get('launch') || 'main';
+        const roleFromUrl = params.get('role');
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/advertiser-config.js?v=20261018-registrationflow2"></script>
-    <script src="js/common.js?v=20261018-registrationflow2"></script>
+    <script src="js/advertiser-config.js?v=20261019-masterpinfl1"></script>
+    <script src="js/common.js?v=20261019-masterpinfl1"></script>
     <script>
-        const rawUserId = window.Telegram?.WebApp?.initDataUnsafe?.user?.id ?? null;
-        const userId = rawUserId === null || rawUserId === undefined || rawUserId === '' ? null : Number(rawUserId);
-        // index.html is the master entry point. Missing query/initData now leads to code login, not a dead-end error.
-        const role = roleFromUrl === 'client' ? 'client' : 'master';
-        console.info('[Remont BT] login-code build 20261018', {
-            path: window.location.pathname,
-            queryKeys: Array.from(params.keys()),
-            hashKeys: Array.from(hashParams.keys()),
-            initDataPresent: Boolean(window.Telegram?.WebApp?.initData),
-            initUserPresent: Number.isFinite(userId)
-        });
-        const script = document.createElement('script');
-        script.src = role === 'master' ? 'js/master.js?v=20261018-registrationflow2' : 'js/client.js?v=20261018-registrationflow2';
-        script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить приложение</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
-        document.body.appendChild(script);
+        const MASTER_ID = 450540408;
+        const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
+            ? tg.initDataUnsafe.user.id : null;
+        const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
+            ? null : Number(rawUserId);
+        const hasMasterSession = Boolean(params.get('master_uid') && params.get('master_exp') && params.get('master_sig'));
+
+        console.log('Mini App build 20261019-masterpinfl1', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession});
+
+        // The master URL is signed server-side and checked by the API. Never invent an identity client-side.
+        let role = null;
+        if (roleFromUrl === 'master' && hasMasterSession) role = 'master';
+        else if ((roleFromUrl === 'master' || roleFromUrl === 'client') && Number.isFinite(userId)) role = roleFromUrl;
+        else if (Number.isFinite(userId)) role = userId === Number(MASTER_ID) ? 'master' : 'client';
+
+        if (!role) {
+            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте Mini App. В чате с ботом отправьте /start и откройте приложение новой кнопкой «Открыть кабинет мастера». Если кнопки нет, перезапустите бота. Не открывайте обычную HTTPS-ссылку.</p><p style="opacity:.7">Техническая причина: в ссылке запуска нет подписанной сессии мастера, а Telegram не передал user в initData.</p></main>`;
+        } else {
+            const script = document.createElement('script');
+            script.src = role === 'master' ? 'js/master.js?v=20261019-masterpinfl1' : 'js/client.js?v=20261019-masterpinfl1';
+            script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
+            document.body.appendChild(script);
+        }
     </script>
 </body>
 </html>
