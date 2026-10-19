@@ -15,7 +15,7 @@
         if (!('serviceWorker' in navigator)) return;
         window.addEventListener('load', async function () {
           try {
-            const workerUrl = new URL('./sw.js?release=20261019-masterflow3', document.baseURI);
+            const workerUrl = new URL('./sw.js?release=20261019-masterflow4', document.baseURI);
             const scopeUrl = new URL('./', document.baseURI);
             const registration = await navigator.serviceWorker.register(workerUrl.href, {
               scope: scopeUrl.pathname,
@@ -29,7 +29,7 @@
         }, { once: true });
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261019-masterflow3">
+    <link rel="stylesheet" href="css/style.css?v=20261019-masterflow4">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
@@ -40,17 +40,28 @@
         // sendData is available only when opened from a reply-keyboard WebApp button.
         window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     </script>
-    <script src="js/advertiser-config.js?v=20261019-masterflow3"></script>
-    <script src="js/common.js?v=20261019-masterflow3"></script>
+    <script src="js/advertiser-config.js?v=20261019-masterflow4"></script>
+    <script src="js/common.js?v=20261019-masterflow4"></script>
     <script>
         const MASTER_ID = 450540408;
         const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
             ? tg.initDataUnsafe.user.id : null;
         const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
             ? null : Number(rawUserId);
-        const hasMasterSession = Boolean(params.get('master_uid') && params.get('master_exp') && params.get('master_sig'));
+        const queryMasterSession = Boolean(params.get('master_uid') && params.get('master_exp') && params.get('master_sig'));
+        // Fallback for an authenticated master redirect from client.js. The
+        // server still verifies the HMAC on every API request; this only lets
+        // the static page select master.js when Telegram initData is empty.
+        let storedMasterSession = false;
+        try {
+            const parts = String(localStorage.getItem('remontBT.master.session.v1') || '').split(':');
+            storedMasterSession = parts.length === 3 && /^\d+$/.test(parts[0]) &&
+                /^\d+$/.test(parts[1]) && /^[a-f0-9]{64}$/i.test(parts[2]) &&
+                Number(parts[1]) >= Math.floor(Date.now() / 1000);
+        } catch (_) {}
+        const hasMasterSession = queryMasterSession || storedMasterSession;
 
-        console.log('Mini App build 20261019-masterflow3', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession});
+        console.log('Mini App build 20261019-masterflow4', {rawUserId, userId, roleFromUrl, launchMode, queryMasterSession, storedMasterSession});
 
         // The master URL is signed server-side and checked by the API. Never invent an identity client-side.
         let role = null;
@@ -62,7 +73,7 @@
             document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте Mini App. В чате с ботом отправьте /start и откройте приложение новой кнопкой «Открыть кабинет мастера». Если кнопки нет, перезапустите бота. Не открывайте обычную HTTPS-ссылку.</p><p style="opacity:.7">Техническая причина: в ссылке запуска нет подписанной сессии мастера, а Telegram не передал user в initData.</p></main>`;
         } else {
             const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261019-masterflow3' : 'js/client.js?v=20261019-masterflow3';
+            script.src = role === 'master' ? 'js/master.js?v=20261019-masterflow4' : 'js/client.js?v=20261019-masterflow4';
             script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
             document.body.appendChild(script);
         }

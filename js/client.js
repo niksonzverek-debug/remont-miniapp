@@ -104,7 +104,18 @@ function showExistingMasterHelp(message='') {
         if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
         localStorage.setItem('remontBT.master.session.v1',data.session);
         localStorage.setItem('remont_bt_phone',phone);
-        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261019-masterpinfl1');
+        const target=new URL('index.html',location.href);
+        target.searchParams.set('role','master');
+        target.searchParams.set('appv','20261019-masterflow4');
+        // Keep the signed session in the redirect URL. index.html needs it to
+        // select the master app when Telegram's initData is empty; master.js
+        // also retains the same verified session in localStorage for API calls.
+        const sessionParts=String(data.session).split(':');
+        if(sessionParts.length===3 && /^\d+$/.test(sessionParts[0]) && /^\d+$/.test(sessionParts[1]) && /^[a-f0-9]{64}$/i.test(sessionParts[2])){
+          target.searchParams.set('master_uid',sessionParts[0]);
+          target.searchParams.set('master_exp',sessionParts[1]);
+          target.searchParams.set('master_sig',sessionParts[2]);
+        }
         status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
         location.href=target.href;
       }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
