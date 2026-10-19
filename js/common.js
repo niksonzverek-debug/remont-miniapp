@@ -75,8 +75,13 @@ function setClientLocal(key, value) {
 }
 function isQueueItemForCurrentUser(item) {
     const uid = currentQueueOwnerId();
-    return Boolean(uid) && String(item && item.telegram_user_id || '') === uid &&
-        (!item.launch_role || item.launch_role === 'client');
+    if (!uid || String(item && item.telegram_user_id || '') !== uid) return false;
+    const event = String(item && item.event || '');
+    const role = String(item && item.launch_role || '');
+    if (!role || role === 'client') return event !== 'offline_create_act';
+    if (role === 'master_entry') return event === 'submit_master_application';
+    if (role === 'master') return event === 'offline_create_act' || event === 'submit_master_application';
+    return false;
 }
 function saveOfflineQueue(queue) {
     try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue.slice(-100))); } catch (e) {

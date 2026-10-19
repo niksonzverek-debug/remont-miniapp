@@ -17,6 +17,16 @@ let orderData = {
 };
 
 const clientUrlParams = new URLSearchParams(location.search);
+const currentClientTelegramId = String(tg?.initDataUnsafe?.user?.id || '');
+// Mini App localStorage is shared by Telegram accounts on the same device. Scope
+// profile/autofill data to the Telegram UID; never clear the offline operation queue.
+if (currentClientTelegramId) {
+    const storedProfileUid = String(localStorage.getItem('remont_bt_profile_uid') || '');
+    if (storedProfileUid !== currentClientTelegramId) {
+        ['remont_bt_name','remont_bt_phone','remont_bt_house','remont_bt_apartment',
+         'remont_bt_identity_saved','remont_bt_registered','remont_bt_master_application'].forEach(k => localStorage.removeItem(k));
+    }
+}
 const isNewClientFlow = clientUrlParams.get("new_client") === "1";
 // Регистрационный номер в ссылке добавляет бот только для уже зарегистрированного клиента.
 const hasJustRegisteredLocally = isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1';
@@ -40,8 +50,6 @@ function renderClientMenu() {
           <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
           <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
           <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
-          <button class="menu-btn" onclick="showRegistrationScreen()"><span class="emoji">🪪</span> Регистрация / мои данные</button>
-          <button class="menu-btn" onclick="showMasterChoice()"><span class="emoji">🧑‍🔧</span> Кабинет мастера</button>
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
@@ -119,9 +127,11 @@ function showMasterApplicationForm() {
     form?.addEventListener('submit',e=>{e.preventDefault();submitMasterApplication(form);});
 }
 
-function submitMasterApplication(form){
+async function submitMasterApplication(form){
     const data=Object.fromEntries(new FormData(form).entries());
     data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone); data.gender=String(data.gender||'').trim(); data.birth_date=String(data.birth_date||'').trim(); data.pinfl=String(data.pinfl||'').replace(/\D/g,''); data.event='submit_master_application';
+    const status=document.getElementById('masterApplicationStatus');
+    const button=form.querySelector('button[type="submit"]');
     if(data.name.length<2)return showAlert('Введите ФИО.');
     if(!validPhone(data.phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
     if(!['Мужской','Женский'].includes(data.gender))return showAlert('Выберите пол.');
@@ -135,12 +145,23 @@ function submitMasterApplication(form){
     if(!pin)return showAlert('Первая цифра ПИНФЛ не соответствует допустимому формату.');
     const pinDate=`${data.pinfl.slice(1,3)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(5,7))}`;
     if(pin[0]!==data.gender||pinDate!==data.birth_date)return showAlert(`Проверьте данные: по ПИНФЛ указаны пол ${pin[0]} и дата рождения ${pinDate}.`);
-    try{localStorage.setItem('remont_bt_master_application',JSON.stringify(data));}catch(_){}
-    if(typeof queueOperation==='function'){
-      queueOperation(data);
-      const status=document.getElementById('masterApplicationStatus');
-      if(status){status.textContent='Данные проверены и заявка поставлена в очередь отправки. Статус отправки отобразится после синхронизации.';status.className='notice';}
-    }else showAlert('Локальная очередь недоступна. Откройте приложение из Telegram и повторите.');
+    try{localStorage.setItem('remont_bt_master_application',JSON.stringify(data)); localStorage.setItem('remont_bt_phone',data.phone); localStorage.setItem('remont_bt_name',data.name);if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
+    if(button){button.disabled=true;button.textContent='⏳ Отправляем заявку…';}
+    try {
+      const result=await clientApi('/api/master/apply','POST',{name:data.name,phone:data.phone,gender:data.gender,birth_date:data.birth_date,pinfl:data.pinfl});
+      if(status){status.textContent=result.already_master?'У вас уже есть кабинет мастера. Вернитесь в Telegram и откройте приложение мастера.':(result.existing_master_phone_match?'Найден существующий мастер с этим номером. Заявка отправлена администратору для проверки привязки.':'Ваша заявка отправлена и находится на рассмотрении.');status.className='notice';}
+      if(result.already_master) showExistingMasterHelp('Кабинет мастера уже зарегистрирован. Подтвердите телефон для входа.');
+      else if(button){button.textContent='✓ Заявка отправлена';}
+    } catch(err) {
+      if(err.status && err.status !== 401 && err.status < 500){
+        if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные.';status.className='error';}
+        if(button){button.textContent='Исправить данные и повторить';button.disabled=false;}
+      } else if(typeof queueOperation==='function'){
+        queueOperation(data);
+        if(status){status.textContent='Сервер сейчас недоступен или не подтвердил Telegram. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
+        if(button){button.textContent='📦 Заявка сохранена в очереди';button.disabled=false;}
+      } else {if(status){status.textContent='Не удалось отправить заявку. Проверьте связь и повторите.';status.className='error';} if(button)button.disabled=false;}
+    }
 }
 
 async function clientApi(path, method='GET', body=null) {
@@ -166,7 +187,7 @@ async function clientApi(path, method='GET', body=null) {
     });
     let data = {};
     try { data = await res.json(); } catch (_) {}
-    if (!res.ok) throw new Error(data.error || `Ошибка запроса (${res.status})`);
+    if (!res.ok) { const err = new Error(data.error || `Ошибка запроса (${res.status})`); err.status = res.status; throw err; }
     return data;
 }
 
@@ -558,17 +579,30 @@ function showNewOrder() {
 
 // ============ РЕГИСТРАЦИЯ КЛИЕНТА ============
 
-function submitRegistration() {
+async function submitRegistration() {
     const nameEl=document.getElementById('client_name'), phoneEl=document.getElementById('client_phone');
     const name=(nameEl?nameEl.value:'').trim(), phone=cleanPhone(phoneEl?phoneEl.value:'');
     if(name.length<2)return showAlert('Введите ФИО не короче 2 символов.');
     if(!validPhone(phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
-    try{localStorage.setItem('remont_bt_name',name);localStorage.setItem('remont_bt_phone',phone);localStorage.setItem('remont_bt_identity_saved','1');}catch(_){}
-    if(typeof queueOperation==='function'){
-      queueOperation({event:'register_client',client_name:name,client_phone:phone,client_registration_id:getClientRegistrationId(phone),client_registration_no:getClientRegistrationNo(phone)});
-      renderClientMenu();
-      showAlert('Данные сохранены на устройстве. Для регистрации на сервере передайте сохранённые записи кнопкой внизу приложения.');
-    }else showAlert('Не удалось открыть локальную очередь. Повторите из Telegram.');
+    try{localStorage.setItem('remont_bt_name',name);localStorage.setItem('remont_bt_phone',phone);localStorage.setItem('remont_bt_identity_saved','1');if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
+    const data={event:'register_client',name,phone,client_name:name,client_phone:phone,client_registration_id:getClientRegistrationId(phone),client_registration_no:getClientRegistrationNo(phone)};
+    // Open the client menu immediately; server synchronisation happens in the background.
+    try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
+    renderClientMenu();
+    try {
+      await clientApi('/api/client/register','POST',{name,phone,client_registration_id:data.client_registration_id,client_registration_no:data.client_registration_no});
+      try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
+      showAlert('Регистрация сохранена на сервере.');
+    } catch(err) {
+      if(err.status && err.status !== 401 && err.status < 500){
+        try{localStorage.removeItem('remont_bt_registered');localStorage.removeItem('remont_bt_identity_saved');}catch(_){}
+        showAlert(err.message || 'Сервер отклонил регистрацию. Проверьте введённые данные.');
+        showRegistrationScreen();
+      } else if(typeof queueOperation==='function'){
+        queueOperation(data);
+        showAlert('Профиль открыт. Данные сохранены на устройстве и поставлены в очередь синхронизации.');
+      } else showAlert('Профиль открыт, но сервер недоступен и локальная очередь не загрузилась. Не закрывайте приложение до восстановления связи.');
+    }
 }
 
 // ============ ВЫБОР "ДРУГОЕ" ============
@@ -773,5 +807,17 @@ async function showCallMaster() {
 
 // ============ СТАРТ ============
 
-// Главное меню доступно сразу: регистрация и сетевые разделы не блокируют офлайн-заявку.
-renderClientMenu();
+async function startRemontApp(){
+  const role=clientUrlParams.get('role')||'client';
+  if(role==='master_entry'){ showMasterChoice(); return; }
+  const localKnown=localStorage.getItem('remont_bt_identity_saved')==='1'||localStorage.getItem('remont_bt_registered')==='1';
+  if(localKnown||isKnownRegisteredClient){ renderClientMenu(); return; }
+  // Existing server-side client profiles should not be forced through registration again.
+  try{
+    const d=await clientApi('/api/client/profile');
+    const profile=d.profile||{};
+    if(profile.name&&profile.phone){localStorage.setItem('remont_bt_name',profile.name);localStorage.setItem('remont_bt_phone',profile.phone);localStorage.setItem('remont_bt_registered','1');localStorage.setItem('remont_bt_identity_saved','1');if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);renderClientMenu();return;}
+  }catch(_){}
+  showRegistrationScreen();
+}
+startRemontApp();
