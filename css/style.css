@@ -725,3 +725,25 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 .bt-act-readable{margin:12px 0;padding:12px 14px;border:1px solid rgba(93,180,255,.3);border-radius:14px;background:rgba(15,37,74,.45);color:#e7f2ff;line-height:1.65}
 .bt-act-readable p{margin:8px 0}.bt-act-readable ol{padding-left:26px;margin:8px 0 16px}.bt-act-readable li{padding:3px 0}
 .bt-act-readable b{color:#e8f7ff}
+
+/* Stage 6: urgent attention and swipe-friendly client home */
+.bt-client-home{touch-action:pan-x pan-y;overscroll-behavior-y:contain;min-height:calc(100dvh + 90px)!important;padding-bottom:calc(165px + env(safe-area-inset-bottom))!important}
+.bt-client-home .bt-home-chat{min-height:230px!important}
+.bt-order-success-notice{margin:12px 0;padding:12px 14px;border-radius:13px;border:1px solid #41d8a9;background:#082d32;color:#b9ffe4;box-shadow:0 0 14px #32c5ab54;font-weight:750}
+.bt-master-new-orders.bt-attention-urgent,.bt-master-message-panel.bt-attention-urgent,
+.master-app .bt-attention-urgent,.master-app .bt-inbox-thread.bt-unread-thread,
+.master-app .order-card.bt-new-order{border:2px solid #ff4759!important;
+ background:linear-gradient(135deg,#3b101c,#112338)!important;
+ box-shadow:0 0 17px #ff2a4c90,0 0 29px #ff2a4c48,inset 0 0 14px #ff35552e!important}
+.bt-attention-urgent .count-bubble{background:#e6314a!important;color:#fff!important;box-shadow:0 0 16px #ff375c!important}
+.master-app .bt-attention-nav{position:relative;color:#ffc6ce!important;text-shadow:0 0 9px #ff334e}
+.master-app .bt-attention-nav::before{content:'';position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:#ff405a;box-shadow:0 0 11px #ff405a}
+.bt-inbox-thread.bt-unread-thread .bt-inbox-unread{background:#eb3356;box-shadow:0 0 16px #fd5273;color:#fff}
+.bt-chat-compose-actions{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;align-items:stretch!important}
+.bt-chat-compose-actions .bt-chat-attach,.bt-chat-compose-actions button{height:100%;min-height:47px!important;min-width:0!important;align-items:center!important;justify-content:center!important;display:flex!important;line-height:1.2!important;text-align:center!important;white-space:normal!important}
+@media (max-width:350px){.bt-chat-compose-actions{grid-template-columns:1fr!important}}
+.bt-payout-row{padding:12px 0;border-top:1px solid #224c74}.bt-payout-row label{margin-top:9px}
+.bt-payout-row input{width:100%;max-width:100%}
+
+.bt-home-chat-history{overscroll-behavior-y:auto!important;-webkit-overflow-scrolling:touch!important}
+body.bt-inner-page{overscroll-behavior-x:contain}

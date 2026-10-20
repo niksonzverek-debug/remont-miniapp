@@ -1,8 +1,8 @@
-/* Remont BT Service Worker — 20261020-stage5-acts-admin
+/* Remont BT Service Worker — 20261021-stage6-cycle-chat-payout
  * Network-first for navigation and static assets; cache is only an offline fallback.
  * Only this app's own caches are cleaned. API and user-specific requests are never cached.
  */
-const RELEASE = '20261020-stage5-acts-admin';
+const RELEASE = '20261021-stage6-cycle-chat-payout';
 const CACHE_NAME = `remont-bt-miniapp-${RELEASE}`;
 const CACHE_PREFIX = 'remont-bt-miniapp-';
 const STATIC_ASSETS = [

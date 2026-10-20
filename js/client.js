@@ -439,13 +439,30 @@ async function clientApi(path, method='GET', body=null) {
     return data;
 }
 
+// Swipe-back on inner pages; Telegram/Android owns system-level edge gestures.
+let btClientPageBack=()=>renderClientMenu();
+(function setupBtClientSwipe(){
+    let start=null;
+    document.addEventListener('touchstart',e=>{
+        const t=e.touches?.[0];
+        start=t&&t.clientX<=70?{x:t.clientX,y:t.clientY,target:e.target}:null;
+    },{passive:true});
+    document.addEventListener('touchend',e=>{
+        if(!start||!document.body.classList.contains('bt-inner-page'))return;
+        const t=e.changedTouches?.[0],dx=t? t.clientX-start.x:0,dy=t?Math.abs(t.clientY-start.y):0;
+        const interactive=start.target?.closest?.('input,textarea,select,[contenteditable],.bt-chat-history');
+        start=null;
+        if(!interactive&&dx>90&&dy<70){e.preventDefault();btClientPageBack();}
+    },{passive:false});
+})();
 function setPage(title, body) {
     btStopOrderProgressRefresh();
     if(!String(title).includes('Живой чат'))btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
     document.body.classList.add('bt-inner-page');
     document.body.classList.remove('bt-order-page');
-    document.body.innerHTML = `<main class="bt-inner-content"><button class="back-btn" onclick="renderClientMenu()">← Главная</button><h1>${title}</h1>${body}</main>` + btClientBottomNav();
+    btClientPageBack=()=>renderClientMenu();
+    document.body.innerHTML = `<main class="bt-inner-content"><button class="back-btn" onclick="btClientPageBack()">← Главная</button><h1>${title}</h1>${body}</main>` + btClientBottomNav();
 }
 
 function btClientBottomNav() {
@@ -454,7 +471,7 @@ function btClientBottomNav() {
 
 const btOrderStatusLabels = {
     new: 'Ожидает мастера', accepted: 'Принята мастером', in_progress: 'Выполняется ремонт',
-    act_issued: 'Акт выдан — ожидает подтверждения', rejected: 'Отклонена мастером',
+    act_issued: 'Ожидает подтверждения акта', act_pending_delivery:'Акт готов — ожидает уведомления', rejected: 'Отклонена мастером',
     closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена'
 };
 function btOrderTimeline(o) {
@@ -467,18 +484,20 @@ function btOrderTimeline(o) {
 }
 function btOrderCards(rows) {
     return rows.length ? rows.map(o => {
-        const label=btOrderStatusLabels[o.status]||o.status||'Обрабатывается';
+        const confirmationReady=Boolean(o.can_confirm_act === true);
+        const displayStatus=String(o.display_status||o.status||'');
+        const label=btOrderStatusLabels[displayStatus]||displayStatus||'Обрабатывается';
         const date=String(o.updated_at||o.act_issued_at||o.created_at||'').replace('T',' ').slice(0,16);
         let deadline='';
         const remaining=Number(o.act_confirmation_deadline||0)*1000-Date.now();
-        if(o.status==='act_issued' && remaining>0)deadline=`<p class="subtitle">Если не подтвердить акт, он может автоматически закрыться после ${Math.ceil(remaining/60000)} мин. Ознакомьтесь с документом заранее.</p>`;
+        if(confirmationReady && remaining>0)deadline=`<p class="subtitle">Если не подтвердить акт, он может автоматически закрыться после ${Math.ceil(remaining/60000)} мин. Ознакомьтесь с документом заранее.</p>`;
         return `<article class="card bt-order-progress-card">
             <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>
             <h3>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3>
             <p>${escapeClient(o.problem||'')}</p>${btOrderTimeline(o)}
             <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
             ${o.promocode?`<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>`:''}
-            ${o.status==='act_issued'?`<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button>${deadline}`:''}
+            ${confirmationReady?`<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button>${deadline}`:''}
         </article>`;
     }).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
 }
@@ -513,7 +532,10 @@ async function confirmClientActRequest(orderId) {
         const r = await clientApi('/api/client/confirm-act', 'POST', {order_id: orderId});
         if (tg && typeof tg.showAlert === 'function') tg.showAlert(r.message || 'Заявка закрыта.');
         await showMyOrders();
-    } catch (e) { showAlert(e.message); }
+    } catch (e) {
+        if (e.status===409) { await showMyOrders(); showAlert('Статус обновился. Заявка больше не требует подтверждения.'); }
+        else showAlert(e.message);
+    }
 }
 
 let btClientActsCache=[];
@@ -677,11 +699,10 @@ async function btRefreshClientChat(silent=false){
         history.dataset.fingerprint=fingerprint;
         history.innerHTML=rows.length?rows.map(btChatBubble).join(''):'<p class="subtitle">Пока нет сообщений. Напишите мастеру прямо здесь.</p>';
         for(const slot of history.querySelectorAll('[data-media-id]'))btLoadChatMedia(slot,slot.dataset.mediaId,slot.dataset.mediaKind);
-        history.scrollTop=history.scrollHeight;
-    }catch(e){
-        const status=document.getElementById('messageStatus');
-        if(status&&!silent){status.textContent=e.message;status.className='error';}
-    }
+        const anchor=document.createElement('a'); anchor.href=url; anchor.download=`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
+        document.body.appendChild(anchor); anchor.click(); anchor.remove();
+        setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){showAlert(e.message);}
 }
 async function showMessages(){
     btStopChatRefresh();
@@ -1269,10 +1290,15 @@ async function submitOrder() {
         }
         localStorage.setItem('remont_bt_registered','1');
         btOrderOperationId=null;
-        const done=`✅ Заявка ${result.order_id||''} отправлена. ${result.notified===false?'Она сохранена на сервере, уведомление мастеру задерживается.':'Вернитесь в чат Telegram — там будет кнопка кабинета.'}`;
-        if(tg && typeof tg.showAlert==='function') {
-            tg.showAlert(done,()=>{try{tg.close();}catch(_){renderClientMenu();}});
-        } else {showAlert(done);renderClientMenu();}
+        // Остаёмся в Mini App: Telegram-чат не открывается автоматически.
+        renderClientMenu();
+        const notice=document.createElement('div');
+        notice.className='bt-order-success-notice';
+        notice.role='status';
+        notice.textContent=`✓ Заявка ${result.order_id||''} сохранена. Мастер увидит её в кабинете.`;
+        const anchor=document.querySelector('.bt-client-home .bt-main-action');
+        if(anchor)anchor.insertAdjacentElement('afterend',notice);
+        setTimeout(()=>{if(notice.isConnected)notice.remove();},9500);
     } catch(err) {
         // Keep operation_id for an idempotent retry if the response was lost.
         showAlert(err.message||'Не удалось отправить заявку. Проверьте связь и повторите.');

@@ -110,7 +110,9 @@ async function sendMasterActCorrection(number){
 }
 function masterShell(title, body) {
   if(title!=='Диалог' && typeof btMasterStopChatMedia==='function') btMasterStopChatMedia();
-  document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="bt-master-title"><img class="bt-master-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><div class="eyebrow">REMONT BT · ELECTRIC STEEL BLUE</div><h1>${masterEsc(title)}</h1></div></div><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button onclick="showMasterMessages()"><span>▤</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
+  btMasterCurrentScreen=title;
+  document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="bt-master-title"><img class="bt-master-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><div class="eyebrow">REMONT BT · ELECTRIC STEEL BLUE</div><h1>${masterEsc(title)}</h1></div></div><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button id="btMasterOrdersNav" onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button id="btMasterChatsNav" onclick="showMasterMessages()"><span>✉</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
+  btUpdateMasterAttention();
 }
 function masterToast(message, error=false) { const e=document.getElementById('masterToast'); if(e){e.textContent=message;e.className=error?'error':'notice';} else showAlert(message); }
 function showMasterLogin(message='') {
@@ -160,22 +162,66 @@ async function loadMasterData() {
   }
   masterCurrentUserId=String(dash.authenticated_master_id||'');
   masterCache={...masterCache,profile:dash.profile,stats:dash.stats,orders:orders.orders||[],clients:clients.clients||[],messages:messages.messages||[],acts:acts.acts||[],promos:promos.promocodes||[]};
+  btUpdateMasterAttention();
+  btStartMasterAttention();
   return masterCache;
 }
+let btMasterCurrentScreen='';
+let btMasterAttentionTimer=null;
+let btMasterAttentionInFlight=false;
+function btUpdateMasterAttention(){
+  const s=masterCache.stats||{};
+  document.querySelector('#btMasterOrdersNav')?.classList.toggle('bt-attention-nav',Number(s.new_orders)>0);
+  document.querySelector('#btMasterChatsNav')?.classList.toggle('bt-attention-nav',Number(s.unread_messages)>0);
+  const newBtn=document.querySelector('.bt-master-new-orders'),msgBtn=document.querySelector('.bt-master-message-panel');
+  newBtn?.classList.toggle('bt-attention-urgent',Number(s.new_orders)>0);
+  msgBtn?.classList.toggle('bt-attention-urgent',Number(s.unread_messages)>0);
+  if(newBtn)newBtn.querySelector('.count-bubble').textContent=String(s.new_orders||0);
+  if(msgBtn){msgBtn.querySelector('.count-bubble').textContent=String(s.unread_messages||0);
+    const small=msgBtn.querySelector('small');if(small)small.textContent=`${s.unread_messages||0} непрочитанных · Открыть переписку →`;}
+}
+function btStartMasterAttention(){
+  if(btMasterAttentionTimer)return;
+  btMasterAttentionTimer=setInterval(async()=>{
+    if(document.hidden||btMasterAttentionInFlight)return;
+    btMasterAttentionInFlight=true;
+    try{
+      const d=await masterApi('/api/master/dashboard');
+      masterCache.stats=d.stats||{};
+      btUpdateMasterAttention();
+      if(btMasterCurrentScreen==='Чаты'&&Number(d.stats?.unread_messages)>0){
+        await showMasterMessages();
+      }
+    }catch(_){ /* no stale-UI overwrite during network failure */ }
+    finally{btMasterAttentionInFlight=false;}
+  },12000);
+}
+// Finger-swipe within the app, preserving the native Android/Telegram edge gesture.
+(function setupBtMasterSwipe(){
+ let origin=null;
+ document.addEventListener('touchstart',e=>{const t=e.touches?.[0];origin=t&&t.clientX<=70?{x:t.clientX,y:t.clientY,target:e.target}:null;},{passive:true});
+ document.addEventListener('touchend',e=>{
+   if(!origin)return; const t=e.changedTouches?.[0],dx=t?t.clientX-origin.x:0,dy=t?Math.abs(t.clientY-origin.y):0;
+   const src=origin.target;origin=null;
+   if(dx>90&&dy<70&&!src?.closest?.('input,textarea,select,[contenteditable],.bt-chat-history')&&btMasterCurrentScreen!=='Панель мастера'){
+     e.preventDefault(); if(btMasterCurrentScreen==='Диалог')showMasterMessages();else renderMasterMenu();
+   }
+ },{passive:false});
+})();
 async function renderMasterMenu() {
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
   const s=masterCache.stats;
   masterShell('Панель мастера',`<div class="master-welcome card"><div><h2>Здравствуйте, ${masterEsc(masterCache.profile?.name || tg.initDataUnsafe?.user?.first_name || 'мастер')}!</h2><p class="subtitle">Ваш рабочий центр Remont BT</p></div><span class="status-pill">● Онлайн</span></div>
-  <button class="bt-master-new-orders" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
+  <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
   <button class="bt-master-primary" onclick="showCreateAct()">▧ Создать акт</button>
   <div class="master-action-grid bt-master-feature-grid"><button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><span><b>Заявки</b><small>Все обращения</small></span></button><button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><span><b>Все акты</b><small>Документы</small></span></button><button class="menu-btn" onclick="showMasterMessages()"><span class="emoji">✉</span><span><b>Чаты</b><small>Сообщения клиентов</small></span></button><button class="menu-btn" onclick="showMasterClients()"><span class="emoji">♙</span><span><b>Клиенты</b><small>Контакты и история</small></span></button></div>
-  <button class="bt-master-message-panel" onclick="showMasterMessages()"><span><b>✉ Последние сообщения</b><small>${s.unread_messages||0} непрочитанных · Открыть переписку →</small></span><span class="count-bubble">${s.unread_messages||0}</span></button>
+  <button class="bt-master-message-panel ${Number(s.unread_messages)>0?'bt-attention-urgent':''}" onclick="showMasterMessages()"><span><b>✉ Последние сообщения</b><small>${s.unread_messages||0} непрочитанных · Открыть переписку →</small></span><span class="count-bubble">${s.unread_messages||0}</span></button>
   <div class="bt-master-extra"><button onclick="showMasterPromos()">◇ Промокоды</button><button onclick="showMasterMarketingLink()">↗ Рекламная ссылка</button><button onclick="showMasterProfile()">⚙ Настройки</button></div>
   <div class="bt-master-progress"><b>⚡ Электрическая цепь ремонта</b><p>Заявка → Принято → Ремонт → Акт</p><div class="bt-master-progress-track"><span>✓</span><span>⚡</span><span>⚙</span><span>▤</span></div></div>`);
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
- const rows=masterCache.orders.map(o=>`<article class="card order-card"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p><div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button></div></article>`).join('');
+ const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p><div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button></div></article>`).join('');
  masterShell('Заявки',`<div class="section-heading"><p>Сначала показываются последние заявки. Действия доступны только по заявкам вашего кабинета.</p><select id="orderFilter" onchange="filterMasterOrders()"><option value="all">Все статусы</option><option value="new">Новые</option><option value="accepted">Принятые</option><option value="act_issued">Акт отправлен</option><option value="closed">Закрытые</option></select></div><div id="masterOrderList" class="stack-list">${rows||'<article class="card">Заявок пока нет.</article>'}</div>`);}
 function filterMasterOrders(){const f=document.getElementById('orderFilter')?.value||'all';document.querySelectorAll('#masterOrderList .order-card').forEach((el,i)=>{const o=masterCache.orders[i];el.style.display=f==='all'||o?.status===f?'':'none';});}
 async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/master/orders/${encodeURIComponent(id)}/decision`,'POST',{decision});masterToast(r.message);await showMasterOrders();}catch(e){masterToast(e.message,true);}}
@@ -199,7 +245,7 @@ async function showMasterMessages(){
     }).sort((a,b)=>String(b.last.created_at||'').localeCompare(String(a.last.created_at||'')));
     const rows=threads.map(t=>{
         const preview=t.last.text||({photo:'📷 Фото',video:'🎬 Видео'}[t.last.type]||'Сообщение');
-        return `<button type="button" class="chat-list-item bt-inbox-thread" onclick="openMasterChat('${t.id}')"><span class="chat-avatar">${masterEsc(t.name.trim().charAt(0).toUpperCase()||'К')}</span><span class="chat-info"><b>${masterEsc(t.name)}</b><small>${masterEsc(preview).slice(0,115)}</small></span><span class="bt-inbox-aside"><small>${masterEsc(String(t.last.created_at||'').replace('T',' ').slice(0,16))}</small>${t.unread?`<span class="bt-inbox-unread" aria-label="${t.unread} новых сообщений">${t.unread}</span>`:''}</span></button>`;
+        return `<button type="button" class="chat-list-item bt-inbox-thread ${t.unread?'bt-unread-thread':''}" onclick="openMasterChat('${t.id}')"><span class="chat-avatar">${masterEsc(t.name.trim().charAt(0).toUpperCase()||'К')}</span><span class="chat-info"><b>${masterEsc(t.name)}</b><small>${masterEsc(preview).slice(0,115)}</small></span><span class="bt-inbox-aside"><small>${masterEsc(String(t.last.created_at||'').replace('T',' ').slice(0,16))}</small>${t.unread?`<span class="bt-inbox-unread" aria-label="${t.unread} новых сообщений">${t.unread}</span>`:''}</span></button>`;
     }).join('');
     masterShell('Чаты',`<p class="subtitle">Выберите клиента — откроется его переписка. Новые сообщения отмечены числом справа.</p><div class="chat-list">${rows||'<article class="card">Сообщений пока нет.</article>'}</div>`);
 }
@@ -442,9 +488,53 @@ async function showMasterPromos(){
         <p><b>Вознаграждение начислено:</b> ${money(st.total_reward)}</p>
         <p><b>Выплачено:</b> ${money(st.paid_to_partner)}</p>
         <p><b>К выплате:</b> ${money(st.balance_due)}</p>
-       </div></details>${!p.active&&p.awaiting_master_activation?`<button type="button" onclick="activateMasterPromo('${masterEsc(p.code)}')">✓ Активировать промокод</button>`:''}</article>`;
+       </div></details>${Number(st.balance_due)>0 && p.advertiser_linked?`<button type="button" class="bt-payout-action" onclick="showMasterPayout('${masterEsc(p.code)}')">💳 Выплатить рекламодателю · ${money(st.balance_due)}</button>`:''}${!p.active&&p.awaiting_master_activation?`<button type="button" onclick="activateMasterPromo('${masterEsc(p.code)}')">✓ Активировать промокод</button>`:''}</article>`;
   }).join('');
   masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);
+}
+let btMasterPayoutRequestId='';
+async function showMasterPayout(code){
+ try{await loadMasterData();}catch(e){return masterToast(e.message,true)}
+ const promo=masterCache.promos.find(x=>x.code===code);
+ if(!promo)return masterToast('Промокод не найден.',true);
+ const balance=Math.max(0,Math.floor(Number(promo.stats?.balance_due||0)));
+ if(!balance)return masterToast('Задолженности по этому промокоду нет.',true);
+ btMasterPayoutRequestId=(typeof crypto!=='undefined'&&crypto.randomUUID)?crypto.randomUUID():`${Date.now()}-${Math.random().toString(16).slice(2).padEnd(24,'0')}`;
+ masterShell('Выплата рекламодателю',`<article class="card"><h2>${masterEsc(code)}</h2>
+  <p><b>Рекламодатель:</b> ${masterEsc(promo.partner_name||'—')}</p>
+  <p><b>Карта:</b> ${promo.card_last4?'•••• '+masterEsc(promo.card_last4):'Уточните реквизиты'}</p>
+  <p><b>Задолженность:</b> ${new Intl.NumberFormat('ru-RU').format(balance)} сум</p>
+  <p class="subtitle">Переведите деньги рекламодателю через свой банк. Remont BT не списывает деньги с карты.
+  После перевода укажите сумму и прикрепите скриншот/фото чека.</p>
+  <form class="bt-payout-row" onsubmit="event.preventDefault();submitMasterPayout('${masterEsc(code)}')">
+   <label>Сумма перевода, сум</label><input id="btPayoutAmount" required inputmode="numeric" pattern="[0-9 ]*" value="${balance}" data-max="${balance}">
+   <label>Чек перевода (JPG/PNG, до 4 МБ)</label><input type="file" id="btPayoutReceipt" required accept="image/jpeg,image/png">
+   <button type="submit" id="btPayoutSubmit">Подтвердить выплату с чеком</button>
+   <p id="btPayoutStatus" role="status" class="subtitle"></p>
+  </form><button class="back-btn" type="button" onclick="showMasterPromos()">← Промокоды</button></article>`);
+}
+async function submitMasterPayout(code){
+ const btn=document.getElementById('btPayoutSubmit'),st=document.getElementById('btPayoutStatus');
+ const amount=Number((document.getElementById('btPayoutAmount')?.value||'').replace(/\s/g,''));
+ const maximum=Number(document.getElementById('btPayoutAmount')?.dataset?.max||0);
+ const file=document.getElementById('btPayoutReceipt')?.files?.[0];
+ if(!Number.isSafeInteger(amount)||amount<1||amount>maximum){st.textContent='Укажите сумму от 1 до остатка задолженности.';return;}
+ if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size>4*1024*1024){st.textContent='Прикрепите JPG или PNG до 4 МБ.';return;}
+ if(!confirm(`Вы действительно перевели ${new Intl.NumberFormat('ru-RU').format(amount)} сум рекламодателю?`))return;
+ btn.disabled=true;st.textContent='Загружаем чек в Telegram и сохраняем выплату…';st.className='subtitle';
+ try{
+    const reader=new FileReader();const content=await new Promise((resolve,reject)=>{
+        reader.onload=()=>resolve(String(reader.result||'').split(',')[1]||'');
+        reader.onerror=()=>reject(new Error('Чек не удалось прочитать.'));
+        reader.readAsDataURL(file);
+    });
+    const res=await masterApi('/api/master/payout-with-receipt','POST',{
+        code,amount,mime_type:file.type,data:content,request_id:btMasterPayoutRequestId
+    });
+    st.textContent=res.message||'Выплата сохранена.';st.className='notice';
+    btn.textContent='✓ Выплата записана';
+    await loadMasterData();
+ }catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}
 }
 async function activateMasterPromo(code){
  if(!confirm(`Активировать промокод ${code}? После активации только администратор сможет его отключить.`))return;
