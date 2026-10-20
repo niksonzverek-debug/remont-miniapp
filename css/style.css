@@ -720,3 +720,8 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 .bt-promo-stats{border-top:1px solid #2c5279;padding:9px 0}
 .bt-promo-stats p{margin:9px 0;color:#d4eafb;overflow-wrap:anywhere}
 @media(max-width:370px){.bt-home-chat-compose .bt-chat-compose-actions{grid-template-columns:1fr}}
+
+/* Этап 5: документ доступен в Telegram даже без встроенного PDF-viewer */
+.bt-act-readable{margin:12px 0;padding:12px 14px;border:1px solid rgba(93,180,255,.3);border-radius:14px;background:rgba(15,37,74,.45);color:#e7f2ff;line-height:1.65}
+.bt-act-readable p{margin:8px 0}.bt-act-readable ol{padding-left:26px;margin:8px 0 16px}.bt-act-readable li{padding:3px 0}
+.bt-act-readable b{color:#e8f7ff}

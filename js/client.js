@@ -516,15 +516,56 @@ async function confirmClientActRequest(orderId) {
     } catch (e) { showAlert(e.message); }
 }
 
+let btClientActsCache=[];
+const btActMoney=value=>new Intl.NumberFormat('ru-RU').format(Number(value||0))+' сум';
 async function showMyActs() {
     setPage('📄 Акты и документы', '<p class="subtitle">Загружаем документы…</p>');
     try {
         const d = await clientApi('/api/client/dashboard');
-        const rows = d.acts || [];
-        const actStatus={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',cancelled:'Отменён',draft:'Черновик'};
-        const content = rows.length ? rows.map(a => `<article class="card"><b>Акт ${escapeClient(a.number || '—')}</b><p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p>Стоимость: ${escapeClient(String(a.final_price ?? a.price ?? '—'))} сум</p><p>Гарантия: ${escapeClient(a.guarantee_text || '—')} · до ${escapeClient(a.guarantee_until || '—')}</p><p>Статус: ${escapeClient(actStatus[a.status]||a.status||'—')}</p></article>`).join('') : '<div class="card">Актов пока нет.</div>';
-        setPage('📄 Акты и документы', content);
-    } catch (e) { setPage('📄 Акты и документы', `<div class="card error">${escapeClient(e.message)}</div>`); }
+        btClientActsCache = d.acts || [];
+        const statuses={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',cancelled:'Отменён',draft:'Черновик'};
+        const content=btClientActsCache.length?btClientActsCache.map(a=>`<article class="card">
+          <div class="card-row"><b>Акт № ${escapeClient(a.number||'—')}</b><span class="status-pill">${escapeClient(statuses[a.status]||a.status||'—')}</span></div>
+          <p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p>
+          <p>Стоимость: <b>${escapeClient(btActMoney(a.final_price??a.price))}</b></p>
+          <p>Гарантия: ${escapeClient(a.guarantee_text||'—')}</p>
+          <button type="button" onclick="showClientActPreview('${escapeClient(a.number)}')">📄 Посмотреть акт</button></article>`).join(''):'<div class="card">Актов пока нет.</div>';
+        setPage('📄 Акты и документы',content);
+    } catch(e){setPage('📄 Акты и документы',`<div class="card error">${escapeClient(e.message)}</div>`);}
+}
+function showClientActPreview(number){
+    const act=btClientActsCache.find(a=>String(a.number)===String(number));
+    if(!act){showMyActs();return;}
+    const works=Array.isArray(act.works)?act.works:[];
+    setPage('📄 Просмотр акта',`<article class="card bt-act-readable"><h2>Акт № ${escapeClient(act.number)}</h2>
+      <p><b>Техника:</b> ${escapeClient([act.device,act.brand,act.model].filter(Boolean).join(' '))}</p>
+      <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${escapeClient(w)}</li>`).join('')||'<li>Не указаны</li>'}</ol>
+      <p><b>Стоимость:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
+      <p><b>Гарантия:</b> ${escapeClient(act.guarantee_text||'—')} · до ${escapeClient(act.guarantee_until||'—')}</p>
+      <p>Для просмотра оригинала нажмите «Открыть PDF».</p>
+      <button type="button" onclick="openClientActPdf('${escapeClient(number)}')">📄 Открыть PDF</button>
+      <button type="button" class="secondary" onclick="downloadClientActPdf('${escapeClient(number)}')">↓ Сохранить PDF</button>
+      <button type="button" class="back-btn" onclick="showMyActs()">← Все акты</button></article>`);
+}
+async function openClientActPdf(number){
+    try{
+        const r=await clientApi(`/api/client/acts/${encodeURIComponent(String(number))}/view-link`,'POST',{});
+        const url=String(window.REMONT_ADVERTISER_API_BASE||'http://127.0.0.1:8767').replace(/\/$/,'')+r.path;
+        const app=window.Telegram?.WebApp;
+        if(app&&typeof app.openLink==='function')app.openLink(url,{try_instant_view:false});
+        else window.open(url,'_blank','noopener,noreferrer');
+    }catch(e){showAlert(e.message)}
+}
+async function downloadClientActPdf(number){
+    try{
+        const base=String(window.REMONT_ADVERTISER_API_BASE||'http://127.0.0.1:8767').replace(/\/$/,'');
+        const link=await clientApi(`/api/client/acts/${encodeURIComponent(String(number))}/view-link`,'POST',{});
+        const r=await fetch(base+link.path,{cache:'no-store'});
+        if(!r.ok){const err=await r.json().catch(()=>({}));throw Error(err.error||'PDF недоступен')}
+        const blob=await r.blob(),url=URL.createObjectURL(blob);
+        const a=document.createElement('a');a.href=url;a.download=`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
+        document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+    }catch(e){showAlert(e.message)}
 }
 
 function showEnterPromo() {

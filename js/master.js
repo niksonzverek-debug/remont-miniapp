@@ -44,28 +44,59 @@ async function downloadMasterAct(number){
 }
 const masterActStatusLabels={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён клиентом',cancelled:'Отменён',draft:'Черновик'};
 function masterActStatus(v){return masterActStatusLabels[v]||v||'Без статуса';}
+function masterActSummary(number){
+ const act=masterCache.acts.find(a=>String(a.number)===String(number));
+ if(!act)return '<p class="subtitle">Сведения об акте можно посмотреть в разделе «Все акты».</p>';
+ const works=Array.isArray(act.works)?act.works:[];
+ const money=new Intl.NumberFormat('ru-RU').format(Number(act.final_price??act.price??0));
+ return `<div class="bt-act-readable"><p><b>Клиент:</b> ${masterEsc(act.client_name||'—')}</p>
+ <p><b>Телефон:</b> ${masterEsc(act.client_phone||'—')}</p><p><b>Техника:</b> ${masterEsc([act.device,act.brand,act.model].filter(Boolean).join(' '))}</p>
+ <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${masterEsc(w)}</li>`).join('')||'<li>Не указаны</li>'}</ol>
+ <p><b>Стоимость:</b> ${masterEsc(money)} сум</p><p><b>Гарантия:</b> ${masterEsc(act.guarantee_text||'—')}</p>
+ <p><b>Статус:</b> ${masterEsc(masterActStatus(act.status))}</p></div>`;
+}
+async function masterActPublicUrl(number,purpose='share-link'){
+ const r=await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/${purpose}`,'POST',{});
+ return masterApiBase.replace(/\/$/,'')+String(r.path);
+}
+function openMasterDocumentUrl(url){
+ const app=window.Telegram?.WebApp;
+ if(app&&typeof app.openLink==='function')app.openLink(url,{try_instant_view:false});
+ else window.open(url,'_blank','noopener,noreferrer');
+}
+async function openMasterActPdf(number){
+ try{const url=await masterActPublicUrl(number,'view-link');openMasterDocumentUrl(url)}
+ catch(e){masterToast(e.message,true)}
+}
 async function previewMasterAct(number){
-  try{
-    masterShell('Просмотр акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2><p id="masterPdfStatus" class="subtitle">Загружаем PDF…</p><div id="masterPdfArea"></div><div class="button-row"><button type="button" onclick="shareMasterAct('${masterEsc(number)}')">↗ Поделиться</button><button type="button" class="secondary" onclick="downloadMasterAct('${masterEsc(number)}')">↓ Сохранить PDF</button></div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(number)}')">✎ Заявка на исправление</button><button type="button" class="back-btn" onclick="clearMasterPdfUrl();showMasterActs()">← Все акты</button></article>`);
-    clearMasterPdfUrl();
-    const pdf=await getMasterActPdf(number);
-    masterPdfUrl=URL.createObjectURL(pdf);
-    const frame=document.createElement('iframe');frame.title=`Акт № ${number}`;frame.src=masterPdfUrl;frame.className='bt-master-pdf-viewer';
-    document.getElementById('masterPdfArea')?.appendChild(frame);
-    const status=document.getElementById('masterPdfStatus');if(status)status.textContent='Если Telegram не показывает PDF внутри окна, нажмите «Сохранить PDF». Внесение изменений доступно через заявку администратору.';
-  }catch(e){const status=document.getElementById('masterPdfStatus');if(status){status.textContent=e.message;status.className='error';}else masterToast(e.message,true);}
+ clearMasterPdfUrl();
+ masterShell('Просмотр акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2>
+ <p class="subtitle">Содержимое акта отображается сразу. PDF откроется в просмотрщике телефона или браузере.</p>
+ ${masterActSummary(number)}
+ <div class="button-row"><button type="button" onclick="openMasterActPdf('${masterEsc(number)}')">📄 Открыть PDF</button>
+ <button type="button" class="secondary" onclick="downloadMasterAct('${masterEsc(number)}')">↓ Сохранить PDF</button></div>
+ <div class="button-row"><button type="button" onclick="shareMasterAct('${masterEsc(number)}')">↗ Поделиться через Telegram</button>
+ <button type="button" class="secondary" onclick="copyMasterActLink('${masterEsc(number)}')">🔗 Копировать ссылку</button></div>
+ <p class="subtitle">Ссылка для передачи человеку без регистрации действительна 24 часа. Любой, кто получит ссылку, сможет прочитать этот акт.</p>
+ <button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(number)}')">✎ Заявка на исправление</button>
+ <button type="button" class="back-btn" onclick="showMasterActs()">← Все акты</button></article>`);
+}
+async function copyMasterActLink(number){
+ try{
+  const url=await masterActPublicUrl(number);
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);masterToast('Ссылка скопирована. Действует 24 часа.');}
+  else window.prompt('Скопируйте ссылку на акт (действует 24 часа):',url);
+ }catch(e){masterToast(e.message,true)}
 }
 async function shareMasterAct(number){
-  try{
-    const blob=await getMasterActPdf(number);
-    const file=new File([blob],`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`,{type:'application/pdf'});
-    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
-      try{await navigator.share({files:[file],title:`Акт № ${number}`,text:'Акт выполненных работ Remont BT'});return;}
-      catch(e){if(e.name==='AbortError')return;}
-    }
-    masterToast('Передача PDF напрямую не поддерживается на этом устройстве. Сохраните файл и отправьте его через Telegram.');
-    await downloadMasterAct(number);
-  }catch(e){masterToast(e.message,true);}
+ try{
+  const url=await masterActPublicUrl(number);
+  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(`Акт выполненных работ № ${number} — Remont BT. Ссылка действительна 24 часа.`);
+  const app=window.Telegram?.WebApp;
+  if(app&&typeof app.openTelegramLink==='function')app.openTelegramLink(shareUrl);
+  else window.open(shareUrl,'_blank','noopener,noreferrer');
+  masterToast('Выберите получателя в Telegram. Передаётся защищённая ссылка на PDF, а не открытый доступ к базе.');
+ }catch(e){masterToast(e.message,true)}
 }
 function showMasterActCorrection(number){
   masterShell('Исправление акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2><p class="subtitle">Напишите, что нужно исправить. Запрос будет сохранён на сервере и передан администратору. Сам акт мастер изменить не может.</p><label for="masterCorrectionReason">Что изменить?</label><textarea id="masterCorrectionReason" maxlength="1500" required rows="6" placeholder="Например: исправить модель, сумму, выполненные работы…"></textarea><button type="button" id="masterCorrectionSend" onclick="sendMasterActCorrection('${masterEsc(number)}')">Отправить администратору</button><p id="masterCorrectionResult" role="status" class="subtitle"></p><button type="button" class="back-btn" onclick="showMasterActs()">← Акты</button></article>`);
@@ -390,7 +421,7 @@ async function showMasterPromos(){
   const money=n=>new Intl.NumberFormat('ru-RU').format(Number(n||0))+' сум';
   const rows=masterCache.promos.map(p=>{
     const st=p.stats||{};
-    return `<article class="card bt-promo-detail-card"><div class="card-row"><b>${masterEsc(p.code)}</b><span class="status-pill">${p.active?'Активен':'Отключён'}</span></div>
+    return `<article class="card bt-promo-detail-card"><div class="card-row"><b>${masterEsc(p.code)}</b><span class="status-pill">${p.active?'Активен':p.awaiting_master_activation?'Ожидает активации':p.disabled_by_admin?'Отключён администратором':'Отключён'}</span></div>
       <p>${masterEsc(p.partner_name||'Рекламодатель')} · ${masterEsc(p.partner_contact||'')}</p>
       <p>Скидка клиенту: ${masterEsc(p.discount_percent)}% · вознаграждение: ${masterEsc(p.reward_percent)}%</p>
       <details class="bt-promo-details"><summary>Посмотреть подробности промокода <span>⌄</span></summary>
@@ -411,9 +442,14 @@ async function showMasterPromos(){
         <p><b>Вознаграждение начислено:</b> ${money(st.total_reward)}</p>
         <p><b>Выплачено:</b> ${money(st.paid_to_partner)}</p>
         <p><b>К выплате:</b> ${money(st.balance_due)}</p>
-       </div></details></article>`;
+       </div></details>${!p.active&&p.awaiting_master_activation?`<button type="button" onclick="activateMasterPromo('${masterEsc(p.code)}')">✓ Активировать промокод</button>`:''}</article>`;
   }).join('');
   masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);
+}
+async function activateMasterPromo(code){
+ if(!confirm(`Активировать промокод ${code}? После активации только администратор сможет его отключить.`))return;
+ try{const result=await masterApi(`/api/master/promos/${encodeURIComponent(code)}/activate`,'POST',{});masterToast(result.message||'Промокод активирован');await showMasterPromos();}
+ catch(e){masterToast(e.message,true)}
 }
 function showCreateMasterPromo(){masterShell('Новый промокод',`<button class="back-btn" onclick="showMasterPromos()">← Назад</button><form class="card" onsubmit="event.preventDefault();submitMasterPromo()"><label>Код</label><input id="pCode" required maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" placeholder="PARTNER10"><label>Имя партнёра</label><input id="pName" required maxlength="150"><label>Telegram партнёра</label><input id="pContact" required maxlength="150" placeholder="@username"><label>Телефон рекламодателя</label><input id="pPartnerPhone" required type="tel" placeholder="+998901234567"><label>Номер карты</label><input id="pCard" required inputmode="numeric" maxlength="23" placeholder="16–19 цифр"><label>Скидка клиенту, %</label><input id="pDiscount" required type="number" min="1" max="50" value="5"><label>Вознаграждение партнёру, %</label><input id="pReward" required type="number" min="0" max="30" value="5"><label>Использований на клиента</label><input id="pLimit" required type="number" min="1" max="100" value="1"><label>Действует до</label><input id="pExpiry" required type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}"><button type="submit" id="promoSubmit">Создать промокод</button><p id="promoStatus" class="subtitle"></p></form>`);}
 async function submitMasterPromo(){const btn=document.getElementById('promoSubmit'),st=document.getElementById('promoStatus');btn.disabled=true;try{const r=await masterApi('/api/master/promo','POST',{code:document.getElementById('pCode').value.trim().toUpperCase(),partner_name:document.getElementById('pName').value.trim(),partner_contact:document.getElementById('pContact').value.trim(),partner_phone:document.getElementById('pPartnerPhone').value.trim(),partner_card:document.getElementById('pCard').value.replace(/\D/g,''),discount_percent:Number(document.getElementById('pDiscount').value),reward_percent:Number(document.getElementById('pReward').value),max_act:Number(document.getElementById('pLimit').value),expires_at:document.getElementById('pExpiry').value+'T23:59:59'});st.textContent=r.message;await showMasterPromos();}catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}}
