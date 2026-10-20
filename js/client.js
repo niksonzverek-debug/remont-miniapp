@@ -279,6 +279,12 @@ function showMasterApplicationForm() {
         <label for="masterApplicationPinfl">ПИНФЛ (14 цифр) *</label><input id="masterApplicationPinfl" name="pinfl" required inputmode="numeric" autocomplete="off" minlength="14" maxlength="14" pattern="[0-9]{14}" placeholder="14 цифр" value="${escapeClient(saved.pinfl || '')}">
         <button type="submit">Проверить данные и отправить заявку</button><p id="masterApplicationStatus" class="subtitle" role="status"></p>
       </form>`);
+    // Phone is already verified in Telegram before either cabinet is opened.
+    clientApi('/api/client/profile').then(d => {
+        const phone = d?.profile?.phone;
+        const field = document.getElementById('masterApplicationPhone');
+        if (phone && field) { field.value = phone; field.readOnly = true; }
+    }).catch(() => {});
     const form=document.getElementById('masterApplicationForm');
     form?.addEventListener('submit',e=>{e.preventDefault();submitMasterApplication(form);});
     const birthInput = document.getElementById('masterApplicationBirthDate');
@@ -741,7 +747,25 @@ function showNewOrder() {
         // (new_client=1) всегда показывает поля.
         const identityCard = document.getElementById('clientIdentityCard');
         // После успешного шага регистрации ФИО/телефон уже введены; не просим повторно в форме заявки.
-        identityCard.style.display = (isKnownRegisteredClient || (isNewClientFlow && localStorage.getItem('remont_bt_identity_saved') === '1')) ? 'none' : 'block';
+        // The contact gate verified the phone. Ask the name only on the first order.
+        const savedConfirmation = localStorage.getItem('remont_bt_customer_name_confirmed') === '1';
+        identityCard.style.display = savedConfirmation ? 'none' : 'block';
+        const verifiedPhone = localStorage.getItem('remont_bt_phone') || '';
+        if (verifiedPhone) document.getElementById('client_phone').value = formatClientPhone(verifiedPhone);
+        document.getElementById('client_phone').readOnly = true;
+        clientApi('/api/client/profile').then(d => {
+            const profile = d.profile || {};
+            if (profile.phone) {
+                document.getElementById('client_phone').value = formatClientPhone(profile.phone);
+                localStorage.setItem('remont_bt_phone', profile.phone);
+            }
+            if (profile.name_confirmed) {
+                identityCard.style.display = 'none';
+                localStorage.setItem('remont_bt_customer_name_confirmed','1');
+            } else {
+                identityCard.style.display = 'block';
+            }
+        }).catch(() => {});
 
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
@@ -942,6 +966,9 @@ async function submitOrder() {
     const client_phone = cleanPhone(phoneInput ? phoneInput.value : '');
     const order_promo_code = (document.getElementById('order_promo_code')?.value || '').trim().toUpperCase();
 
+    if (document.getElementById('clientIdentityCard')?.style.display !== 'none' && client_name.length < 2) {
+        return showAlert('Введите имя клиента');
+    }
     if (!isKnownRegisteredClient) {
         if (client_name.length < 2) return showAlert('Введите имя клиента');
         if (!validPhone(client_phone)) return showAlert('Введите корректный номер телефона +998XXXXXXXXX');
@@ -1013,7 +1040,10 @@ async function submitOrder() {
 
     const ok = sendToBot(data);
     if (ok) {
-        try { localStorage.setItem('remont_bt_registered', '1'); } catch (_) {}
+        try {
+            localStorage.setItem('remont_bt_registered', '1');
+            if (client_name.length >= 2) localStorage.setItem('remont_bt_customer_name_confirmed', '1');
+        } catch (_) {}
     }
 
     if (!ok) {
