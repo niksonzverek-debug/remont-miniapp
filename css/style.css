@@ -522,3 +522,28 @@ input:focus,select:focus,textarea:focus{border-color:#47caff;box-shadow:0 0 0 2p
 @keyframes btElectricSweep{0%,67%{transform:translateX(-160%)}92%,100%{transform:translateX(160%)}}
 @media(prefers-reduced-motion:reduce){.menu-btn::before{animation:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 @media(max-width:480px){body{padding-left:13px;padding-right:13px}.card{border-radius:16px}}
+
+/* Remont BT Electric Steel Blue — client home, isolated from old grid rules */
+.bt-client-home{max-width:740px;margin:auto;padding:10px 3px 90px;color:#eef7ff}
+.bt-brand-head{display:flex;align-items:center;gap:12px;margin:3px 0 28px;padding:14px 16px;border-radius:17px;border:1px solid #245b96;background:linear-gradient(130deg,#122844,#081426);box-shadow:0 0 22px #168bff30}
+.bt-brand-mark{width:48px;height:48px;border-radius:14px;display:grid;place-items:center;background:linear-gradient(135deg,#135bb3,#0b1e39);border:1px solid #61cfff;color:#d8f8ff;font-size:26px;box-shadow:0 0 20px #168bff66}
+.bt-brand-head strong{font-size:20px;letter-spacing:1px}.bt-brand-head small{display:block;color:#86bee9;font-size:9px;letter-spacing:2px;margin-top:4px}
+.bt-greeting h2{margin:0 0 5px;font-size:23px}.bt-greeting p{margin:0 0 20px;color:#a5b9d4;font-size:14px}
+.bt-client-home .bt-main-action{display:block;width:100%;padding:19px 14px;border:1px solid #72d9ff;border-radius:16px;background:linear-gradient(110deg,#07479d,#137ff1,#0853ad);box-shadow:0 0 25px #168bff70,inset 0 1px #b4f2ff80;color:#fff;font-size:17px;font-weight:800;position:relative;overflow:hidden}
+.bt-client-home .bt-main-action::after{content:"";position:absolute;top:-40%;left:-55%;width:28%;height:180%;transform:rotate(22deg);background:linear-gradient(90deg,transparent,#fff6,transparent);animation:btHomeShine 5s ease-in-out infinite;pointer-events:none}
+.bt-client-home .client-home-grid.bt-home-tiles{display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:9px!important;margin:14px 0 0!important;padding:0!important;border:0!important;background:transparent!important}
+.bt-client-home .bt-home-tiles .menu-btn{min-width:0!important;min-height:100px!important;display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;text-align:center!important;gap:8px!important;padding:13px 4px!important;border:1px solid #2c6098!important;border-radius:15px!important;background:linear-gradient(145deg,#112744,#081627)!important;color:#e8f6ff!important;font-size:11px!important;font-weight:700!important;line-height:1.3!important;box-shadow:0 0 15px #168bff29!important}
+.bt-client-home .bt-home-tiles .menu-btn .emoji{font-size:25px!important;background:none!important;border:0!important;padding:0!important;width:auto!important;height:auto!important;box-shadow:none!important}
+.bt-client-home .bt-live-panel{position:relative;margin-top:15px;padding:17px;border:1px solid #29619b;border-radius:16px;background:linear-gradient(145deg,#112641,#081424);box-shadow:0 0 19px #168bff30,inset 0 0 14px #168bff0c;overflow:hidden}
+.bt-client-home .bt-live-panel[hidden]{display:none!important}
+.bt-client-home .bt-live-panel::before{content:"";position:absolute;left:-40%;right:-40%;top:0;height:2px;background:linear-gradient(90deg,transparent,#00d7ff,transparent);animation:btHomeLine 4.5s linear infinite;pointer-events:none}
+.bt-section-title{font-size:15px;font-weight:800;color:#f1f8ff}.bt-live-panel p,.bt-order-label{color:#a6bcd7;font-size:12px;margin:8px 0 13px}
+.bt-client-home .bt-chat-action{background:#0e4c95;border:1px solid #3caaff;color:#e8f8ff;border-radius:11px;padding:11px 16px;font-weight:700;box-shadow:0 0 12px #168bff40}
+.bt-circuit{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;position:relative;margin-top:17px}.bt-circuit::before{content:"";position:absolute;top:14px;left:11%;right:11%;height:2px;background:#1a4c7d}
+.bt-circuit span{z-index:1;text-align:center;color:#8aa7c7;font-size:10px}.bt-circuit span::before{content:"⚡";display:grid;place-items:center;margin:0 auto 8px;width:29px;height:29px;border-radius:50%;background:#10243d;border:1px solid #2b649e;color:#6abfff}
+.bt-circuit span.bt-complete::before{background:#0c68c9;color:#fff;border-color:#a1efff;box-shadow:0 0 17px #168bffbb}
+.bt-advertiser-action{margin-top:15px}
+@keyframes btHomeShine{0%,72%{left:-55%}95%,100%{left:140%}}@keyframes btHomeLine{from{transform:translateX(-65%)}to{transform:translateX(65%)}}
+@media(max-width:480px){.bt-client-home .client-home-grid.bt-home-tiles{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:6px!important}.bt-client-home .bt-home-tiles .menu-btn{font-size:10px!important;padding:10px 2px!important;min-height:90px!important}.bt-brand-head strong{font-size:18px}}
+@media(max-width:330px){.bt-client-home .client-home-grid.bt-home-tiles{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(prefers-reduced-motion:reduce){.bt-client-home .bt-main-action::after,.bt-client-home .bt-live-panel::before{animation:none}}

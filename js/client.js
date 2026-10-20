@@ -40,36 +40,36 @@ const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow &&
 
 function renderClientMenu() {
     document.body.innerHTML = `
-        <header class="portal-head"><h1>Remont BT</h1><p>Ваш ремонт — под контролем</p></header>
-        <h2>👋 Личный кабинет</h2>
-        <p class="subtitle">Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</span>!</p>
-        <div class="client-home-grid">
-          <button class="menu-btn" onclick="showNewOrder()"><span class="emoji">📝</span> Создать заявку</button>
-          <button class="menu-btn" onclick="showMyOrders()"><span class="emoji">📋</span> Мои заявки и статусы</button>
-          <button class="menu-btn" onclick="showMyActs()"><span class="emoji">📄</span> Акты и документы</button>
-          <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
-          <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
-          <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
-        </div>
-        <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
-    `;
+        <main class="bt-client-home">
+          <header class="bt-brand-head"><div class="bt-brand-mark">⚡</div><div><strong>REMONT BT</strong><small>ELECTRIC STEEL BLUE</small></div></header>
+          <div class="bt-greeting"><h2>Личный кабинет</h2><p>Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</span>!</p></div>
+          <button class="bt-main-action" onclick="showNewOrder()">＋ Создать заявку</button>
+          <div class="client-home-grid bt-home-tiles">
+            <button class="menu-btn" onclick="showMyOrders()"><span class="emoji">📋</span><span>Мои заявки</span></button>
+            <button class="menu-btn" onclick="showMyActs()"><span class="emoji">📄</span><span>Акты и гарантия</span></button>
+            <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span><span>Промокоды</span></button>
+            <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span><span>Профиль</span></button>
+          </div>
+          <section class="bt-live-panel"><div class="bt-section-title">💬 Связь с мастером</div><p>Сообщения и вопросы по вашему ремонту</p><button class="bt-chat-action" onclick="showMessages()">Открыть переписку →</button></section>
+          <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
+          <div id="btAdvertiserSlot"></div>
+        </main>`;
     clientApi('/api/advertiser/dashboard').then(d => {
-        if (!d || !d.advertiser || document.getElementById('clientAdvertiserBtn')) return;
-        const grid = document.querySelector('.client-home-grid');
-        if (!grid) return;
-        const btn = document.createElement('button');
-        btn.id = 'clientAdvertiserBtn';
-        btn.className = 'menu-btn';
-        btn.innerHTML = '<span class="emoji">📣</span> Я рекламодатель';
-        btn.onclick = () => { window.location.href = 'advertiser.html'; };
-        grid.appendChild(btn);
-    }).catch(() => {});
-    // Use the authoritative profile name from the database, not Telegram's optional first_name.
-    clientApi('/api/client/profile').then(d => {
-        const name = String(d.profile?.name || '').trim();
-        const node = document.getElementById('clientWelcomeName');
-        if (node && name) node.textContent = name;
-    }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
+        if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
+        const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
+        const btn = document.createElement('button'); btn.id='clientAdvertiserBtn'; btn.className='bt-main-action bt-advertiser-action';
+        btn.textContent='📣 Кабинет рекламодателя'; btn.onclick=()=>{window.location.href='advertiser.html';}; slot.appendChild(btn);
+    }).catch(()=>{});
+    clientApi('/api/client/dashboard').then(d => {
+        const name=String(d.profile?.name||'').trim(); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
+        const orders=Array.isArray(d.orders)?d.orders:[]; if(!orders.length)return;
+        const recent=orders[0]; const panel=document.getElementById('btRecentOrder');if(!panel)return;
+        panel.hidden=false;
+        const status=String(recent.status||'').toLowerCase();
+        const step=/закры|заверш|готов|complete|closed/.test(status)?4:/ремонт|работ|progress/.test(status)?3:/принят|accepted|назначен/.test(status)?2:1;
+        panel.querySelectorAll('.bt-circuit span').forEach((node,i)=>node.classList.toggle('bt-complete',i<step));
+        const label=document.getElementById('btOrderLabel');if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника');
+    }).catch(()=>{});
 }
 
 function requestMasterRole() { showMasterApplicationForm(); }
@@ -1100,7 +1100,7 @@ async function startRemontApp(){
   try {
     const d = await clientApi('/api/client/profile');
     const profile = d.profile || {};
-    if (profile.name && profile.phone) {
+    if (profile.phone) {
       try {
         localStorage.setItem('remont_bt_name', profile.name);
         localStorage.setItem('remont_bt_phone', profile.phone);
@@ -1111,11 +1111,15 @@ async function startRemontApp(){
       renderClientMenu();
       return;
     }
-  } catch (_) {
-    // A 403 means no server registration. Other errors also must not falsely
-    // open a registered menu; the form will report an error on submit if offline.
+  } catch (err) {
+    // Never ask for personal details again just because the API is unavailable.
+    document.body.innerHTML = '<div class="card"><h2>Не удалось открыть кабинет</h2><p class="subtitle">Проверьте подключение к серверу и попробуйте снова. Повторно вводить номер не нужно.</p><button onclick="location.reload()">Повторить</button></div>';
+    console.warn('Client profile check failed:', err);
+    return;
   }
-  showRegistrationScreen();
+  // Contact-first onboarding is performed in Telegram. Do not resurrect the
+  // legacy manual registration form for an account without a server profile.
+  document.body.innerHTML = '<div class="card"><h2>Подтвердите номер в Telegram</h2><p class="subtitle">Вернитесь в чат с ботом, нажмите /start и отправьте свой контакт кнопкой Telegram. Затем откройте кабинет снова.</p><button onclick="location.reload()">Проверить ещё раз</button></div>';
 }
 migrateLegacyMasterApplicationQueue();
 startRemontApp();
