@@ -114,6 +114,52 @@ function showExistingMasterHelp(message='') {
 const MASTER_APPLICATION_QUEUE_KEY = 'remont_bt_master_application_queue_v2';
 let masterApplicationSyncInProgress = false;
 
+function normalizeMasterBirthDate(value) {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+    let day, month, year;
+    let m = raw.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})$/);
+    if (m) { year = Number(m[1]); month = Number(m[2]); day = Number(m[3]); }
+    else {
+        m = raw.match(/^(\d{1,2})\D+(\d{1,2})\D+(\d{2}|\d{4})$/);
+        if (m) {
+            day = Number(m[1]); month = Number(m[2]); year = Number(m[3]);
+            if (year < 100) year += year < 30 ? 2000 : 1900;
+        } else {
+            const digits = raw.replace(/\D/g, '');
+            if (digits.length === 8) {
+                if (Number(digits.slice(0,4)) >= 1900 && Number(digits.slice(0,4)) <= 2099) {
+                    year=Number(digits.slice(0,4)); month=Number(digits.slice(4,6)); day=Number(digits.slice(6,8));
+                } else { day=Number(digits.slice(0,2)); month=Number(digits.slice(2,4)); year=Number(digits.slice(4,8)); }
+            } else if (digits.length === 6) {
+                day=Number(digits.slice(0,2)); month=Number(digits.slice(2,4)); year=Number(digits.slice(4,6)); year += year < 30 ? 2000 : 1900;
+            } else return '';
+        }
+    }
+    const date = new Date(year, month - 1, day);
+    if (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear() ||
+        date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day || date > new Date()) return '';
+    return `${String(day).padStart(2,'0')}.${String(month).padStart(2,'0')}.${String(year).padStart(4,'0')}`;
+}
+
+function recoverMasterApplicationQueue() {
+    const uid = currentMasterApplicationOwner();
+    if (!/^\d{1,20}$/.test(uid)) return;
+    const items = getMasterApplicationQueue();
+    let changed = false;
+    for (const item of items) {
+        if (String(item.telegram_user_id || '') !== uid || item.status !== 'blocked') continue;
+        const err = String(item.last_error || '');
+        // Retry old requests blocked only because the API rejected the not-yet-registered user.
+        if (/401|403|Telegram|авторизац|подтвердить/i.test(err)) {
+            item.status = 'pending';
+            item.last_error = '';
+            changed = true;
+        }
+    }
+    if (changed) saveMasterApplicationQueue(items);
+}
+
 function getMasterApplicationQueue() {
     try {
         const parsed = JSON.parse(localStorage.getItem(MASTER_APPLICATION_QUEUE_KEY) || '[]');
@@ -190,18 +236,29 @@ async function syncMasterApplicationQueue() {
         if (idx >= 0) {
             current[idx].attempts = Number(current[idx].attempts || 0) + 1;
             current[idx].last_attempt_at = new Date().toISOString();
-            if ((err && Number(err.status) >= 400 && Number(err.status) < 500) || authOrConfigError) {
+            const statusCode = Number(err && err.status || 0);
+            const retryableAuthFailure = statusCode === 401 || statusCode === 403 || /Telegram не передал данные авторизации|подтвердить Telegram|откройте приложение через кнопку бота/i.test(String(err?.message || ''));
+            if ((statusCode >= 400 && statusCode < 500 && !retryableAuthFailure) || (authOrConfigError && !retryableAuthFailure)) {
                 current[idx].status = 'blocked';
                 current[idx].last_error = String(err.message || 'Сервер отклонил заявку');
+            } else {
+                current[idx].status = 'pending';
+                current[idx].last_error = String(err.message || 'Временно не удалось отправить заявку');
             }
             saveMasterApplicationQueue(current);
         }
         const status = document.getElementById('masterApplicationStatus');
         const button = document.querySelector('#masterApplicationForm button[type="submit"]');
-        if (status && ((err && Number(err.status) >= 400 && Number(err.status) < 500) || authOrConfigError)) {
-            status.textContent = `Сервер не принял заявку: ${err.message || 'проверьте данные'}. Исправьте данные и отправьте снова.`;
+        const code = Number(err && err.status || 0);
+        const retryableAuthFailure = code === 401 || code === 403 || /Telegram не передал данные авторизации|подтвердить Telegram|откройте приложение через кнопку бота/i.test(String(err?.message || ''));
+        if (status && ((code >= 400 && code < 500 && !retryableAuthFailure) || (authOrConfigError && !retryableAuthFailure))) {
+            status.textContent = `Сервер отклонил заявку: ${err.message || 'проверьте данные'}. Исправьте данные в форме и отправьте снова.`;
             status.className = 'error';
             if (button) { button.textContent = 'Проверить данные и отправить заявку'; button.disabled = false; }
+        } else if (status) {
+            status.textContent = 'Заявка сохранена в очереди и автоматически отправится, когда сервер подтвердит авторизацию или восстановится связь. Ничего дополнительно нажимать не нужно.';
+            status.className = 'notice';
+            if (button) { button.textContent = '⏳ Заявка ожидает отправки'; button.disabled = true; }
         }
         // Network errors and 5xx responses stay pending and are retried automatically.
         console.warn('Автосинхронизация заявки мастера не завершена:', err?.message || err);
@@ -209,6 +266,7 @@ async function syncMasterApplicationQueue() {
 }
 function startMasterApplicationAutoSync() {
     migrateLegacyMasterApplicationQueue();
+    recoverMasterApplicationQueue();
     syncMasterApplicationQueue();
 }
 window.addEventListener('online', startMasterApplicationAutoSync);
@@ -226,7 +284,7 @@ function showMasterApplicationForm() {
         <label for="masterApplicationName">ФИО *</label><input id="masterApplicationName" name="name" required minlength="2" maxlength="150" autocomplete="name" value="${escapeClient(saved.name || localStorage.getItem('remont_bt_name') || '')}">
         <label for="masterApplicationPhone">Телефон *</label><input id="masterApplicationPhone" name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="+998 90 123 45 67" value="${escapeClient(saved.phone || localStorage.getItem('remont_bt_phone') || '')}">
         <label for="masterApplicationGender">Пол *</label><select id="masterApplicationGender" name="gender" required><option value="">Выберите пол</option><option value="Мужской" ${saved.gender==='Мужской'?'selected':''}>Мужской</option><option value="Женский" ${saved.gender==='Женский'?'selected':''}>Женский</option></select>
-        <label for="masterApplicationBirthDate">Дата рождения *</label><input id="masterApplicationBirthDate" name="birth_date" required inputmode="numeric" placeholder="ДД.ММ.ГГГГ" pattern="[0-9]{2}\.[0-9]{2}\.[0-9]{4}" value="${escapeClient(saved.birth_date || '')}">
+        <label for="masterApplicationBirthDate">Дата рождения *</label><input id="masterApplicationBirthDate" name="birth_date" required inputmode="text" autocomplete="bday" placeholder="ДДММГГГГ, ДД.ММ.ГГГГ или ГГГГ-ММ-ДД" value="${escapeClient(saved.birth_date || '')}">
         <label for="masterApplicationPinfl">ПИНФЛ (14 цифр) *</label><input id="masterApplicationPinfl" name="pinfl" required inputmode="numeric" autocomplete="off" minlength="14" maxlength="14" pattern="[0-9]{14}" placeholder="14 цифр" value="${escapeClient(saved.pinfl || '')}">
         <button type="submit">Проверить данные и отправить заявку</button><p id="masterApplicationStatus" class="subtitle" role="status"></p>
       </form>`);
@@ -250,45 +308,32 @@ function showMasterApplicationForm() {
 
 async function submitMasterApplication(form){
     const data=Object.fromEntries(new FormData(form).entries());
-    data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone); data.gender=String(data.gender||'').trim(); data.birth_date=String(data.birth_date||'').trim(); data.pinfl=String(data.pinfl||'').replace(/\D/g,''); data.event='submit_master_application';
+    data.name=String(data.name||'').trim(); data.phone=cleanPhone(data.phone); data.gender=String(data.gender||'').trim(); data.birth_date=normalizeMasterBirthDate(data.birth_date); data.pinfl=String(data.pinfl||'').replace(/\D/g,''); data.event='submit_master_application';
     const status=document.getElementById('masterApplicationStatus');
     const button=form.querySelector('button[type="submit"]');
     if(data.name.length<2)return showAlert('Введите ФИО.');
     if(!validPhone(data.phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
     if(!['Мужской','Женский'].includes(data.gender))return showAlert('Выберите пол.');
-    const birthMatch=data.birth_date.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
-    if(!birthMatch)return showAlert('Введите дату рождения в формате ДД.ММ.ГГГГ.');
-    const day=Number(birthMatch[1]), month=Number(birthMatch[2]), year=Number(birthMatch[3]);
-    const date=new Date(year,month-1,day);
-    if(date.getFullYear()!==year||date.getMonth()!==month-1||date.getDate()!==day||date>new Date()||year<1900)return showAlert('Указана некорректная дата рождения.');
+    if(!data.birth_date)return showAlert('Не удалось распознать дату. Введите, например, 01021990, 01/02/1990, 1-2-1990 или 1990-02-01.');
+    const [birthDay,birthMonth,birthYear]=data.birth_date.split('.').map(Number);
     if(!/^\d{14}$/.test(data.pinfl))return showAlert('ПИНФЛ должен содержать ровно 14 цифр.');
     const first=Number(data.pinfl[0]); const map={3:['Мужской',1900],4:['Женский',1900],5:['Мужской',2000],6:['Женский',2000]}; const pin=map[first];
     if(!pin)return showAlert('Первая цифра ПИНФЛ не соответствует допустимому формату.');
     const pinDate=`${data.pinfl.slice(1,3)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(5,7))}`;
     if(pin[0]!==data.gender||pinDate!==data.birth_date)return showAlert(`Проверьте данные: по ПИНФЛ указаны пол ${pin[0]} и дата рождения ${pinDate}.`);
-    try{localStorage.removeItem('remont_bt_master_application'); localStorage.setItem('remont_bt_phone',data.phone); localStorage.setItem('remont_bt_name',data.name);if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
-    if(button){button.disabled=true;button.textContent='⏳ Отправляем заявку…';}
     try {
-      const result=await clientApi('/api/master/apply','POST',{name:data.name,phone:data.phone,gender:data.gender,birth_date:data.birth_date,pinfl:data.pinfl});
-      saveMasterApplicationQueue(getMasterApplicationQueue().filter(x => String(x.telegram_user_id || '') !== currentMasterApplicationOwner()));
-      if(status){status.textContent=result.already_master?'У вас уже есть кабинет мастера. Вернитесь в Telegram и откройте приложение мастера.':(result.existing_master_phone_match?'Найден существующий мастер с этим номером. Заявка отправлена администратору для проверки привязки.':'Ваша заявка отправлена и находится на рассмотрении.');status.className='notice';}
-      if(result.already_master) showExistingMasterHelp('Кабинет мастера уже зарегистрирован. Подтвердите телефон для входа.');
-      else if(button){button.textContent='✓ Заявка отправлена';}
-    } catch(err) {
-      const authOrConfigError = /Telegram не передал данные авторизации|API не настроен|Откройте приложение кнопкой из чата/i.test(String(err?.message || ''));
-      if((err.status && err.status < 500) || authOrConfigError){
-        if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные и авторизацию Telegram.';status.className='error';}
-        if(button){button.textContent='Проверить данные и отправить заявку';button.disabled=false;}
-      } else if(queueMasterApplication(data)){
-        if(status){status.textContent='Сервер временно недоступен. Заявка сохранена в очереди и отправится автоматически, как только связь восстановится. Ничего дополнительно нажимать не нужно.';status.className='notice';}
-        if(button){button.textContent='⏳ Заявка ожидает отправки';button.disabled=true;}
-        // One immediate retry covers brief network interruptions; further retries are automatic.
-        setTimeout(syncMasterApplicationQueue, 1000);
-      } else {
-        if(status){status.textContent='Не удалось связаться с сервером и сохранить очередь. Откройте приложение из Telegram и повторите отправку.';status.className='error';}
-        if(button)button.disabled=false;
-      }
+      localStorage.setItem('remont_bt_phone',data.phone);
+      localStorage.setItem('remont_bt_name',data.name);
+      if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);
+    } catch(_) {}
+    // Persist first, then try the server. This prevents a 401/network error from losing the form.
+    if(!queueMasterApplication(data)) {
+      if(status){status.textContent='Не удалось сохранить заявку в очереди устройства. Освободите место в браузере и повторите.';status.className='error';}
+      if(button)button.disabled=false;
+      return;
     }
+    if(button){button.disabled=true;button.textContent='⏳ Отправляем заявку…';}
+    await syncMasterApplicationQueue();
 }
 
 async function clientApi(path, method='GET', body=null) {

@@ -1,8 +1,8 @@
-/* Remont BT Service Worker — 20261020-master-autoqueue1
+/* Remont BT Service Worker — 20261020-master-date-auth-retry2
  * Network-first for navigation and static assets; cache is only an offline fallback.
  * Only this app's own caches are cleaned. API and user-specific requests are never cached.
  */
-const RELEASE = '20261020-master-autoqueue1';
+const RELEASE = '20261020-master-date-auth-retry2';
 const CACHE_NAME = `remont-bt-miniapp-${RELEASE}`;
 const CACHE_PREFIX = 'remont-bt-miniapp-';
 const STATIC_ASSETS = [
