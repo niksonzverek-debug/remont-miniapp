@@ -184,8 +184,12 @@ function clearSubmittedQueue() {
 }
 function renderOfflineQueueBanner() {
     const existing=document.getElementById('offlineQueueBanner');
+    const params = new URLSearchParams(location.search);
+    const masterEntryLaunch = params.get('role') === 'master_entry';
+    const masterApplicationVisible = Boolean(document.getElementById('masterApplicationForm'));
+    if (masterEntryLaunch || masterApplicationVisible) { if (existing) existing.remove(); return; }
     const queue=getOfflineQueue();
-    const owned=queue.filter(isQueueItemForCurrentUser);
+    const owned=queue.filter(x => isQueueItemForCurrentUser(x) && String(x.event || '') !== 'submit_master_application');
     const pending=owned.filter(x=>x.local_status==='pending'||x.local_status==='retry').length;
     const submitted=owned.filter(x=>x.local_status==='submitted').length;
     if(!pending&&!submitted){if(existing)existing.remove();return;}

@@ -104,16 +104,123 @@ function showExistingMasterHelp(message='') {
         if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
         localStorage.setItem('remontBT.master.session.v1',data.session);
         localStorage.setItem('remont_bt_phone',phone);
-        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261019-masterpinfl1');
+        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261020-master-autoqueue1');
         status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
         location.href=target.href;
       }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
     });
 }
 
+const MASTER_APPLICATION_QUEUE_KEY = 'remont_bt_master_application_queue_v2';
+let masterApplicationSyncInProgress = false;
+
+function getMasterApplicationQueue() {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(MASTER_APPLICATION_QUEUE_KEY) || '[]');
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) { return []; }
+}
+function saveMasterApplicationQueue(items) {
+    try { localStorage.setItem(MASTER_APPLICATION_QUEUE_KEY, JSON.stringify(items.slice(-20))); return true; }
+    catch (e) { console.error('Не удалось сохранить очередь заявки мастера:', e); return false; }
+}
+function currentMasterApplicationOwner() {
+    return String(currentClientTelegramId || (typeof currentQueueOwnerId === 'function' ? currentQueueOwnerId() : '') || '');
+}
+function queueMasterApplication(data) {
+    const uid = currentMasterApplicationOwner();
+    if (!/^\d{1,20}$/.test(uid)) return false;
+    const items = getMasterApplicationQueue().filter(x => String(x.telegram_user_id || '') !== uid);
+    items.push({
+        operation_id: (typeof uuidV4 === 'function' ? uuidV4() : `${Date.now()}-${Math.random()}`),
+        telegram_user_id: uid,
+        payload: {name:data.name, phone:data.phone, gender:data.gender, birth_date:data.birth_date, pinfl:data.pinfl},
+        queued_at: new Date().toISOString(),
+        attempts: 0,
+        status: 'pending'
+    });
+    return saveMasterApplicationQueue(items);
+}
+function migrateLegacyMasterApplicationQueue() {
+    if (typeof getOfflineQueue !== 'function' || typeof saveOfflineQueue !== 'function') return;
+    const legacy = getOfflineQueue();
+    const remain = [];
+    let changed = false;
+    for (const item of legacy) {
+        if (item && item.event === 'submit_master_application' && ['pending','retry'].includes(item.local_status)) {
+            const uid = String(item.telegram_user_id || '');
+            const owner = currentMasterApplicationOwner();
+            if (uid && uid === owner && item.name && item.phone && item.pinfl) {
+                const current = getMasterApplicationQueue();
+                if (!current.some(x => x.telegram_user_id === uid && x.payload?.pinfl === item.pinfl && x.payload?.phone === item.phone)) {
+                    current.push({operation_id:item.operation_id || (typeof uuidV4==='function'?uuidV4():String(Date.now())), telegram_user_id:uid,
+                        payload:{name:item.name,phone:item.phone,gender:item.gender,birth_date:item.birth_date,pinfl:item.pinfl},
+                        queued_at:item.queued_at || new Date().toISOString(),attempts:0,status:'pending'});
+                    saveMasterApplicationQueue(current);
+                }
+                changed = true;
+                continue;
+            }
+        }
+        remain.push(item);
+    }
+    if (changed) saveOfflineQueue(remain);
+}
+async function syncMasterApplicationQueue() {
+    if (masterApplicationSyncInProgress || (typeof navigator !== 'undefined' && navigator.onLine === false)) return;
+    const uid = currentMasterApplicationOwner();
+    if (!/^\d{1,20}$/.test(uid)) return;
+    const items = getMasterApplicationQueue();
+    const item = items.find(x => String(x.telegram_user_id || '') === uid && x.status === 'pending');
+    if (!item) return;
+    masterApplicationSyncInProgress = true;
+    try {
+        const result = await clientApi('/api/master/apply', 'POST', item.payload);
+        if (!result || result.ok !== true) throw new Error('Сервер не подтвердил приём заявки.');
+        saveMasterApplicationQueue(getMasterApplicationQueue().filter(x => x.operation_id !== item.operation_id));
+        try { localStorage.removeItem('remont_bt_master_application'); } catch (_) {}
+        const status = document.getElementById('masterApplicationStatus');
+        const button = document.querySelector('#masterApplicationForm button[type="submit"]');
+        if (status) { status.textContent = result.already_master ? 'Кабинет мастера уже активен.' : 'Заявка отправлена на сервер и находится на рассмотрении.'; status.className = 'notice'; }
+        if (button) { button.textContent = result.already_master ? 'Кабинет уже активен' : '✓ Заявка отправлена'; button.disabled = true; }
+    } catch (err) {
+        const authOrConfigError = /Telegram не передал данные авторизации|API не настроен|Откройте приложение кнопкой из чата/i.test(String(err?.message || ''));
+        const current = getMasterApplicationQueue();
+        const idx = current.findIndex(x => x.operation_id === item.operation_id);
+        if (idx >= 0) {
+            current[idx].attempts = Number(current[idx].attempts || 0) + 1;
+            current[idx].last_attempt_at = new Date().toISOString();
+            if ((err && Number(err.status) >= 400 && Number(err.status) < 500) || authOrConfigError) {
+                current[idx].status = 'blocked';
+                current[idx].last_error = String(err.message || 'Сервер отклонил заявку');
+            }
+            saveMasterApplicationQueue(current);
+        }
+        const status = document.getElementById('masterApplicationStatus');
+        const button = document.querySelector('#masterApplicationForm button[type="submit"]');
+        if (status && ((err && Number(err.status) >= 400 && Number(err.status) < 500) || authOrConfigError)) {
+            status.textContent = `Сервер не принял заявку: ${err.message || 'проверьте данные'}. Исправьте данные и отправьте снова.`;
+            status.className = 'error';
+            if (button) { button.textContent = 'Проверить данные и отправить заявку'; button.disabled = false; }
+        }
+        // Network errors and 5xx responses stay pending and are retried automatically.
+        console.warn('Автосинхронизация заявки мастера не завершена:', err?.message || err);
+    } finally { masterApplicationSyncInProgress = false; }
+}
+function startMasterApplicationAutoSync() {
+    migrateLegacyMasterApplicationQueue();
+    syncMasterApplicationQueue();
+}
+window.addEventListener('online', startMasterApplicationAutoSync);
+window.addEventListener('focus', startMasterApplicationAutoSync);
+document.addEventListener('visibilitychange', () => { if (!document.hidden) startMasterApplicationAutoSync(); });
+setInterval(startMasterApplicationAutoSync, 15000);
+
 function showMasterApplicationForm() {
+    // The previous version kept the full master application (including PINFL) as a reusable local draft.
+    // Pending offline submissions now live in a separate, automatically synchronized queue.
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem('remont_bt_master_application') || '{}') || {}; } catch (_) {}
+    try { localStorage.removeItem('remont_bt_master_application'); } catch (_) {}
     setPage('🧑‍🔧 Заявка мастера', `<p class="subtitle">Укажите ФИО, телефон и данные для проверки ПИНФЛ. Пол и дата рождения сверяются с первыми цифрами ПИНФЛ. После проверки заявка уйдёт администратору; доступ выдаётся только после одобрения и привязывается к вашему Telegram ID.</p>
       <form id="masterApplicationForm" class="card master-auth-card">
         <label for="masterApplicationName">ФИО *</label><input id="masterApplicationName" name="name" required minlength="2" maxlength="150" autocomplete="name" value="${escapeClient(saved.name || localStorage.getItem('remont_bt_name') || '')}">
@@ -125,6 +232,20 @@ function showMasterApplicationForm() {
       </form>`);
     const form=document.getElementById('masterApplicationForm');
     form?.addEventListener('submit',e=>{e.preventDefault();submitMasterApplication(form);});
+    const uid = currentMasterApplicationOwner();
+    const queued = getMasterApplicationQueue().find(x => String(x.telegram_user_id || '') === uid && ['pending','blocked'].includes(x.status));
+    if (queued) {
+      const status = document.getElementById('masterApplicationStatus');
+      const button = form?.querySelector('button[type="submit"]');
+      if (queued.status === 'pending') {
+        if (status) { status.textContent='Есть заявка, ожидающая отправки. Она отправится автоматически при восстановлении связи.'; status.className='notice'; }
+        if (button) { button.textContent='⏳ Заявка ожидает отправки'; button.disabled=true; }
+      } else {
+        if (status) { status.textContent=`Не удалось автоматически отправить сохранённую заявку: ${queued.last_error || 'проверьте авторизацию Telegram и данные'}. Исправьте данные и отправьте снова.`; status.className='error'; }
+        if (button) { button.textContent='Проверить данные и отправить заявку'; button.disabled=false; }
+      }
+    }
+    startMasterApplicationAutoSync();
 }
 
 async function submitMasterApplication(form){
@@ -145,22 +266,28 @@ async function submitMasterApplication(form){
     if(!pin)return showAlert('Первая цифра ПИНФЛ не соответствует допустимому формату.');
     const pinDate=`${data.pinfl.slice(1,3)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(5,7))}`;
     if(pin[0]!==data.gender||pinDate!==data.birth_date)return showAlert(`Проверьте данные: по ПИНФЛ указаны пол ${pin[0]} и дата рождения ${pinDate}.`);
-    try{localStorage.setItem('remont_bt_master_application',JSON.stringify(data)); localStorage.setItem('remont_bt_phone',data.phone); localStorage.setItem('remont_bt_name',data.name);if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
+    try{localStorage.removeItem('remont_bt_master_application'); localStorage.setItem('remont_bt_phone',data.phone); localStorage.setItem('remont_bt_name',data.name);if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
     if(button){button.disabled=true;button.textContent='⏳ Отправляем заявку…';}
     try {
       const result=await clientApi('/api/master/apply','POST',{name:data.name,phone:data.phone,gender:data.gender,birth_date:data.birth_date,pinfl:data.pinfl});
+      saveMasterApplicationQueue(getMasterApplicationQueue().filter(x => String(x.telegram_user_id || '') !== currentMasterApplicationOwner()));
       if(status){status.textContent=result.already_master?'У вас уже есть кабинет мастера. Вернитесь в Telegram и откройте приложение мастера.':(result.existing_master_phone_match?'Найден существующий мастер с этим номером. Заявка отправлена администратору для проверки привязки.':'Ваша заявка отправлена и находится на рассмотрении.');status.className='notice';}
       if(result.already_master) showExistingMasterHelp('Кабинет мастера уже зарегистрирован. Подтвердите телефон для входа.');
       else if(button){button.textContent='✓ Заявка отправлена';}
     } catch(err) {
-      if(err.status && err.status !== 401 && err.status < 500){
-        if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные.';status.className='error';}
-        if(button){button.textContent='Исправить данные и повторить';button.disabled=false;}
-      } else if(typeof queueOperation==='function'){
-        queueOperation(data);
-        if(status){status.textContent='Сервер сейчас недоступен или не подтвердил Telegram. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
-        if(button){button.textContent='📦 Заявка сохранена в очереди';button.disabled=false;}
-      } else {if(status){status.textContent='Не удалось отправить заявку. Проверьте связь и повторите.';status.className='error';} if(button)button.disabled=false;}
+      const authOrConfigError = /Telegram не передал данные авторизации|API не настроен|Откройте приложение кнопкой из чата/i.test(String(err?.message || ''));
+      if((err.status && err.status < 500) || authOrConfigError){
+        if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные и авторизацию Telegram.';status.className='error';}
+        if(button){button.textContent='Проверить данные и отправить заявку';button.disabled=false;}
+      } else if(queueMasterApplication(data)){
+        if(status){status.textContent='Сервер временно недоступен. Заявка сохранена в очереди и отправится автоматически, как только связь восстановится. Ничего дополнительно нажимать не нужно.';status.className='notice';}
+        if(button){button.textContent='⏳ Заявка ожидает отправки';button.disabled=true;}
+        // One immediate retry covers brief network interruptions; further retries are automatic.
+        setTimeout(syncMasterApplicationQueue, 1000);
+      } else {
+        if(status){status.textContent='Не удалось связаться с сервером и сохранить очередь. Откройте приложение из Telegram и повторите отправку.';status.className='error';}
+        if(button)button.disabled=false;
+      }
     }
 }
 
@@ -849,4 +976,6 @@ async function startRemontApp(){
   }
   showRegistrationScreen();
 }
+migrateLegacyMasterApplicationQueue();
 startRemontApp();
+startMasterApplicationAutoSync();
