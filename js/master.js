@@ -78,6 +78,7 @@ async function sendMasterActCorrection(number){
   catch(e){status.textContent=e.message;status.className='error';button.disabled=false;}
 }
 function masterShell(title, body) {
+  if(title!=='Диалог' && typeof btMasterStopChatMedia==='function') btMasterStopChatMedia();
   document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="bt-master-title"><img class="bt-master-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><div class="eyebrow">REMONT BT · ELECTRIC STEEL BLUE</div><h1>${masterEsc(title)}</h1></div></div><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button onclick="showMasterMessages()"><span>▤</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
 }
 function masterToast(message, error=false) { const e=document.getElementById('masterToast'); if(e){e.textContent=message;e.className=error?'error':'notice';} else showAlert(message); }
@@ -150,8 +151,86 @@ async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/
 async function showMasterClients(){try{await loadMasterData();}catch(e){return masterShell('Клиенты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.clients.map(c=>`<article class="card"><div class="card-row"><b>${masterEsc(c.name||'Клиент')}</b><span class="status-pill">${c.registered?'Зарегистрирован':'Без регистрации'}</span></div><p>${masterEsc(c.phone||'Телефон не указан')}</p><p class="subtitle">${masterEsc(c.registration_no||'')}</p><div class="button-row"><button onclick="openMasterChat('${masterEsc(c.id)}')">💬 Написать</button>${c.phone?`<a class="secondary menu-btn" href="tel:${masterEsc(c.phone)}">📞 Позвонить</a>`:''}</div></article>`).join('');masterShell('Клиенты',`<input id="clientSearch" placeholder="Поиск по имени, телефону" oninput="filterMasterClients()"><div id="masterClientList" class="stack-list">${rows||'<article class="card">Клиентов пока нет.</article>'}</div>`);}
 function filterMasterClients(){const q=(document.getElementById('clientSearch')?.value||'').toLowerCase();document.querySelectorAll('#masterClientList .card').forEach(el=>el.style.display=el.textContent.toLowerCase().includes(q)?'':'none');}
 async function showMasterMessages(){try{await loadMasterData();}catch(e){return masterShell('Сообщения',`<article class="card error">${masterEsc(e.message)}</article>`)}const grouped=new Map();for(const m of masterCache.messages){const k=String(m.client_id);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)}const rows=[...grouped.entries()].map(([id,ms])=>{const last=ms[ms.length-1];return `<button class="chat-list-item" onclick="openMasterChat('${masterEsc(id)}')"><span class="chat-avatar">${masterEsc((last.client_name||'К').slice(0,1).toUpperCase())}</span><span class="chat-info"><b>${masterEsc(last.client_name||'Клиент')}</b><small>${masterEsc(last.text||'Медиа')}</small></span><small>${masterEsc((last.created_at||'').replace('T',' ').slice(0,16))}</small></button>`}).join('');masterShell('Сообщения',`<p class="subtitle">Ответы отправляются выбранному клиенту в личный чат Telegram. Перед отправкой проверьте имя в заголовке диалога.</p><div class="chat-list">${rows||'<article class="card">Сообщений пока нет. Когда клиент напишет боту, диалог появится здесь.</article>'}</div>`);}
-async function openMasterChat(clientId){activeChatClientId=String(clientId);try{await loadMasterData();}catch(e){return masterToast(e.message,true)}const c=masterCache.clients.find(x=>String(x.id)===activeChatClientId);if(!c){masterToast('Клиент не найден в вашем кабинете.',true);return}const ms=masterCache.messages.filter(m=>String(m.client_id)===activeChatClientId);const bubbles=ms.map(m=>`<div class="message-bubble ${String(m.from_id)===masterCurrentUserId?'mine':'theirs'}"><p>${masterEsc(m.text||(`[${m.type||'медиа'}]`))}</p><small>${masterEsc((m.created_at||'').replace('T',' ').slice(0,16))}</small></div>`).join('');masterShell('Диалог',`<button class="back-btn" onclick="showMasterMessages()">← Все диалоги</button><article class="card chat-header"><div class="chat-avatar">${masterEsc((c.name||'К').slice(0,1).toUpperCase())}</div><div><h2>${masterEsc(c.name||'Клиент')}</h2><p class="subtitle">${masterEsc(c.phone||'Телефон не указан')} · Telegram ID ${masterEsc(c.id)}</p></div></article><div class="chat-history">${bubbles||'<p class="subtitle">Начало переписки. Напишите клиенту ниже.</p>'}</div><form class="card" onsubmit="event.preventDefault();sendMasterReply()"><label for="masterReplyText">Сообщение для ${masterEsc(c.name||'клиента')}</label><textarea id="masterReplyText" maxlength="1500" required placeholder="Введите ответ…"></textarea><button type="submit" id="masterReplySend">➤ Отправить этому клиенту</button><p id="replyStatus" class="subtitle"></p></form>`);const h=document.querySelector('.chat-history');if(h)h.scrollTop=h.scrollHeight;}
-async function sendMasterReply(){const field=document.getElementById('masterReplyText');const status=document.getElementById('replyStatus');const btn=document.getElementById('masterReplySend');const text=field?.value.trim();if(!activeChatClientId||!text)return;btn.disabled=true;try{const r=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});status.textContent=r.message;field.value='';await openMasterChat(activeChatClientId);}catch(e){status.textContent=e.message;status.className='error';btn.disabled=false;}}
+let btMasterChatRefreshTimer=null;
+let btMasterChatUrls=[];
+function btMasterStopChatMedia(){
+    if(btMasterChatRefreshTimer){clearInterval(btMasterChatRefreshTimer);btMasterChatRefreshTimer=null;}
+    btMasterChatUrls.forEach(u=>URL.revokeObjectURL(u));btMasterChatUrls=[];
+}
+function btMasterChatBubble(m){
+    const mine=String(m.from_id)===String(masterCurrentUserId);
+    const mid=String(m.media_id||'');
+    const kind=m.type==='video'?'video':m.type==='photo'?'photo':'';
+    return `<div class="message-bubble ${mine?'mine':'theirs'}"><b>${mine?'Вы':'Клиент'}</b>`+
+        (m.text?`<p>${masterEsc(m.text)}</p>`:'')+
+        (kind&&/^[a-f0-9]{32}$/.test(mid)?`<div class="bt-chat-media-slot" data-media-id="${mid}" data-media-kind="${kind}">Загрузка файла…</div>`:'')+
+        `<small>${masterEsc((m.created_at||'').replace('T',' ').slice(0,16))}</small></div>`;
+}
+async function btMasterDisplayMedia(el){
+    if(!el?.isConnected)return;
+    try{
+        const headers=masterAuthHeaders();
+        const r=await fetch(masterApiBase+`/api/chat/media/${encodeURIComponent(el.dataset.mediaId)}`,{headers,cache:'no-store'});
+        if(!r.ok)throw new Error('Не удалось получить файл.');
+        const blob=await r.blob();if(!el.isConnected)return;
+        const url=URL.createObjectURL(blob);btMasterChatUrls.push(url);
+        const media=document.createElement(el.dataset.mediaKind==='video'?'video':'img');
+        media.src=url;media.className='bt-chat-media';media.alt='Вложение из переписки';
+        if(media.tagName==='VIDEO'){media.controls=true;media.preload='metadata';}
+        el.textContent='';el.appendChild(media);
+    }catch(e){if(el.isConnected)el.textContent=e.message;}
+}
+function btMasterRenderMessages(messages){
+    const h=document.getElementById('btMasterChatHistory');if(!h)return;
+    const fingerprint=messages.map(m=>`${m.id}:${m.media_id||''}`).join('|');
+    if(h.dataset.fingerprint===fingerprint)return;
+    h.dataset.fingerprint=fingerprint;
+    btMasterChatUrls.forEach(u=>URL.revokeObjectURL(u));btMasterChatUrls=[];
+    h.innerHTML=messages.length?messages.map(btMasterChatBubble).join(''):'<p class="subtitle">Напишите клиенту первое сообщение.</p>';
+    h.querySelectorAll('[data-media-id]').forEach(btMasterDisplayMedia);
+    h.scrollTop=h.scrollHeight;
+}
+async function btMasterRefreshOpenChat(){
+    if(!document.getElementById('btMasterChatHistory')||!activeChatClientId)return;
+    try{
+        const result=await masterApi('/api/master/messages');
+        masterCache.messages=Array.isArray(result.messages)?result.messages:[];
+        btMasterRenderMessages(masterCache.messages.filter(m=>String(m.client_id)===String(activeChatClientId)));
+    }catch(e){const status=document.getElementById('replyStatus');if(status)status.textContent=e.message;}
+}
+async function openMasterChat(clientId){
+    btMasterStopChatMedia();activeChatClientId=String(clientId);
+    try{await loadMasterData();}catch(e){return masterToast(e.message,true);}
+    const c=masterCache.clients.find(x=>String(x.id)===activeChatClientId);
+    if(!c){masterToast('Клиент не найден в вашем кабинете.',true);return;}
+    masterShell('Диалог',`<button class="back-btn" onclick="showMasterMessages()">← Все диалоги</button>
+        <article class="card chat-header"><div class="chat-avatar">${masterEsc((c.name||'К').slice(0,1).toUpperCase())}</div><div><h2>${masterEsc(c.name||'Клиент')}</h2><p class="subtitle">${masterEsc(c.phone||'Телефон не указан')}</p></div></article>
+        <div id="btMasterChatHistory" class="chat-history bt-chat-history"></div>
+        <form class="card bt-chat-compose" onsubmit="event.preventDefault();sendMasterReply()"><label for="masterReplyText">Сообщение для ${masterEsc(c.name||'клиента')}</label><textarea id="masterReplyText" maxlength="1500" placeholder="Введите ответ…"></textarea>
+        <div class="bt-chat-compose-actions"><label class="bt-chat-attach" for="masterChatFile">＋ Фото / видео</label><input id="masterChatFile" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" hidden onchange="btMasterDescribeFile()"><button id="masterReplySend" type="submit">➤ Отправить</button></div><p id="btMasterFileName" class="subtitle"></p><p id="replyStatus" class="subtitle" role="status"></p></form>`);
+    btMasterRenderMessages(masterCache.messages.filter(m=>String(m.client_id)===activeChatClientId));
+    btMasterChatRefreshTimer=setInterval(()=>{if(document.getElementById('btMasterChatHistory'))btMasterRefreshOpenChat();else btMasterStopChatMedia();},12000);
+}
+function btMasterDescribeFile(){
+    const f=document.getElementById('masterChatFile')?.files?.[0];const e=document.getElementById('btMasterFileName');
+    if(e)e.textContent=f?`${f.name} · ${(f.size/1048576).toFixed(1)} МБ · максимум 6 МБ`:'';
+}
+function btMasterFileBase64(file){return new Promise((resolve,reject)=>{const fr=new FileReader();fr.onerror=()=>reject(new Error('Не удалось прочитать файл.'));fr.onload=()=>resolve(String(fr.result||'').split(',')[1]||'');fr.readAsDataURL(file);});}
+async function sendMasterReply(){
+    const field=document.getElementById('masterReplyText'),status=document.getElementById('replyStatus'),btn=document.getElementById('masterReplySend');
+    const text=String(field?.value||'').trim();const file=document.getElementById('masterChatFile')?.files?.[0];
+    if(!activeChatClientId||(!text&&!file)){if(status)status.textContent='Напишите сообщение или добавьте файл.';return;}
+    if(file&&(file.size>6*1024*1024||!['image/jpeg','image/png','image/webp','video/mp4','video/webm'].includes(file.type))){status.textContent='Файл должен быть JPG, PNG, WebP, MP4 или WebM до 6 МБ.';return;}
+    btn.disabled=true;status.textContent='Отправляем…';
+    try{
+        let response;
+        if(file){const data=await btMasterFileBase64(file);response=await masterApi('/api/master/message-media','POST',{client_id:activeChatClientId,text,media_type:file.type,file_name:file.name,data});}
+        else response=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});
+        status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
+        await btMasterRefreshOpenChat();
+    }catch(e){status.textContent=e.message;status.className='error';}
+    finally{if(btn?.isConnected)btn.disabled=false;}
+}
 async function showMasterActs(){
  try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
  clearMasterPdfUrl();

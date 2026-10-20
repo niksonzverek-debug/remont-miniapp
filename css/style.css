@@ -650,3 +650,41 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 .master-app .master-bottom-nav button:focus-visible span,.master-app .master-bottom-nav button:active span{
   border-color:#7fddff;color:#fff!important;box-shadow:0 0 19px #219dff99
 }
+
+
+/* Client patch 2026-10-20 — same electric-blue components as master. */
+.bt-client-address-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:end}
+.bt-client-address-row>*{min-width:0}
+.bt-client-address-row input{width:100%;min-width:0}
+.bt-enhanced-native-select{position:absolute!important;left:-9999px!important;width:1px!important;height:1px!important;opacity:0!important;pointer-events:none!important}
+.bt-client-picker{margin:7px 0 14px;min-width:0}
+.bt-client-picker summary{list-style:none;cursor:pointer;background:linear-gradient(125deg,#112f50,#081b30);border:1px solid #3887c8;border-radius:13px;padding:13px 15px;min-height:50px;display:flex;justify-content:space-between;align-items:center;color:#effaff;box-shadow:0 0 12px #148dff30;font-weight:650}
+.bt-client-picker summary::-webkit-details-marker{display:none}
+.bt-client-picker[open] summary{border-radius:13px 13px 0 0;border-color:#77d7ff}
+.bt-client-picker-options{background:#091e36;border:1px solid #3785c8;border-top:0;border-radius:0 0 13px 13px;max-height:310px;overflow-y:auto;overscroll-behavior:contain;scroll-snap-type:y proximity;-webkit-overflow-scrolling:touch}
+.bt-client-picker-option{display:flex!important;align-items:center;text-align:left;gap:12px;width:100%;min-height:54px;padding:10px 14px!important;border:0!important;border-radius:0!important;border-bottom:1px solid #214667!important;background:#0d2742!important;color:#f2faff!important;box-shadow:none!important;font-size:15px!important;scroll-snap-align:start}
+.bt-client-picker-option>span:nth-child(2){flex:1}
+.bt-client-picker-option>span:last-child{opacity:0;color:#6ee6ff}
+.bt-client-picker-option.selected{background:#163e64!important}
+.bt-client-picker-option.selected>span:last-child{opacity:1}
+.bt-client-picker-option:last-child{border-bottom:0!important}
+.bt-client-picker-option .bt-master-choice-icon{display:inline-flex;align-items:center;justify-content:center;background:#0a345a;border:1px solid #2b7db8;color:#8bdcff;border-radius:10px;width:37px;height:37px;font-weight:750;font-size:14px;flex-shrink:0}
+.bt-client-submit{margin-bottom:22px!important}
+.bt-line-icon{font-size:30px!important;color:#81cbff;text-shadow:0 0 15px #219aff6e}
+.bt-chat-shell{display:flex;flex-direction:column;gap:10px;min-height:calc(100dvh - 230px)}
+.bt-chat-history{display:flex;flex-direction:column;gap:10px;overflow-y:auto;max-height:calc(100dvh - 380px);min-height:220px;padding:12px 8px;border:1px solid #244368;border-radius:15px;background:#07172a;overscroll-behavior:contain}
+.bt-chat-bubble,.message-bubble{padding:12px 14px;border:1px solid #234f7c;border-radius:15px;background:linear-gradient(140deg,#0b233b,#153356);max-width:88%;align-self:flex-start;overflow-wrap:anywhere}
+.bt-chat-bubble.mine,.message-bubble.mine{align-self:flex-end;background:linear-gradient(140deg,#15527c,#0e3360);border-color:#3e9ce2}
+.bt-chat-bubble p,.message-bubble p{margin:5px 0;white-space:pre-wrap}
+.bt-chat-bubble small,.message-bubble small{display:block;font-size:11px;color:#9fbdd5;margin-top:6px}
+.bt-chat-sender{font-size:12px;color:#8ecfff;font-weight:800}
+.bt-chat-compose{background:#101e34;border-radius:17px;border:1px solid #284c74;padding:14px}
+.bt-chat-compose label:first-child{margin-top:0}
+.bt-chat-compose-actions{display:flex;gap:8px;align-items:center;margin:10px 0}
+.bt-chat-compose-actions button{flex:1;min-height:47px;margin:0}
+.bt-chat-attach{display:flex;align-items:center;justify-content:center;margin:0!important;padding:10px;border:1px solid #3788cb;border-radius:12px;background:#132e4d;color:#b9e9ff;white-space:nowrap;cursor:pointer;font-size:13px;font-weight:700}
+.bt-chat-media{display:block;width:100%;max-width:310px;max-height:300px;object-fit:contain;border-radius:9px;background:#071320;margin:8px 0}
+.bt-chat-media-slot{font-size:13px;color:#99cbef}
+.master-app .chat-history{display:flex;flex-direction:column}
+.bt-order-page .bt-client-bottom-nav{z-index:15}
+@media (max-width:340px){.bt-client-address-row{gap:8px}.bt-chat-attach{font-size:11px;padding:7px}}
