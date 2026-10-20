@@ -9,7 +9,11 @@ function masterAuthHeaders() {
   const initData = String((tg && tg.initData) || '').trim();
   if (initData) headers['X-Telegram-Init-Data'] = initData;
   const savedSession = String(localStorage.getItem('remontBT.master.session.v1') || '');
-  if (savedSession) headers['X-Remont-Session'] = savedSession;
+  const telegramId = String(tg?.initDataUnsafe?.user?.id || '');
+  const savedId = savedSession.split(':')[0];
+  if (initData && telegramId && savedSession && savedId !== telegramId) {
+    localStorage.removeItem('remontBT.master.session.v1');
+  } else if (savedSession) headers['X-Remont-Session'] = savedSession;
   if (!initData && !savedSession) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
   return headers;
 }
@@ -82,6 +86,14 @@ async function loadMasterData() {
   const [dash,orders,clients,messages,acts,promos]=await Promise.all([
     masterApi('/api/master/dashboard'),masterApi('/api/master/orders'),masterApi('/api/master/clients'),masterApi('/api/master/messages'),masterApi('/api/master/acts'),masterApi('/api/master/promos')
   ]);
+  const telegramId=String(tg?.initDataUnsafe?.user?.id||'');
+  const signedId=String(new URLSearchParams(location.search).get('master_uid')||'');
+  const expectedId=String((tg?.initData && telegramId) ? telegramId : (signedId || masterCurrentUserId));
+  if (expectedId && String(dash.authenticated_master_id||'') !== expectedId) {
+    localStorage.removeItem('remontBT.master.session.v1');
+    throw new Error('Кабинет открыт под другим Telegram ID. Откройте новую кнопку кабинета из чата с ботом.');
+  }
+  masterCurrentUserId=String(dash.authenticated_master_id||'');
   masterCache={...masterCache,profile:dash.profile,stats:dash.stats,orders:orders.orders||[],clients:clients.clients||[],messages:messages.messages||[],acts:acts.acts||[],promos:promos.promocodes||[]};
   return masterCache;
 }
@@ -138,5 +150,7 @@ async function showMasterMarketingLink(){
 async function saveMasterMarketingLink(){
  const name=(document.getElementById('marketingShopName')?.value||'').trim(); const out=document.getElementById('marketingLinkResult');
  if(name.length<2){out.textContent='Введите название не короче двух символов.';return;}
- try{const saved=await masterApi('/api/master/settings','POST',{marketing_name:name}); const d=await masterApi('/api/master/marketing-link'); masterCache.profile.marketing_name=name; out.innerHTML=`<p><b>${masterEsc(name)}</b></p><input id="masterMarketingUrl" readonly value="${masterEsc(d.url)}"><button onclick="navigator.clipboard.writeText(document.getElementById('masterMarketingUrl').value).then(()=>masterToast('Ссылка скопирована')).catch(()=>document.getElementById('masterMarketingUrl').select())">Копировать ссылку</button><p class="subtitle">Отправьте эту ссылку клиентам. Переход закрепляется за вашим профилем мастера.</p>`;masterToast(saved.message||'Ссылка готова');}catch(e){out.textContent=e.message;}
+ try{const saved=await masterApi('/api/master/settings','POST',{marketing_name:name}); const d=await masterApi('/api/master/marketing-link');
+  if (String(d.master_id||'') !== String(masterCurrentUserId||'')) throw new Error('Ошибка: ссылка создана для другого мастера. Обновите кабинет.');
+  masterCache.profile.marketing_name=name; out.innerHTML=`<p><b>${masterEsc(name)}</b></p><input id="masterMarketingUrl" readonly value="${masterEsc(d.url)}"><button onclick="navigator.clipboard.writeText(document.getElementById('masterMarketingUrl').value).then(()=>masterToast('Ссылка скопирована')).catch(()=>document.getElementById('masterMarketingUrl').select())">Копировать ссылку</button><p class="subtitle">Отправьте эту ссылку клиентам. Переход закрепляется за вашим профилем мастера.</p>`;masterToast(saved.message||'Ссылка готова');}catch(e){out.textContent=e.message;}
 }
