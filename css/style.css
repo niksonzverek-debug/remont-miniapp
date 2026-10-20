@@ -480,3 +480,106 @@ label,.subtitle,.muted,.hint,small{color:var(--rb-muted)}
 .master-auth-card input{width:100%;box-sizing:border-box;margin:0 0 7px}
 .master-auth-card button{width:100%;margin-top:6px;white-space:normal;line-height:1.35;min-height:48px}
 .master-auth-card p{line-height:1.5;overflow-wrap:anywhere}
+
+/* Remont BT — signature brushed-steel / electric-blue identity */
+:root{
+  --rb-bg:#050a13; --rb-panel:#0c1523; --rb-panel-2:#111e30;
+  --rb-line:#263b55; --rb-text:#edf6ff; --rb-muted:#91a6bf;
+  --rb-blue:#168bff; --rb-cyan:#42e5ff; --rb-violet:#8497ff;
+  --rb-steel:#b8c9dc; --rb-glow:rgba(22,139,255,.32);
+}
+html,body{background-color:var(--rb-bg)!important;color:var(--rb-text)!important}
+body{
+ background-image:
+  radial-gradient(ellipse at 92% -7%,rgba(29,92,157,.28),transparent 39%),
+  radial-gradient(ellipse at -12% 45%,rgba(19,54,91,.17),transparent 43%),
+  linear-gradient(155deg,#080f1b 0%,#050a13 60%,#07101c 100%)!important;
+}
+.card,form,.section,.metric,.stat-card,.portal-head,.master-welcome,
+.client-home-grid .menu-btn,.chat-list-item,.notice,.promo-card{
+ background:linear-gradient(145deg,rgba(20,37,57,.96),rgba(9,18,31,.98))!important;
+ border:1px solid rgba(107,151,195,.23)!important;
+ box-shadow:inset 0 1px 0 rgba(220,239,255,.045),0 12px 28px rgba(0,0,0,.24)!important;
+}
+.portal-head{
+ position:relative;overflow:hidden;
+ background:linear-gradient(112deg,rgba(20,38,60,.98),rgba(10,20,34,.98))!important;
+ border-color:rgba(112,173,231,.35)!important;
+}
+.portal-head:after{
+ content:"";position:absolute;left:-25%;right:-25%;bottom:0;height:1px;
+ background:linear-gradient(90deg,transparent,rgba(66,229,255,.8),rgba(184,201,220,.4),transparent);
+ opacity:.75;pointer-events:none;
+}
+button,.button,input[type=submit],input[type=button],.master-app button{
+ position:relative;isolation:isolate;overflow:hidden;
+ background:linear-gradient(112deg,#1265c9 0%,#168bff 48%,#1765cb 100%)!important;
+ color:#fff!important;border:1px solid rgba(125,205,255,.88)!important;
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 0 1px rgba(22,139,255,.12),0 7px 20px rgba(0,91,201,.22)!important;
+ transition:transform .2s cubic-bezier(.2,.8,.2,1),filter .22s ease,box-shadow .25s ease,border-color .22s ease!important;
+}
+/* A single travelling steel-blue glint, rather than a permanently blinking neon button. */
+button:not(:disabled):before,.button:before,input[type=submit]:before,input[type=button]:before{
+ content:"";position:absolute;z-index:-1;top:-60%;bottom:-60%;left:-80%;width:42%;
+ transform:skewX(-22deg);background:linear-gradient(90deg,transparent,rgba(225,248,255,.25),transparent);
+ transition:left .65s cubic-bezier(.2,.7,.2,1);pointer-events:none;
+}
+button:not(:disabled):hover:before,.button:hover:before,input[type=submit]:hover:before,input[type=button]:hover:before{left:140%}
+button:not(:disabled):hover,.button:hover{filter:brightness(1.1);border-color:var(--rb-cyan)!important;box-shadow:inset 0 1px 0 #ffffff30,0 0 0 1px #168bff33,0 0 22px rgba(22,139,255,.27)!important}
+button:not(:disabled):active,.button:active,input[type=submit]:active,input[type=button]:active{transform:translateY(1px) scale(.985);filter:brightness(1.16);box-shadow:inset 0 0 0 1px #bceeff66,0 0 26px rgba(22,139,255,.35)!important}
+button:disabled{filter:saturate(.45);box-shadow:none!important}
+button.secondary,.secondary,.back-btn,.cancel-btn,.master-nav button{
+ background:linear-gradient(145deg,#142238,#0d1726)!important;color:#dcecff!important;
+ border:1px solid rgba(103,139,177,.28)!important;box-shadow:inset 0 1px 0 #ffffff08!important;
+}
+.menu-btn,.master-app .menu-btn,.client-home-grid .menu-btn{
+ position:relative;overflow:hidden;isolation:isolate;
+ background:linear-gradient(145deg,rgba(19,37,58,.96),rgba(10,19,32,.98))!important;
+ border:1px solid rgba(102,146,188,.25)!important;
+ box-shadow:inset 0 1px 0 rgba(235,247,255,.045),0 8px 22px rgba(0,0,0,.18)!important;
+ transition:transform .22s ease,border-color .22s ease,box-shadow .24s ease,background .24s ease!important;
+}
+.menu-btn:after,.master-app .menu-btn:after,.client-home-grid .menu-btn:after{
+ content:"";position:absolute;left:14px;right:14px;bottom:0;height:1px;
+ background:linear-gradient(90deg,transparent,rgba(66,229,255,.36),transparent);opacity:.45;pointer-events:none;
+}
+.menu-btn:hover,.master-app .menu-btn:hover,.client-home-grid .menu-btn:hover{
+ transform:translateY(-2px);border-color:rgba(66,229,255,.48)!important;
+ box-shadow:inset 0 1px 0 rgba(235,247,255,.07),0 8px 25px rgba(0,0,0,.25),0 0 18px rgba(22,139,255,.09)!important;
+}
+.menu-btn .emoji,.master-app .menu-btn .emoji{
+ background:linear-gradient(145deg,#1b3a5c,#10243a)!important;color:#bdeaff!important;
+ border:1px solid rgba(90,176,232,.3)!important;box-shadow:inset 0 1px 0 #ffffff12,0 0 16px rgba(22,139,255,.07);
+}
+input,select,textarea,.field,.master-app input,.master-app select,.master-app textarea{
+ background:linear-gradient(145deg,#081321,#0b1523)!important;color:#eff7ff!important;
+ border:1px solid rgba(101,142,181,.32)!important;
+}
+input:focus,select:focus,textarea:focus,.master-app input:focus,.master-app select:focus,.master-app textarea:focus{
+ border-color:rgba(66,229,255,.72)!important;box-shadow:0 0 0 3px rgba(22,139,255,.13),0 0 18px rgba(22,139,255,.07)!important;
+}
+.master-app .chat-list-item{transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease!important}
+.master-app .chat-list-item:hover{transform:translateX(2px);border-color:rgba(66,229,255,.42)!important;box-shadow:0 0 18px rgba(22,139,255,.08)!important}
+.chat-avatar{background:linear-gradient(145deg,#1c4c7c,#10243a)!important;border:1px solid rgba(66,229,255,.35);box-shadow:0 0 14px rgba(22,139,255,.1)}
+.message-bubble.mine{background:linear-gradient(135deg,#174d82,#12375c)!important;border:1px solid rgba(74,177,255,.35)}
+.message-bubble.theirs{background:linear-gradient(145deg,#17283d,#101c2b)!important;border:1px solid rgba(113,151,190,.18)}
+.master-app .master-bottom-nav{background:rgba(5,11,20,.94)!important;border-top:1px solid rgba(96,144,188,.25)!important;backdrop-filter:blur(22px) saturate(135%)!important}
+.master-app .master-bottom-nav button{background:transparent!important;border-color:transparent!important;box-shadow:none!important;color:#8298b3!important}
+.master-app .master-bottom-nav button span{color:#89bfff!important;transition:filter .2s ease,transform .2s ease}
+.master-app .master-bottom-nav button:hover span{filter:drop-shadow(0 0 6px rgba(22,139,255,.8));transform:translateY(-1px)}
+.master-app .master-bottom-nav button:focus-visible{outline:1px solid var(--rb-cyan)!important;box-shadow:0 0 14px rgba(22,139,255,.18)!important}
+.count-bubble{background:linear-gradient(135deg,#168bff,#1259b5)!important;box-shadow:0 0 12px rgba(22,139,255,.23)}
+.status-pill{border-color:rgba(93,157,211,.24)!important}
+/* Signature pulse: reserved for key actions, never applied to every control. */
+#submit,#promo_submit,button.primary,.primary,.master-app .menu-btn.primary{
+ box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 0 0 1px rgba(22,139,255,.18),0 8px 24px rgba(0,91,201,.28)!important;
+ animation:rb-steel-breathe 5.8s ease-in-out infinite;
+}
+@keyframes rb-steel-breathe{
+ 0%,100%{box-shadow:inset 0 1px 0 rgba(255,255,255,.24),0 0 0 1px rgba(22,139,255,.12),0 7px 20px rgba(0,91,201,.2)}
+ 50%{box-shadow:inset 0 1px 0 rgba(255,255,255,.3),0 0 0 1px rgba(66,229,255,.18),0 8px 25px rgba(0,130,255,.3)}
+}
+@media(hover:none){button:not(:disabled):hover,.button:hover,.menu-btn:hover,.master-app .menu-btn:hover{transform:none;filter:none}}
+@media(prefers-reduced-motion:reduce){
+ *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+}
