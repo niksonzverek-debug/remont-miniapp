@@ -1,0 +1,52 @@
+
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Регистрация клиента</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        (function () {
+            const params = new URLSearchParams(window.location.search);
+            const isNewClient = params.get('new_client') === '1';
+
+            if (isNewClient) {
+                try {
+                    // Удаляем только поля автозаполнения, которые могли принадлежать
+                    // предыдущему тестовому клиенту. Очередь офлайн-записей, язык,
+                    // локальный ID регистрации и остальные данные не трогаем.
+                    const staleFormKeys = [
+                        'remont_bt_name', 'remont_bt_phone', 'remont_bt_house',
+                        'remont_bt_apartment', 'remont_bt_identity_saved'
+                    ];
+                    for (const storage of [localStorage, sessionStorage]) {
+                        staleFormKeys.forEach(key => storage.removeItem(key));
+                    }
+
+                    console.log('Remont BT: очищены только старые поля формы');
+                } catch (e) {
+                    console.error('Ошибка очистки локальных данных:', e);
+                }
+            }
+        })();
+    </script>
+    <link rel="stylesheet" href="css/style.css?v=20261020-actsubmit1">
+    <link rel="manifest" href="manifest.webmanifest?v=20261020-actsubmit1">
+</head>
+<body>
+    <script>
+        const params = new URLSearchParams(window.location.search);
+        window.WEBAPP_SENDDATA_SUPPORTED = params.get('launch') === 'keyboard';
+
+        document.write(
+            '<script src="js/advertiser-config.js?v=20261020-actsubmit1"><\/script>' +
+            '<script src="js/common.js?v=20261020-actsubmit1"><\/script>' +
+            '<script src="js/client.js?v=20261020-actsubmit1"><\/script>'
+        );
+    </script>
+</body>
+</html>
