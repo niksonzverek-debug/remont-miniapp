@@ -39,6 +39,7 @@ const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow &&
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
 function renderClientMenu() {
+    document.body.classList.remove('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <main class="bt-client-home">
           <header class="bt-brand-head"><img class="bt-brand-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><strong>REMONT BT</strong><small>ELECTRIC STEEL BLUE</small></div></header>
@@ -378,7 +379,13 @@ async function clientApi(path, method='GET', body=null) {
 }
 
 function setPage(title, body) {
-    document.body.innerHTML = `<button class="back-btn" onclick="renderClientMenu()">← Главная</button><h1>${title}</h1>${body}`;
+    document.body.classList.add('bt-inner-page');
+    document.body.classList.remove('bt-order-page');
+    document.body.innerHTML = `<main class="bt-inner-content"><button class="back-btn" onclick="renderClientMenu()">← Главная</button><h1>${title}</h1>${body}</main>` + btClientBottomNav();
+}
+
+function btClientBottomNav() {
+    return `<nav class="bt-client-bottom-nav bt-inner-nav" aria-label="Навигация"><button type="button" onclick="renderClientMenu()"><span>⌂</span>Главная</button><button type="button" onclick="showMyOrders()"><span>▤</span>Заявки</button><button type="button" onclick="showMessages()"><span>✉</span>Чат</button><button type="button" onclick="showProfile()"><span>♙</span>Профиль</button></nav>`;
 }
 
 async function showMyOrders() {
@@ -597,6 +604,7 @@ function showNewOrder() {
         }
     }
 
+    document.body.classList.add('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <button class="back-btn" onclick="renderClientMenu()">← Назад</button>
         <h1>📝 Новая заявка</h1>
@@ -707,7 +715,7 @@ function showNewOrder() {
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
-    `;
+    ` + btClientBottomNav();
 
     try {
         document.getElementById('house').value = isNewClientFlow
