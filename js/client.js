@@ -50,15 +50,34 @@ function renderClientMenu() {
           <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
           <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
           <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
+          <button class="menu-btn" id="advertiserCabinetButton" style="display:none" onclick="showAdvertiserCabinet()"><span class="emoji">📣</span> Я рекламодатель</button>
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
+    // Рекламодатель определяется сервером по телефону из зарегистрированного профиля.
+    clientApi('/api/client/advertiser/status').then(d => {
+        const button = document.getElementById('advertiserCabinetButton');
+        if (button && d.is_advertiser) button.style.display = '';
+    }).catch(err => console.warn('Не удалось проверить статус рекламодателя:', err.message));
     // Use the authoritative profile name from the database, not Telegram's optional first_name.
     clientApi('/api/client/profile').then(d => {
         const name = String(d.profile?.name || '').trim();
         const node = document.getElementById('clientWelcomeName');
         if (node && name) node.textContent = name;
     }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
+}
+
+async function showAdvertiserCabinet() {
+    setPage('📣 Кабинет рекламодателя', '<p class="subtitle">Загружаем ваши промокоды и статистику…</p>');
+    try {
+        const d = await clientApi('/api/advertiser/dashboard');
+        const s = d.summary || {};
+        const promos = (d.promocodes || []).map(p => `<article class="card"><div class="card-row"><b>${escapeClient(p.code)}</b><span class="status-pill">${p.active ? 'Активен' : 'Отключён'}</span></div><p>Скидка клиенту: ${escapeClient(p.discount_percent)}% · Вознаграждение: ${escapeClient(p.reward_percent)}%</p><p class="subtitle">Использований: ${escapeClient(p.repairs)} · До: ${escapeClient(p.expires_at || 'без срока')}</p></article>`).join('');
+        const money = v => Number(v || 0).toLocaleString('ru-RU') + ' сум';
+        setPage('📣 Кабинет рекламодателя', `<div class="card"><h2>${escapeClient(d.advertiser?.name || 'Рекламодатель')}</h2><p>Привлечено клиентов: <b>${escapeClient(s.activations || 0)}</b></p><p>Завершённых ремонтов: <b>${escapeClient(s.repairs || 0)}</b></p><p>Начислено: <b>${escapeClient(money(s.accrued))}</b></p><p>В ожидании выплаты: <b>${escapeClient(money(s.pending))}</b></p><p>Баланс к выплате: <b>${escapeClient(money(s.balance))}</b></p></div><h2>Мои промокоды</h2>${promos || '<div class="card">Промокоды пока не найдены.</div>'}<button class="secondary" onclick="renderClientMenu()">← Вернуться в меню клиента</button>`);
+    } catch (e) {
+        setPage('📣 Кабинет рекламодателя', `<div class="card error">${escapeClient(e.message || 'Не удалось загрузить кабинет рекламодателя.')}</div><button class="secondary" onclick="renderClientMenu()">← Вернуться в меню клиента</button>`);
+    }
 }
 
 function requestMasterRole() { showMasterApplicationForm(); }
