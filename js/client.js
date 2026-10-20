@@ -61,7 +61,7 @@ function renderClientMenu() {
     }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
 }
 
-function requestMasterRole() { showMasterChoice(); }
+function requestMasterRole() { showMasterApplicationForm(); }
 
 function showMasterChoice() {
     setPage('🧑‍🔧 Кабинет мастера', `<div class="card master-choice-card">
@@ -994,7 +994,22 @@ async function showCallMaster() {
 
 async function startRemontApp(){
   const role = clientUrlParams.get('role') || 'client';
-  if (role === 'master_entry') { showMasterChoice(); return; }
+  if (role === 'master_entry') {
+    // The master entry button opens the application directly for new users.
+    // If this Telegram account has since been approved, open the master cabinet instead.
+    try {
+      await clientApi('/api/master/dashboard');
+      const target = new URL('index.html', location.href);
+      target.searchParams.set('role', 'master');
+      target.searchParams.set('appv', '20261020-master-flow-fix6');
+      location.replace(target.href);
+      return;
+    } catch (_) {
+      // Not approved (or temporarily unavailable): keep the application form available.
+    }
+    showMasterApplicationForm();
+    return;
+  }
 
   // Local storage is only a cache and may be stale/shared on the device.
   // Ask the server first; only a registered server profile may bypass registration.
