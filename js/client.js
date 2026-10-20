@@ -60,21 +60,27 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><span>Промокоды</span></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><span>Профиль</span></button>
           </div>
-          <section class="bt-live-panel bt-chat-preview" onclick="showMessages()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')showMessages()"><div class="bt-section-title">✉ Живой чат <span class="bt-glow-dot">●</span></div><div class="bt-chat-preview-row"><span class="bt-chat-avatar">⚙</span><div><strong>Живой чат</strong><p id="btChatPreviewText">Напишите мастеру или отправьте фото/видео</p></div><span class="bt-chat-chevron">→</span></div></section>
+          <section class="bt-live-panel bt-home-chat" id="btHomeChat" aria-label="Чат с мастером">
+            <div class="bt-section-title">✉ Живой чат <span class="bt-glow-dot">●</span></div>
+            <div id="btChatHistory" class="bt-chat-history bt-home-chat-history" aria-live="polite"><p class="subtitle">Загружаем переписку…</p></div>
+            <form class="bt-chat-compose bt-home-chat-compose" onsubmit="event.preventDefault();sendClientMessage()">
+              <label for="masterMessage">Сообщение мастеру</label>
+              <textarea id="masterMessage" maxlength="1500" rows="2" placeholder="Напишите сообщение прямо здесь…"></textarea>
+              <div class="bt-chat-compose-actions"><label class="bt-chat-attach" for="clientChatFile">＋ Фото / видео</label><input id="clientChatFile" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" hidden onchange="btDescribeChatFile()"><button id="clientChatSend" type="submit">➤ Отправить</button></div>
+              <p id="clientChatFileName" class="subtitle"></p><p id="messageStatus" class="subtitle" role="status"></p>
+            </form>
+          </section>
           <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
-          <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="showMessages()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
+          <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     clientApi('/api/advertiser/dashboard').then(d => {
         if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
         const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
         const btn = document.createElement('button'); btn.id='clientAdvertiserBtn'; btn.className='bt-main-action bt-advertiser-action';
-        btn.textContent='📣 Кабинет рекламодателя'; btn.onclick=()=>{window.location.href='advertiser.html';}; slot.appendChild(btn);
+        btn.textContent='📣 Кабинет рекламодателя'; btn.onclick=()=>openAdvertiserCabinet(); slot.appendChild(btn);
     }).catch(()=>{});
     clientApi('/api/client/dashboard').then(d => {
         const name=String(d.profile?.name||'').trim().replace(/\s+([.,!?])/g,'$1'); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
-        const chatPreview=document.getElementById('btChatPreviewText');
-        const latestMessage=Array.isArray(d.messages)&&d.messages.length?d.messages[d.messages.length-1]:null;
-        if(chatPreview&&latestMessage)chatPreview.textContent=String(latestMessage.text||({photo:'📷 Фото',video:'🎬 Видео'}[latestMessage.type]||'Сообщение')).slice(0,90);
         const orders=Array.isArray(d.orders)?d.orders:[]; if(!orders.length)return;
         const recent=orders[0]; const panel=document.getElementById('btRecentOrder');if(!panel)return;
         panel.hidden=false;
@@ -83,13 +89,15 @@ function renderClientMenu() {
         panel.querySelectorAll('.bt-circuit span').forEach((node,i)=>node.classList.toggle('bt-complete',i<step));
         const label=document.getElementById('btOrderLabel');if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника');
     }).catch(()=>{});
+    // Home chat is functional, not a separate navigation screen.
+    btRefreshClientChat(true);
+    btChatAutoTimer=setInterval(()=>{
+        if(document.getElementById('btHomeChat'))btRefreshClientChat(true);
+        else btStopChatRefresh();
+    },12000);
     btHomeTimer=setInterval(()=>{
         if(!document.querySelector('.bt-client-home')){clearInterval(btHomeTimer);btHomeTimer=null;return;}
         clientApi('/api/client/dashboard').then(d=>{
-            const rows=Array.isArray(d.messages)?d.messages:[];
-            const last=rows.length?rows[rows.length-1]:null;
-            const chatText=document.getElementById('btChatPreviewText');
-            if(chatText&&last)chatText.textContent=String(last.text||({photo:'📷 Новое фото',video:'🎬 Новое видео'}[last.type]||'Сообщение')).slice(0,90);
             const orders=Array.isArray(d.orders)?d.orders:[];
             const recent=orders[0],panel=document.getElementById('btRecentOrder');
             if(!recent||!panel)return;
@@ -100,6 +108,30 @@ function renderClientMenu() {
             const label=document.getElementById('btOrderLabel');if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника');
         }).catch(()=>{});
     },20000);
+}
+
+function btFocusHomeChat(){
+    const chat=document.getElementById('btHomeChat');
+    if(!chat){renderClientMenu();return;}
+    chat.scrollIntoView({behavior:'smooth',block:'start'});
+    const input=document.getElementById('masterMessage');
+    if(input)setTimeout(()=>input.focus({preventScroll:true}),250);
+}
+function openAdvertiserCabinet(){
+    const url=new URL('advertiser.html',location.href);
+    const params=new URLSearchParams(location.search);
+    for(const key of ['session_uid','session_exp','session_sig']){
+        const value=params.get(key);if(value)url.searchParams.set(key,value);
+    }
+    // Telegram may not repeat initData after a page navigation in a WebView.
+    // Store only for this tab. The server still verifies its signature and freshness.
+    try{
+        const telegramData=String(window.Telegram?.WebApp?.initData||'');
+        if(telegramData){
+            sessionStorage.setItem('remontbt_adv_auth',JSON.stringify({data:telegramData,uid:String(window.Telegram?.WebApp?.initDataUnsafe?.user?.id||''),time:Date.now()}));
+        }
+    }catch(_){ }
+    location.href=url.href;
 }
 
 function requestMasterRole() { showMasterApplicationForm(); }
@@ -417,7 +449,7 @@ function setPage(title, body) {
 }
 
 function btClientBottomNav() {
-    return `<nav class="bt-client-bottom-nav bt-inner-nav" aria-label="Навигация"><button type="button" onclick="renderClientMenu()"><span>⌂</span>Главная</button><button type="button" onclick="showMyOrders()"><span>▤</span>Заявки</button><button type="button" onclick="showMessages()"><span>✉</span>Чат</button><button type="button" onclick="showProfile()"><span>♙</span>Профиль</button></nav>`;
+    return `<nav class="bt-client-bottom-nav bt-inner-nav" aria-label="Навигация"><button type="button" onclick="renderClientMenu()"><span>⌂</span>Главная</button><button type="button" onclick="showMyOrders()"><span>▤</span>Заявки</button><button type="button" onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button type="button" onclick="showProfile()"><span>♙</span>Профиль</button></nav>`;
 }
 
 const btOrderStatusLabels = {

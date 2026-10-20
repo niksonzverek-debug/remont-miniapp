@@ -150,7 +150,29 @@ function filterMasterOrders(){const f=document.getElementById('orderFilter')?.va
 async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/master/orders/${encodeURIComponent(id)}/decision`,'POST',{decision});masterToast(r.message);await showMasterOrders();}catch(e){masterToast(e.message,true);}}
 async function showMasterClients(){try{await loadMasterData();}catch(e){return masterShell('Клиенты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.clients.map(c=>`<article class="card"><div class="card-row"><b>${masterEsc(c.name||'Клиент')}</b><span class="status-pill">${c.registered?'Зарегистрирован':'Без регистрации'}</span></div><p>${masterEsc(c.phone||'Телефон не указан')}</p><p class="subtitle">${masterEsc(c.registration_no||'')}</p><div class="button-row"><button onclick="openMasterChat('${masterEsc(c.id)}')">💬 Написать</button>${c.phone?`<a class="secondary menu-btn" href="tel:${masterEsc(c.phone)}">📞 Позвонить</a>`:''}</div></article>`).join('');masterShell('Клиенты',`<input id="clientSearch" placeholder="Поиск по имени, телефону" oninput="filterMasterClients()"><div id="masterClientList" class="stack-list">${rows||'<article class="card">Клиентов пока нет.</article>'}</div>`);}
 function filterMasterClients(){const q=(document.getElementById('clientSearch')?.value||'').toLowerCase();document.querySelectorAll('#masterClientList .card').forEach(el=>el.style.display=el.textContent.toLowerCase().includes(q)?'':'none');}
-async function showMasterMessages(){try{await loadMasterData();}catch(e){return masterShell('Сообщения',`<article class="card error">${masterEsc(e.message)}</article>`)}const grouped=new Map();for(const m of masterCache.messages){const k=String(m.client_id);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)}const rows=[...grouped.entries()].map(([id,ms])=>{const last=ms[ms.length-1];return `<button class="chat-list-item" onclick="openMasterChat('${masterEsc(id)}')"><span class="chat-avatar">${masterEsc((last.client_name||'К').slice(0,1).toUpperCase())}</span><span class="chat-info"><b>${masterEsc(last.client_name||'Клиент')}</b><small>${masterEsc(last.text||'Медиа')}</small></span><small>${masterEsc((last.created_at||'').replace('T',' ').slice(0,16))}</small></button>`}).join('');masterShell('Сообщения',`<p class="subtitle">Ответы отправляются выбранному клиенту в личный чат Telegram. Перед отправкой проверьте имя в заголовке диалога.</p><div class="chat-list">${rows||'<article class="card">Сообщений пока нет. Когда клиент напишет боту, диалог появится здесь.</article>'}</div>`);}
+async function showMasterMessages(){
+    try{await loadMasterData();}catch(e){return masterShell('Чаты',`<article class="card error">${masterEsc(e.message)}</article>`)}
+    const grouped=new Map();
+    for(const m of masterCache.messages){
+        const id=String(m.client_id||'');if(!/^\d+$/.test(id))continue;
+        if(!grouped.has(id))grouped.set(id,[]);
+        grouped.get(id).push(m);
+    }
+    const threads=[...grouped.entries()].map(([id,ms])=>{
+        ms.sort((a,b)=>String(a.created_at||'').localeCompare(String(b.created_at||'')));
+        const last=ms[ms.length-1];
+        const client=masterCache.clients.find(c=>String(c.id)===id);
+        const name=String(client?.name||last.client_name||'Клиент');
+        const unread=ms.filter(m=>String(m.to_id)===String(masterCurrentUserId)&&!m.read_by_master).length;
+        return {id,name,last,unread};
+    }).sort((a,b)=>String(b.last.created_at||'').localeCompare(String(a.last.created_at||'')));
+    const rows=threads.map(t=>{
+        const preview=t.last.text||({photo:'📷 Фото',video:'🎬 Видео'}[t.last.type]||'Сообщение');
+        return `<button type="button" class="chat-list-item bt-inbox-thread" onclick="openMasterChat('${t.id}')"><span class="chat-avatar">${masterEsc(t.name.trim().charAt(0).toUpperCase()||'К')}</span><span class="chat-info"><b>${masterEsc(t.name)}</b><small>${masterEsc(preview).slice(0,115)}</small></span><span class="bt-inbox-aside"><small>${masterEsc(String(t.last.created_at||'').replace('T',' ').slice(0,16))}</small>${t.unread?`<span class="bt-inbox-unread" aria-label="${t.unread} новых сообщений">${t.unread}</span>`:''}</span></button>`;
+    }).join('');
+    masterShell('Чаты',`<p class="subtitle">Выберите клиента — откроется его переписка. Новые сообщения отмечены числом справа.</p><div class="chat-list">${rows||'<article class="card">Сообщений пока нет.</article>'}</div>`);
+}
+
 let btMasterChatRefreshTimer=null;
 let btMasterChatUrls=[];
 function btMasterStopChatMedia(){
@@ -193,7 +215,7 @@ function btMasterRenderMessages(messages){
 async function btMasterRefreshOpenChat(){
     if(!document.getElementById('btMasterChatHistory')||!activeChatClientId)return;
     try{
-        const result=await masterApi('/api/master/messages');
+        const result=await masterApi('/api/master/messages?client_id='+encodeURIComponent(String(activeChatClientId)));
         masterCache.messages=Array.isArray(result.messages)?result.messages:[];
         btMasterRenderMessages(masterCache.messages.filter(m=>String(m.client_id)===String(activeChatClientId)));
     }catch(e){const status=document.getElementById('replyStatus');if(status)status.textContent=e.message;}
@@ -201,14 +223,16 @@ async function btMasterRefreshOpenChat(){
 async function openMasterChat(clientId){
     btMasterStopChatMedia();activeChatClientId=String(clientId);
     try{await loadMasterData();}catch(e){return masterToast(e.message,true);}
-    const c=masterCache.clients.find(x=>String(x.id)===activeChatClientId);
-    if(!c){masterToast('Клиент не найден в вашем кабинете.',true);return;}
+    const c=masterCache.clients.find(x=>String(x.id)===activeChatClientId)||
+      (()=>{const m=masterCache.messages.find(x=>String(x.client_id)===activeChatClientId);return m?{id:activeChatClientId,name:m.client_name||'Клиент',phone:m.client_phone||''}:null;})();
+    if(!c){masterToast('Переписка с этим клиентом не найдена.',true);return;}
     masterShell('Диалог',`<button class="back-btn" onclick="showMasterMessages()">← Все диалоги</button>
         <article class="card chat-header"><div class="chat-avatar">${masterEsc((c.name||'К').slice(0,1).toUpperCase())}</div><div><h2>${masterEsc(c.name||'Клиент')}</h2><p class="subtitle">${masterEsc(c.phone||'Телефон не указан')}</p></div></article>
         <div id="btMasterChatHistory" class="chat-history bt-chat-history"></div>
         <form class="card bt-chat-compose" onsubmit="event.preventDefault();sendMasterReply()"><label for="masterReplyText">Сообщение для ${masterEsc(c.name||'клиента')}</label><textarea id="masterReplyText" maxlength="1500" placeholder="Введите ответ…"></textarea>
         <div class="bt-chat-compose-actions"><label class="bt-chat-attach" for="masterChatFile">＋ Фото / видео</label><input id="masterChatFile" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/webm" hidden onchange="btMasterDescribeFile()"><button id="masterReplySend" type="submit">➤ Отправить</button></div><p id="btMasterFileName" class="subtitle"></p><p id="replyStatus" class="subtitle" role="status"></p></form>`);
     btMasterRenderMessages(masterCache.messages.filter(m=>String(m.client_id)===activeChatClientId));
+    await btMasterRefreshOpenChat();
     btMasterChatRefreshTimer=setInterval(()=>{if(document.getElementById('btMasterChatHistory'))btMasterRefreshOpenChat();else btMasterStopChatMedia();},12000);
 }
 function btMasterDescribeFile(){
@@ -361,7 +385,36 @@ async function submitMasterAct(event,orderId){
  }
  return false;
 }
-async function showMasterPromos(){try{await loadMasterData()}catch(e){return masterShell('Промокоды',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.promos.map(p=>`<article class="card"><div class="card-row"><b>${masterEsc(p.code)}</b><span class="status-pill">${p.active?'Активен':'Выключен'}</span></div><p>${masterEsc(p.partner_name)} · ${masterEsc(p.partner_contact)}</p><p>Скидка ${masterEsc(p.discount_percent)}% · вознаграждение ${masterEsc(p.reward_percent)}%</p><p class="subtitle">До: ${masterEsc(p.expires_at||'без срока')}</p></article>`).join('');masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);}
+async function showMasterPromos(){
+  try{await loadMasterData()}catch(e){return masterShell('Промокоды',`<article class="card error">${masterEsc(e.message)}</article>`)}
+  const money=n=>new Intl.NumberFormat('ru-RU').format(Number(n||0))+' сум';
+  const rows=masterCache.promos.map(p=>{
+    const st=p.stats||{};
+    return `<article class="card bt-promo-detail-card"><div class="card-row"><b>${masterEsc(p.code)}</b><span class="status-pill">${p.active?'Активен':'Отключён'}</span></div>
+      <p>${masterEsc(p.partner_name||'Рекламодатель')} · ${masterEsc(p.partner_contact||'')}</p>
+      <p>Скидка клиенту: ${masterEsc(p.discount_percent)}% · вознаграждение: ${masterEsc(p.reward_percent)}%</p>
+      <details class="bt-promo-details"><summary>Посмотреть подробности промокода <span>⌄</span></summary>
+       <div class="bt-promo-stats">
+        <p><b>Рекламодатель:</b> ${masterEsc(p.partner_name||'—')}</p>
+        <p><b>Telegram:</b> ${masterEsc(p.partner_contact||'—')}</p>
+        <p><b>Телефон:</b> ${masterEsc(p.partner_phone||'Не указан')}</p>
+        <p><b>Карта для выплат:</b> ${p.card_last4?'•••• '+masterEsc(p.card_last4):'Не указана'}</p>
+        <p><b>Кабинет рекламодателя:</b> ${p.advertiser_linked?'Создан':'Не привязан'}</p>
+        <p><b>Создан:</b> ${masterEsc(p.created_at||'—')}</p>
+        <p><b>Действует до:</b> ${masterEsc(p.expires_at||'Без срока')}</p>
+        <p><b>Использований на клиента:</b> ${masterEsc(p.max_uses_per_client??p.max_activations??'Без лимита')}</p>
+        <p><b>Регистраций по ссылке:</b> ${masterEsc(st.link_registrations||0)}</p>
+        <p><b>Активаций:</b> ${masterEsc(st.unique_clients||0)}</p>
+        <p><b>Актов со скидкой:</b> ${masterEsc(st.applied_count||0)}</p>
+        <p><b>Завершённых ремонтов:</b> ${masterEsc(st.completed_count||0)}</p>
+        <p><b>Сумма скидок:</b> ${money(st.total_discount)}</p>
+        <p><b>Вознаграждение начислено:</b> ${money(st.total_reward)}</p>
+        <p><b>Выплачено:</b> ${money(st.paid_to_partner)}</p>
+        <p><b>К выплате:</b> ${money(st.balance_due)}</p>
+       </div></details></article>`;
+  }).join('');
+  masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);
+}
 function showCreateMasterPromo(){masterShell('Новый промокод',`<button class="back-btn" onclick="showMasterPromos()">← Назад</button><form class="card" onsubmit="event.preventDefault();submitMasterPromo()"><label>Код</label><input id="pCode" required maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" placeholder="PARTNER10"><label>Имя партнёра</label><input id="pName" required maxlength="150"><label>Telegram партнёра</label><input id="pContact" required maxlength="150" placeholder="@username"><label>Телефон рекламодателя</label><input id="pPartnerPhone" required type="tel" placeholder="+998901234567"><label>Номер карты</label><input id="pCard" required inputmode="numeric" maxlength="23" placeholder="16–19 цифр"><label>Скидка клиенту, %</label><input id="pDiscount" required type="number" min="1" max="50" value="5"><label>Вознаграждение партнёру, %</label><input id="pReward" required type="number" min="0" max="30" value="5"><label>Использований на клиента</label><input id="pLimit" required type="number" min="1" max="100" value="1"><label>Действует до</label><input id="pExpiry" required type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}"><button type="submit" id="promoSubmit">Создать промокод</button><p id="promoStatus" class="subtitle"></p></form>`);}
 async function submitMasterPromo(){const btn=document.getElementById('promoSubmit'),st=document.getElementById('promoStatus');btn.disabled=true;try{const r=await masterApi('/api/master/promo','POST',{code:document.getElementById('pCode').value.trim().toUpperCase(),partner_name:document.getElementById('pName').value.trim(),partner_contact:document.getElementById('pContact').value.trim(),partner_phone:document.getElementById('pPartnerPhone').value.trim(),partner_card:document.getElementById('pCard').value.replace(/\D/g,''),discount_percent:Number(document.getElementById('pDiscount').value),reward_percent:Number(document.getElementById('pReward').value),max_act:Number(document.getElementById('pLimit').value),expires_at:document.getElementById('pExpiry').value+'T23:59:59'});st.textContent=r.message;await showMasterPromos();}catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}}
 function showCreateAct(){const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}

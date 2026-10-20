@@ -14,8 +14,21 @@
  async function api(path, method='GET', body=null) {
   const base=String(window.REMONT_ADVERTISER_API_BASE||'').replace(/\/$/,'');
   if(!base) throw new Error(t('setup'));
-  if(!tg || !tg.initData) throw new Error(t('needTelegram'));
-  const res=await fetch(base+path,{method,headers:{'Content-Type':'application/json','X-Telegram-Init-Data':tg.initData},body:body?JSON.stringify(body):undefined,cache:'no-store'});
+  const headers={'Content-Type':'application/json'};
+  const liveInit=String(tg?.initData||'');
+  let storedInit='';
+  try{
+    const saved=JSON.parse(sessionStorage.getItem('remontbt_adv_auth')||'null');
+    const liveUid=String(tg?.initDataUnsafe?.user?.id||'');
+    if(saved?.data && Date.now()-Number(saved.time||0)<15*60*1000 && (!liveUid || liveUid===String(saved.uid||'')))storedInit=String(saved.data);
+  }catch(_){ }
+  if(liveInit||storedInit)headers['X-Telegram-Init-Data']=liveInit||storedInit;
+  const params=new URLSearchParams(location.search);
+  const uid=params.get('session_uid'),exp=params.get('session_exp'),sig=params.get('session_sig');
+  if(/^\d{1,20}$/.test(uid||'') && /^\d{1,20}$/.test(exp||'') && /^[a-f0-9]{64}$/i.test(sig||''))
+    headers['X-Remont-Session']=`${uid}:${exp}:${sig}`;
+  if(!headers['X-Telegram-Init-Data']&&!headers['X-Remont-Session'])throw new Error(t('needTelegram'));
+  const res=await fetch(base+path,{method,headers,body:body?JSON.stringify(body):undefined,cache:'no-store'});
   const data=await res.json().catch(()=>({error:'Bad response'})); if(!res.ok) throw new Error(data.error||t('loadingError')); return data;
  }
  function render(data) {

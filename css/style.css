@@ -699,3 +699,24 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 .bt-order-stage-note {color:#ffbd8e;font-weight:650;margin:14px 0;}
 #btReferralPanel input[readonly] {display:block;width:100%;font-size:12px;}
 #btReferralPanel button{margin-top:8px;}
+
+/* Stage 4: inline client chat, master inbox, promo detail (Electric Steel Blue) */
+.bt-home-chat{padding:14px!important;scroll-margin-top:12px}
+.bt-home-chat .bt-section-title{margin-bottom:12px}
+.bt-home-chat-history{min-height:150px;max-height:310px;padding:10px;margin-bottom:12px}
+.bt-home-chat-compose{padding:11px;margin:0;background:#0b2037}
+.bt-home-chat-compose textarea{min-height:55px;max-height:130px;resize:vertical;margin:6px 0!important}
+.bt-home-chat-compose .bt-chat-compose-actions{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}
+.bt-home-chat-compose .bt-chat-attach{white-space:normal;text-align:center}
+.bt-home-chat-compose #messageStatus{margin:4px 0 0}
+.bt-inbox-thread{display:flex!important;align-items:center;text-align:left;gap:12px;min-height:70px;width:100%;margin:8px 0;padding:12px!important;border:1px solid #2d6ba1!important;border-radius:14px!important;background:linear-gradient(130deg,#102b48,#071a30)!important;color:#e4f5ff!important}
+.bt-inbox-thread .chat-info{display:flex;flex-direction:column;gap:4px;flex:1;min-width:0}
+.bt-inbox-thread .chat-info small{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#a7c4db}
+.bt-inbox-aside{display:flex;flex-direction:column;align-items:flex-end;gap:5px;font-size:11px;color:#aecde5}
+.bt-inbox-unread{display:grid;place-items:center;min-width:22px;height:22px;padding:0 4px;border-radius:12px;background:#0d9cf6;color:#fff;font-size:12px;font-weight:800}
+.bt-promo-details{border:1px solid #316fa9;border-radius:12px;background:#091d34;padding:4px 12px;margin-top:12px}
+.bt-promo-details summary{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer;padding:11px 0;color:#9ce6ff;font-weight:700}
+.bt-promo-details summary::-webkit-details-marker{display:none}
+.bt-promo-stats{border-top:1px solid #2c5279;padding:9px 0}
+.bt-promo-stats p{margin:9px 0;color:#d4eafb;overflow-wrap:anywhere}
+@media(max-width:370px){.bt-home-chat-compose .bt-chat-compose-actions{grid-template-columns:1fr}}
