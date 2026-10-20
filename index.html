@@ -29,7 +29,7 @@
         }, { once: true });
       })();
     </script>
-    <link rel="stylesheet" href="css/style.css?v=20261020-electric-steel-v1">
+    <link rel="stylesheet" href="css/style.css?v=20261020-electric-final-3">
     <link rel="manifest" href="manifest.webmanifest">
 </head>
 <body>
@@ -62,7 +62,7 @@
             document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте Mini App. В чате с ботом отправьте /start и откройте приложение новой кнопкой «Открыть кабинет мастера». Если кнопки нет, перезапустите бота. Не открывайте обычную HTTPS-ссылку.</p><p style="opacity:.7">Техническая причина: в ссылке запуска нет подписанной сессии мастера, а Telegram не передал user в initData.</p></main>`;
         } else {
             const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261020-master-flow-fix6' : 'js/client.js?v=20261020-master-flow-fix6';
+            script.src = role === 'master' ? 'js/master.js?v=20261020-electric-final-3' : 'js/client.js?v=20261020-electric-final-3';
             script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
             document.body.appendChild(script);
         }

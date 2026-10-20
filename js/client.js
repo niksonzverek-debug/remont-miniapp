@@ -41,7 +41,7 @@ const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow &&
 function renderClientMenu() {
     document.body.innerHTML = `
         <main class="bt-client-home">
-          <header class="bt-brand-head"><div class="bt-brand-mark">⚡</div><div><strong>REMONT BT</strong><small>ELECTRIC STEEL BLUE</small></div></header>
+          <header class="bt-brand-head"><img class="bt-brand-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><strong>REMONT BT</strong><small>ELECTRIC STEEL BLUE</small></div></header>
           <div class="bt-greeting"><h2>Личный кабинет</h2><p>Здравствуйте, <span id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</span>!</p></div>
           <button class="bt-main-action" onclick="showNewOrder()">＋ Создать заявку</button>
           <div class="client-home-grid bt-home-tiles">
@@ -50,9 +50,9 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span><span>Промокоды</span></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span><span>Профиль</span></button>
           </div>
-          <section class="bt-live-panel"><div class="bt-section-title">💬 Связь с мастером</div><p>Сообщения и вопросы по вашему ремонту</p><button class="bt-chat-action" onclick="showMessages()">Открыть переписку →</button></section>
+          <section class="bt-live-panel bt-chat-preview" onclick="showMessages()" role="button" tabindex="0" onkeydown="if(event.key==='Enter')showMessages()"><div class="bt-section-title">✉ Живой чат <span class="bt-glow-dot">●</span></div><div class="bt-chat-preview-row"><span class="bt-chat-avatar">⚙</span><div><strong>Связь с мастером</strong><p>Сообщения и вопросы по вашему ремонту</p></div><span class="bt-chat-chevron">→</span></div></section>
           <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
-          <div id="btAdvertiserSlot"></div>
+          <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="showMessages()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     clientApi('/api/advertiser/dashboard').then(d => {
         if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
