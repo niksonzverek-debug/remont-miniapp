@@ -1,7 +1,14 @@
-REMONT BT — ОБНОВЛЕНИЕ ДЛЯ КОРНЯ GITHUB PAGES
+REMONT BT — ПОЛНЫЙ КОМПЛЕКТ ДЛЯ GITHUB PAGES
 
-Файлы сайта находятся в корне архива: index.html, client.html, sw.js, manifest.webmanifest, js/ и css/. Загружайте их в ту папку репозитория, откуда GitHub Pages публикует index.html. Не создавайте дополнительную папку remont_bt/miniapp, если опубликованный index.html находится в корне репозитория.
+В архив включены все файлы мини-приложения, а не только изменённые: index.html, client.html, advertiser.html, offline.html, js/common.js, js/advertiser-config.js, js/advertiser.js, js/client.js, js/master.js, css/style.css, sw.js и manifest.webmanifest.
 
-BACKEND_SEPARATE/advertiser_api.py — отдельная серверная правка. НЕ копируйте этот файл в корень сайта и не ожидайте, что GitHub Pages запустит Python. Обновляйте его только на хостинге backend, где работает API.
+КАК ОБНОВИТЬ:
+1. Распакуй архив на компьютере.
+2. В GitHub открой репозиторий niksonzverek-debug/remont-miniapp и проверь, что GitHub Pages публикует корень репозитория (Settings → Pages → Build and deployment).
+3. Загрузить нужно содержимое папки сайта из архива в корень публикации, сохраняя структуру папок js/ и css/. Не загружай папку remont_bt/miniapp целиком как вложенную папку.
+4. Commit changes. Дождись завершения GitHub Pages deployment.
+5. Открой сайт с жёстким обновлением Ctrl+F5. В Telegram закрой Mini App полностью и открой снова.
 
-Этот архив включает обновление версии CSS/JS и Service Worker, исправления обновления истории клиентского чата и списка диалогов мастера. Он НЕ гарантирует реализацию отдельной формы регистрации мастера, если её правка отсутствует в исходном патче.
+ВАЖНО: advertiser_api.py — серверный файл. GitHub Pages Python не запускает. Он лежит отдельно в BACKEND_SEPARATE и требует отдельного обновления на сервере, если этот backend используется.
+
+Проверено при сборке: ссылки на локальные JS/CSS файлы, присутствующие в HTML, должны иметь соответствующие файлы в архиве; JS-файлы проверяются на синтаксис. Это не заменяет живой тест с Telegram/backend.
