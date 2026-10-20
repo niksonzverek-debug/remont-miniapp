@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://industries-blog-tournaments-cricket.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://scanning-there-avoiding-fired.trycloudflare.com";
