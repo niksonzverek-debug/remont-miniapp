@@ -442,23 +442,24 @@ async function saveClientProfile(event) {
     }
 }
 
-async function showMessages(statusMessage = '') {
-    setPage('💬 Чат с мастером', '<p class="subtitle">Загружаем переписку…</p>');
+async function showMessages(notice = "") {
+    setPage('💬 Написать мастеру', '<p class="subtitle">Загружаем переписку…</p>');
     let history = '';
     try {
         const d = await clientApi('/api/client/dashboard');
-        const rows = (d.messages || []).slice().sort((a,b) => String(a.created_at||'').localeCompare(String(b.created_at||'')));
-        history = rows.length ? `<div class="chat-history client-chat-history">${rows.map(m => `<article class="message-bubble ${String(m.from_id) === String(tg.initDataUnsafe?.user?.id) ? 'mine' : 'theirs'}"><p>${escapeClient(m.text || (m.type === 'photo' ? 'Фото' : m.type === 'video' ? 'Видео' : 'Сообщение'))}</p><small>${escapeClient((m.created_at || '').replace('T',' ').slice(0,16))}</small></article>`).join('')}</div>` : '<div class="card">Начните переписку с назначенным мастером.</div>';
+        const rows = d.messages || [];
+        history = rows.length ? rows.map(m => `<article class="card"><p><b>${String(m.from_id) === String(tg.initDataUnsafe?.user?.id) ? 'Вы' : 'Мастер'}</b> <span class="subtitle">${escapeClient(m.created_at || '')}</span></p><p>${escapeClient(m.text || (m.type === 'photo' ? 'Фото' : m.type === 'video' ? 'Видео' : 'Сообщение'))}</p></article>`).join('') : '<div class="card">Сообщений пока нет.</div>';
     } catch (e) { history = `<div class="card error">${escapeClient(e.message)}</div>`; }
-    setPage('💬 Чат с мастером', `<p class="subtitle">Сообщения видны только вам и мастеру, привязанному к вашему профилю.</p>${history}<form class="card" onsubmit="event.preventDefault();sendClientMessage()"><label for="masterMessage">Сообщение мастеру</label><textarea id="masterMessage" maxlength="1500" required placeholder="Напишите сообщение…"></textarea><button id="clientMessageSend" type="submit">➤ Отправить сообщение</button><p id="messageStatus" class="subtitle" role="status">${escapeClient(statusMessage)}</p></form>`);
-    const h=document.querySelector('.client-chat-history'); if(h) h.scrollTop=h.scrollHeight;
+    setPage('💬 Написать мастеру', `${history}<div class="card"><p>Напишите назначенному вам мастеру. Переписку видите только вы и ваш мастер.</p><textarea id="masterMessage" maxlength="1500" placeholder="Ваше сообщение"></textarea><button onclick="sendClientMessage()">Отправить сообщение</button><p id="messageStatus" class="${notice ? 'notice' : 'subtitle'}" role="status">${escapeClient(notice)}</p></div>`);
 }
 async function sendClientMessage() {
-    const field = document.getElementById('masterMessage'); const status = document.getElementById('messageStatus'); const btn=document.getElementById('clientMessageSend');
-    const text=field?.value.trim(); if(!text) return;
-    if(btn) btn.disabled=true;
-    try { const r = await clientApi('/api/client/message', 'POST', {text}); await showMessages(r.message || 'Сообщение отправлено мастеру.'); }
-    catch (e) { if(status){status.textContent=e.message;status.className='error';} if(btn)btn.disabled=false; }
+    const field = document.getElementById('masterMessage'); const status = document.getElementById('messageStatus');
+    const text = String(field?.value || '').trim();
+    if (!text) { if (status) { status.textContent = 'Введите сообщение.'; status.className = 'error'; } return; }
+    const button = field?.parentElement?.querySelector('button');
+    if (button) button.disabled = true;
+    try { const r = await clientApi('/api/client/message', 'POST', {text}); await showMessages(r.message || 'Сообщение отправлено.'); }
+    catch (e) { if (status) { status.textContent = e.message; status.className='error'; } if (button) button.disabled = false; }
 }
 function escapeClient(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
