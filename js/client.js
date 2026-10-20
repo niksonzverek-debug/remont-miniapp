@@ -5,6 +5,10 @@ try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Tele
 // ============ СОСТОЯНИЕ ============
 let btOrderOperationId = null;
 let btHomeTimer = null;
+let btOrderProgressTimer = null;
+function btStopOrderProgressRefresh() {
+    if (btOrderProgressTimer) { clearInterval(btOrderProgressTimer); btOrderProgressTimer = null; }
+}
 let orderData = {
     device: "",
     brand: "",
@@ -41,6 +45,7 @@ const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow &&
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
 function renderClientMenu() {
+    btStopOrderProgressRefresh();
     btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
     document.body.classList.remove('bt-inner-page', 'bt-order-page');
@@ -403,6 +408,7 @@ async function clientApi(path, method='GET', body=null) {
 }
 
 function setPage(title, body) {
+    btStopOrderProgressRefresh();
     if(!String(title).includes('Живой чат'))btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
     document.body.classList.add('bt-inner-page');
@@ -414,17 +420,52 @@ function btClientBottomNav() {
     return `<nav class="bt-client-bottom-nav bt-inner-nav" aria-label="Навигация"><button type="button" onclick="renderClientMenu()"><span>⌂</span>Главная</button><button type="button" onclick="showMyOrders()"><span>▤</span>Заявки</button><button type="button" onclick="showMessages()"><span>✉</span>Чат</button><button type="button" onclick="showProfile()"><span>♙</span>Профиль</button></nav>`;
 }
 
+const btOrderStatusLabels = {
+    new: 'Ожидает мастера', accepted: 'Принята мастером', in_progress: 'Выполняется ремонт',
+    act_issued: 'Акт выдан — ожидает подтверждения', rejected: 'Отклонена мастером',
+    closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена'
+};
+function btOrderTimeline(o) {
+    const status = String(o.status || 'new');
+    const steps = [{label:'Заявка',done:true},{label:'Принято',done:['accepted','in_progress','act_issued','closed','completed'].includes(status)},
+        {label:'Ремонт',done:['act_issued','closed','completed'].includes(status)},
+        {label:'Акт',done:['act_issued','closed','completed'].includes(status)}];
+    if (status === 'rejected' || status === 'cancelled') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
+    return `<div class="bt-status-timeline" aria-label="Этапы заявки">${steps.map(s=>`<span class="${s.done?'done':''}"><i>${s.done?'✓':'·'}</i>${s.label}</span>`).join('')}</div>`;
+}
+function btOrderCards(rows) {
+    return rows.length ? rows.map(o => {
+        const label=btOrderStatusLabels[o.status]||o.status||'Обрабатывается';
+        const date=String(o.updated_at||o.act_issued_at||o.created_at||'').replace('T',' ').slice(0,16);
+        let deadline='';
+        const remaining=Number(o.act_confirmation_deadline||0)*1000-Date.now();
+        if(o.status==='act_issued' && remaining>0)deadline=`<p class="subtitle">Если не подтвердить акт, он может автоматически закрыться после ${Math.ceil(remaining/60000)} мин. Ознакомьтесь с документом заранее.</p>`;
+        return `<article class="card bt-order-progress-card">
+            <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>
+            <h3>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3>
+            <p>${escapeClient(o.problem||'')}</p>${btOrderTimeline(o)}
+            <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
+            ${o.promocode?`<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>`:''}
+            ${o.status==='act_issued'?`<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button>${deadline}`:''}
+        </article>`;
+    }).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
+}
+async function btRefreshOrderCards() {
+    if (document.hidden || !document.getElementById('btOrdersList')) return;
+    try {
+        const result=await clientApi('/api/client/dashboard');
+        const list=document.getElementById('btOrdersList');
+        if(list)list.innerHTML=btOrderCards(result.orders||[]);
+    } catch(_) { /* Keep last known status; users may retry manually. */ }
+}
 async function showMyOrders() {
     setPage('📋 Мои заявки', '<p class="subtitle">Загружаем ваши заявки…</p>');
     try {
         const d = await clientApi('/api/client/dashboard');
-        const rows = d.orders || [];
-        const status = {new:'Новая — ждёт мастера', accepted:'Мастер принял', in_progress:'В работе', act_issued:'Акт выдан — ожидает подтверждения', act_pending:'Ожидает подтверждения акта', rejected:'Мастер отклонил', pending:'Ожидает мастера', completed:'Завершена', closed:'Завершена', cancelled:'Отменена'};
-        const content = rows.length ? rows.map(o => `<article class="card"><b>${escapeClient(o.id || 'Заявка')}</b><p>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' '))}</p><p>${escapeClient(o.problem || '')}</p><p><b>Статус:</b> ${escapeClient(status[o.status] || o.status || 'На обработке')}</p><p class="subtitle">${escapeClient(o.created_at || '')}</p>${o.promocode ? `<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>` : ''}${o.status === 'act_issued' ? `<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button><p class="subtitle">Если не подтвердить, акт автоматически подтвердится через 5 минут после выдачи.</p>` : ''}</article>`).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
-        setPage('📋 Мои заявки', content);
+        setPage('📋 Мои заявки', `<p class="subtitle">Статусы обновляются автоматически каждые 20 секунд.</p><div id="btOrdersList">${btOrderCards(d.orders||[])}</div>`);
+        btOrderProgressTimer=setInterval(btRefreshOrderCards,20000);
     } catch (e) { setPage('📋 Мои заявки', `<div class="card error">${escapeClient(e.message)}</div>`); }
 }
-
 
 async function confirmClientAct(orderId) {
     if (tg && typeof tg.showConfirm === 'function') {
@@ -455,7 +496,24 @@ async function showMyActs() {
 }
 
 function showEnterPromo() {
-    setPage('🎟️ Промокод', '<div class="card"><label>Введите промокод</label><input id="promo_code" placeholder="REMONT10" maxlength="64" autocapitalize="characters"><button id="promoSubmit" onclick="submitPromoFromApp()">Активировать</button><p id="promoStatus" class="subtitle"></p></div>');
+    setPage('🎟️ Промокоды и приглашения', '<div class="card"><label>Введите промокод</label><input id="promo_code" placeholder="REMONT10" maxlength="64" autocapitalize="characters"><button id="promoSubmit" onclick="submitPromoFromApp()">Активировать</button><p id="promoStatus" class="subtitle"></p></div><div class="card" id="btReferralPanel"><p class="subtitle">Проверяем реферальную программу…</p></div>');
+    clientApi('/api/client/referral').then(r=>{
+        const box=document.getElementById('btReferralPanel'); if(!box)return;
+        if(!r.enabled){box.innerHTML=`<b>Пригласить друга</b><p class="subtitle">${escapeClient(r.message||'Реферальная программа сейчас отключена.')}</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}</p>`;return;}
+        const link=String(r.link||'');
+        box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Приглашено: ${Number(r.invited_count)||0}.</p>`+
+          (link?`<input id="btReferralLink" readonly value="${escapeClient(link)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`:`<p class="subtitle">${escapeClient(r.message||'Ссылка пока недоступна.')}</p>`);
+    }).catch(e=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent=e.message||'Данные рефералов недоступны.';});
+}
+async function btCopyReferralLink() {
+    const text=document.getElementById('btReferralLink')?.value||''; if(!text)return;
+    try { await navigator.clipboard.writeText(text); showAlert('Ссылка скопирована.'); }
+    catch(_) { document.getElementById('btReferralLink')?.select(); showAlert('Выделена ссылка — скопируйте её.'); }
+}
+function btShareReferralLink(){
+    const link=document.getElementById('btReferralLink')?.value||''; if(!link)return;
+    const share='https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('Приглашаю в Remont BT!');
+    if(tg?.openTelegramLink)tg.openTelegramLink(share);else window.open(share,'_blank','noopener');
 }
 async function submitPromoFromApp() {
     const code = (document.getElementById('promo_code')?.value || '').trim().toUpperCase();

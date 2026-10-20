@@ -688,3 +688,14 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 .master-app .chat-history{display:flex;flex-direction:column}
 .bt-order-page .bt-client-bottom-nav{z-index:15}
 @media (max-width:340px){.bt-client-address-row{gap:8px}.bt-chat-attach{font-size:11px;padding:7px}}
+
+/* Patch 3: compact progress timeline in the client order history */
+.bt-order-progress-card .status-pill { white-space:normal; text-align:right; max-width:55%; }
+.bt-status-timeline {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin:18px 0 12px;}
+.bt-status-timeline span {display:flex;flex-direction:column;align-items:center;text-align:center;gap:5px;min-width:0;font-size:11px;color:var(--muted,#a5b4c9);}
+.bt-status-timeline i {display:grid;place-items:center;width:27px;height:27px;border-radius:50%;border:1px solid rgba(115,155,220,.45);font-style:normal;background:rgba(41,74,110,.22);}
+.bt-status-timeline span.done {color:#bee7ff;}
+.bt-status-timeline span.done i {background:linear-gradient(130deg,#174979,#1e86c9);box-shadow:0 0 12px rgba(23,126,220,.28);border-color:#58b7ff;color:#fff;}
+.bt-order-stage-note {color:#ffbd8e;font-weight:650;margin:14px 0;}
+#btReferralPanel input[readonly] {display:block;width:100%;font-size:12px;}
+#btReferralPanel button{margin-top:8px;}
