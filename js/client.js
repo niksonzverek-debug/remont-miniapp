@@ -685,7 +685,8 @@ function showNewOrder() {
         <div class="card promo-card" id="orderPromoCard">
             <label>🎟️ Промокод (необязательно)</label>
             <input id="order_promo_code" placeholder="Например, REMONT10" maxlength="64" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase">
-            <p class="subtitle">Есть промокод? Введите его здесь — проверим при отправке первой заявки.</p>
+            <button type="button" id="orderPromoCheck" onclick="checkOrderPromo()">Проверить промокод</button>
+            <p id="orderPromoStatus" class="subtitle">Активный промокод привяжется к вашему аккаунту автоматически при отправке заявки.</p>
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
@@ -881,9 +882,38 @@ function getBrowserLocation() {
     );
 }
 
+// Проверка промокода в форме заявки: проверка не активирует и не списывает использование.
+async function checkOrderPromo() {
+    const input = document.getElementById('order_promo_code');
+    const status = document.getElementById('orderPromoStatus');
+    const button = document.getElementById('orderPromoCheck');
+    const code = (input?.value || '').trim().toUpperCase();
+    if (!code) { if (status) { status.textContent = 'Введите промокод.'; status.className = 'subtitle error'; } return false; }
+    if (button) { button.disabled = true; button.textContent = 'Проверяем…'; }
+    try {
+        const r = await clientApi('/api/client/promo/check', 'POST', {code});
+        const timeLeft = r.expires_at ? (r.expires_in_hours >= 24 ? `Осталось ${Math.floor(r.expires_in_hours / 24)} дн. ${r.expires_in_hours % 24} ч.` : `Осталось ${r.expires_in_hours} ч.`) : 'Срок действия не ограничен';
+        const usesLeft = r.remaining_uses === null || r.remaining_uses === undefined ? 'Лимит: без персонального ограничения' : `Осталось использований для вас: ${r.remaining_uses}`;
+        if (status) { status.textContent = `✅ Скидка ${r.discount_percent}% · ${usesLeft} · ${timeLeft}. При отправке заявки код привяжется к аккаунту.`; status.className = 'notice'; }
+        return true;
+    } catch (e) {
+        if (status) { status.textContent = e.message || 'Не удалось проверить промокод.'; status.className = 'subtitle error'; }
+        return false;
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Проверить промокод'; }
+    }
+}
+
+function confirmPromoContinue(message) {
+    return new Promise(resolve => {
+        if (tg && typeof tg.showConfirm === 'function') tg.showConfirm(message, resolve);
+        else resolve(window.confirm(message));
+    });
+}
+
 // ============ ОТПРАВКА ЗАЯВКИ ============
 
-function submitOrder() {
+async function submitOrder() {
     let device = document.getElementById('device').value;
     let brand = document.getElementById('brand').value;
 
@@ -961,6 +991,19 @@ function submitOrder() {
         promo_code: order_promo_code,
         location: orderData.location || null,
     };
+
+    // Даже если клиент не нажал «Проверить», сервер проверит и привяжет активный код
+    // при обработке заявки. Неактивный/неизвестный код требует явного подтверждения.
+    if (order_promo_code) {
+        try {
+            await clientApi('/api/client/promo/check', 'POST', {code: order_promo_code});
+        } catch (e) {
+            const proceed = await confirmPromoContinue(`⚠️ ${e.message || 'Промокод не активен.'}\n\nНажмите OK, чтобы продолжить создание заявки без этой скидки, или Отмена, чтобы вернуться и изменить промокод.`);
+            if (!proceed) return;
+            data.promo_code = '';
+            data.promo_code_invalid_confirmed = true;
+        }
+    }
 
     console.log('Отправляем заявку:', data);
 
