@@ -601,3 +601,52 @@ body.bt-order-page #submit{position:fixed!important;z-index:65;bottom:calc(76px 
 body.bt-order-page #submit:active{transform:translateX(-50%) scale(.99)!important}
 body.bt-inner-page .card.error{border-color:#bd5870!important}
 @media(max-width:390px){body.bt-inner-page{padding-left:12px!important;padding-right:12px!important}body.bt-inner-page .card,body.bt-inner-page form.card{padding:15px 13px!important}}
+
+/* Master act form – Electric Steel Blue, six-row pickers */
+.bt-master-act-form{overflow:visible!important}
+.bt-master-act-form>label{display:block;margin:14px 0 7px;font-weight:650;color:#d6eaff}
+.bt-master-act-form input,.bt-master-act-form textarea,.bt-master-act-form select{
+ color:#f3fbff;background:#0a2038;border:1px solid #3679b8;border-radius:12px;
+ min-height:46px;width:100%;padding:12px;box-shadow:inset 0 1px 0 #92dfff1a
+}
+.bt-master-act-form input:focus,.bt-master-act-form textarea:focus,.bt-master-act-form select:focus{outline:2px solid #59caff;outline-offset:1px}
+.bt-master-picker{position:relative;margin-bottom:8px}
+.bt-master-picker summary{list-style:none;cursor:pointer;background:linear-gradient(130deg,#112f50,#081c31);border:1px solid #3781c4;border-radius:12px;color:#eef9ff;min-height:49px;padding:13px 14px;display:flex;align-items:center;justify-content:space-between;gap:10px;box-shadow:0 0 14px #168bff2b}
+.bt-master-picker summary::-webkit-details-marker{display:none}
+.bt-master-picker[open] summary{border-color:#65d6ff;border-radius:12px 12px 0 0}
+.bt-master-picker-options{max-height:330px;overflow:auto;background:#0b2138;border:1px solid #3984c9;border-top:0;border-radius:0 0 12px 12px;box-shadow:0 12px 25px #0009}
+.bt-master-choice{width:100%!important;text-align:left;display:flex;align-items:center;gap:12px;padding:13px!important;min-height:52px;border:0!important;border-bottom:1px solid #224465!important;border-radius:0!important;background:linear-gradient(90deg,#102944,#0b2139)!important;color:#e6f8ff!important;box-shadow:none!important;font-size:14px!important;font-weight:600}
+.bt-master-choice:focus-visible{outline:2px solid #6acfff;outline-offset:-2px}
+.bt-master-choice.selected{background:#13457a!important}
+.bt-master-choice-icon{display:grid;place-items:center;flex:none;width:34px;height:34px;background:#103f71;border:1px solid #3d95d8;border-radius:10px;color:#84dfff;font-size:18px;box-shadow:0 0 12px #168bff38}
+.bt-master-choice .bt-master-check{margin-left:auto;visibility:hidden;color:#82ecff}
+.bt-master-choice.selected .bt-master-check{visibility:visible}
+.bt-master-works{display:grid;gap:8px;margin-top:9px}
+.bt-master-work-option{display:flex!important;align-items:center;gap:10px;padding:10px 12px!important;min-height:55px;background:linear-gradient(135deg,#102945,#091b30);border:1px solid #2d6698;border-radius:12px;color:#e3f2ff;cursor:pointer;margin:0!important;font-size:14px;font-weight:600}
+.bt-master-work-option input[type=checkbox]{min-height:0!important;width:19px!important;height:19px!important;margin:0!important;accent-color:#159bf1;flex:none}
+.bt-master-work-option .bt-master-check{margin-left:auto;color:#76e5ff;opacity:0}
+.bt-master-work-option:has(input:checked){border-color:#65cbff;background:#104175;box-shadow:0 0 14px #168bff42}
+.bt-master-work-option:has(input:checked) .bt-master-check{opacity:1}
+.bt-master-address-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:10px 0}
+.bt-master-address-row label{display:block;margin-bottom:8px;color:#d6eaff;font-weight:650}
+.bt-master-pdf-viewer{width:100%;height:68vh;min-height:440px;border:1px solid #439de2;border-radius:12px;background:#f3f6fa;margin:10px 0 18px}
+.master-app .bt-master-act-form #actSubmit{width:100%;background:linear-gradient(115deg,#0755b6,#168bff)!important;border:1px solid #62d6ff!important;min-height:53px;font-weight:800}
+.master-app .bt-master-picker-options button:last-child{border-bottom:0!important}
+@media(max-width:360px){.bt-master-work-option{font-size:12px}.bt-master-address-row{gap:8px}.bt-master-choice{font-size:13px!important}}
+
+/* Unified icons for all master navigation cards and tabs */
+.master-app .bt-master-feature-grid .menu-btn .emoji{
+  display:grid!important;place-items:center!important;width:43px!important;height:43px!important;
+  margin:0!important;padding:0!important;border-radius:13px!important;
+  color:#83e3ff!important;background:linear-gradient(140deg,#14487d,#0d2a4e)!important;
+  border:1px solid #4eb9ed!important;box-shadow:0 0 17px #139cf05c!important;
+  font-size:24px!important
+}
+.master-app .master-bottom-nav button span{
+  display:grid;place-items:center;width:30px;height:30px;border-radius:10px;
+  color:#74d7ff!important;background:linear-gradient(140deg,#133b6b,#0c2646);
+  border:1px solid #285e92;box-shadow:0 0 12px #158bff35
+}
+.master-app .master-bottom-nav button:focus-visible span,.master-app .master-bottom-nav button:active span{
+  border-color:#7fddff;color:#fff!important;box-shadow:0 0 19px #219dff99
+}

@@ -24,25 +24,58 @@ function masterApi(path, method='GET', payload=null) {
   return fetch(masterApiBase + path, {method, headers, body: payload === null ? undefined : JSON.stringify(payload), cache:'no-store'})
     .then(async r => { const d=await r.json().catch(()=>({})); if(!r.ok) throw new Error(d.error || `Ошибка сервера (${r.status})`); return d; });
 }
-async function downloadMasterAct(number, quiet=false) {
-  try {
-    const headers = masterAuthHeaders();
-    const response = await fetch(masterApiBase + `/api/master/acts/${encodeURIComponent(String(number))}/pdf`, {headers, cache:'no-store'});
-    if (!response.ok) {
-      const data = await response.json().catch(()=>({}));
-      throw new Error(data.error || `Не удалось скачать PDF (${response.status})`);
+/* Документ открывается для просмотра, без автоматического скачивания. */
+let masterPdfUrl = null;
+function clearMasterPdfUrl(){ if(masterPdfUrl){ URL.revokeObjectURL(masterPdfUrl); masterPdfUrl=null; } }
+async function getMasterActPdf(number){
+  const headers=masterAuthHeaders();
+  const response=await fetch(masterApiBase+`/api/master/acts/${encodeURIComponent(String(number))}/pdf`,{headers,cache:'no-store'});
+  if(!response.ok){const e=await response.json().catch(()=>({}));throw new Error(e.error||`Не удалось открыть акт (${response.status})`);}
+  const blob=await response.blob();
+  if(!blob.size||!String(blob.type).includes('pdf'))throw new Error('Сервер не вернул корректный PDF.');
+  return blob;
+}
+async function downloadMasterAct(number){
+  try{
+    const blob=await getMasterActPdf(number),url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){masterToast(e.message,true);}
+}
+const masterActStatusLabels={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён клиентом',cancelled:'Отменён',draft:'Черновик'};
+function masterActStatus(v){return masterActStatusLabels[v]||v||'Без статуса';}
+async function previewMasterAct(number){
+  try{
+    masterShell('Просмотр акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2><p id="masterPdfStatus" class="subtitle">Загружаем PDF…</p><div id="masterPdfArea"></div><div class="button-row"><button type="button" onclick="shareMasterAct('${masterEsc(number)}')">↗ Поделиться</button><button type="button" class="secondary" onclick="downloadMasterAct('${masterEsc(number)}')">↓ Сохранить PDF</button></div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(number)}')">✎ Заявка на исправление</button><button type="button" class="back-btn" onclick="clearMasterPdfUrl();showMasterActs()">← Все акты</button></article>`);
+    clearMasterPdfUrl();
+    const pdf=await getMasterActPdf(number);
+    masterPdfUrl=URL.createObjectURL(pdf);
+    const frame=document.createElement('iframe');frame.title=`Акт № ${number}`;frame.src=masterPdfUrl;frame.className='bt-master-pdf-viewer';
+    document.getElementById('masterPdfArea')?.appendChild(frame);
+    const status=document.getElementById('masterPdfStatus');if(status)status.textContent='Если Telegram не показывает PDF внутри окна, нажмите «Сохранить PDF». Внесение изменений доступно через заявку администратору.';
+  }catch(e){const status=document.getElementById('masterPdfStatus');if(status){status.textContent=e.message;status.className='error';}else masterToast(e.message,true);}
+}
+async function shareMasterAct(number){
+  try{
+    const blob=await getMasterActPdf(number);
+    const file=new File([blob],`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`,{type:'application/pdf'});
+    if(navigator.share && (!navigator.canShare || navigator.canShare({files:[file]}))){
+      try{await navigator.share({files:[file],title:`Акт № ${number}`,text:'Акт выполненных работ Remont BT'});return;}
+      catch(e){if(e.name==='AbortError')return;}
     }
-    const blob = await response.blob();
-    if (!blob.size || (blob.type && !blob.type.includes('pdf'))) throw new Error('Сервер вернул пустой или некорректный PDF.');
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = `Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
-    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000);
-    if (!quiet) masterToast(`PDF акта № ${number} подготовлен к сохранению.`);
-    return true;
-  } catch (error) {
-    if (!quiet) masterToast(error.message || 'Не удалось скачать PDF.', true);
-    return false;
-  }
+    masterToast('Передача PDF напрямую не поддерживается на этом устройстве. Сохраните файл и отправьте его через Telegram.');
+    await downloadMasterAct(number);
+  }catch(e){masterToast(e.message,true);}
+}
+function showMasterActCorrection(number){
+  masterShell('Исправление акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2><p class="subtitle">Напишите, что нужно исправить. Запрос будет сохранён на сервере и передан администратору. Сам акт мастер изменить не может.</p><label for="masterCorrectionReason">Что изменить?</label><textarea id="masterCorrectionReason" maxlength="1500" required rows="6" placeholder="Например: исправить модель, сумму, выполненные работы…"></textarea><button type="button" id="masterCorrectionSend" onclick="sendMasterActCorrection('${masterEsc(number)}')">Отправить администратору</button><p id="masterCorrectionResult" role="status" class="subtitle"></p><button type="button" class="back-btn" onclick="showMasterActs()">← Акты</button></article>`);
+}
+async function sendMasterActCorrection(number){
+  const reason=document.getElementById('masterCorrectionReason')?.value.trim(),button=document.getElementById('masterCorrectionSend'),status=document.getElementById('masterCorrectionResult');
+  if(!reason||reason.length<10){if(status)status.textContent='Опишите исправление не менее чем 10 символами.';return;}
+  button.disabled=true;
+  try{const r=await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/correction`,'POST',{reason});status.textContent=r.message||'Заявка отправлена.';status.className='notice';masterToast(status.textContent);}
+  catch(e){status.textContent=e.message;status.className='error';button.disabled=false;}
 }
 function masterShell(title, body) {
   document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="bt-master-title"><img class="bt-master-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><div class="eyebrow">REMONT BT · ELECTRIC STEEL BLUE</div><h1>${masterEsc(title)}</h1></div></div><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button onclick="showMasterMessages()"><span>▤</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
@@ -119,21 +152,136 @@ function filterMasterClients(){const q=(document.getElementById('clientSearch')?
 async function showMasterMessages(){try{await loadMasterData();}catch(e){return masterShell('Сообщения',`<article class="card error">${masterEsc(e.message)}</article>`)}const grouped=new Map();for(const m of masterCache.messages){const k=String(m.client_id);if(!grouped.has(k))grouped.set(k,[]);grouped.get(k).push(m)}const rows=[...grouped.entries()].map(([id,ms])=>{const last=ms[ms.length-1];return `<button class="chat-list-item" onclick="openMasterChat('${masterEsc(id)}')"><span class="chat-avatar">${masterEsc((last.client_name||'К').slice(0,1).toUpperCase())}</span><span class="chat-info"><b>${masterEsc(last.client_name||'Клиент')}</b><small>${masterEsc(last.text||'Медиа')}</small></span><small>${masterEsc((last.created_at||'').replace('T',' ').slice(0,16))}</small></button>`}).join('');masterShell('Сообщения',`<p class="subtitle">Ответы отправляются выбранному клиенту в личный чат Telegram. Перед отправкой проверьте имя в заголовке диалога.</p><div class="chat-list">${rows||'<article class="card">Сообщений пока нет. Когда клиент напишет боту, диалог появится здесь.</article>'}</div>`);}
 async function openMasterChat(clientId){activeChatClientId=String(clientId);try{await loadMasterData();}catch(e){return masterToast(e.message,true)}const c=masterCache.clients.find(x=>String(x.id)===activeChatClientId);if(!c){masterToast('Клиент не найден в вашем кабинете.',true);return}const ms=masterCache.messages.filter(m=>String(m.client_id)===activeChatClientId);const bubbles=ms.map(m=>`<div class="message-bubble ${String(m.from_id)===masterCurrentUserId?'mine':'theirs'}"><p>${masterEsc(m.text||(`[${m.type||'медиа'}]`))}</p><small>${masterEsc((m.created_at||'').replace('T',' ').slice(0,16))}</small></div>`).join('');masterShell('Диалог',`<button class="back-btn" onclick="showMasterMessages()">← Все диалоги</button><article class="card chat-header"><div class="chat-avatar">${masterEsc((c.name||'К').slice(0,1).toUpperCase())}</div><div><h2>${masterEsc(c.name||'Клиент')}</h2><p class="subtitle">${masterEsc(c.phone||'Телефон не указан')} · Telegram ID ${masterEsc(c.id)}</p></div></article><div class="chat-history">${bubbles||'<p class="subtitle">Начало переписки. Напишите клиенту ниже.</p>'}</div><form class="card" onsubmit="event.preventDefault();sendMasterReply()"><label for="masterReplyText">Сообщение для ${masterEsc(c.name||'клиента')}</label><textarea id="masterReplyText" maxlength="1500" required placeholder="Введите ответ…"></textarea><button type="submit" id="masterReplySend">➤ Отправить этому клиенту</button><p id="replyStatus" class="subtitle"></p></form>`);const h=document.querySelector('.chat-history');if(h)h.scrollTop=h.scrollHeight;}
 async function sendMasterReply(){const field=document.getElementById('masterReplyText');const status=document.getElementById('replyStatus');const btn=document.getElementById('masterReplySend');const text=field?.value.trim();if(!activeChatClientId||!text)return;btn.disabled=true;try{const r=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});status.textContent=r.message;field.value='';await openMasterChat(activeChatClientId);}catch(e){status.textContent=e.message;status.className='error';btn.disabled=false;}}
-async function showMasterActs(){try{await loadMasterData()}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(a.status||'—')}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>${masterEsc(fmtPrice(a.final_price??a.price??0))}</b> · гарантия: ${masterEsc(a.guarantee_text||'—')}</p><p class="subtitle">Заявка: ${masterEsc(a.order_id||'без связанной заявки')} · ${masterEsc(a.created_at||'')}</p><button class="secondary" type="button" onclick="downloadMasterAct('${masterEsc(a.number)}')">⬇️ Скачать PDF</button></article>`).join('');masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);}
+async function showMasterActs(){
+ try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
+ clearMasterPdfUrl();
+ const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>${masterEsc(fmtPrice(a.final_price??a.price??0))}</b> · гарантия: ${masterEsc(a.guarantee_text||'—')}</p><p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button></div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
+ masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);
+}
 async function showMasterCreateAct(orderId){try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
-function renderMasterActForm(o=null){actGeoLocation=null;const manual=!o;const id=o?String(o.id):'';const safeId=id.replace(/\'/g,"\\\'");masterShell('Создать акт',`<button class="back-btn" onclick="${manual?'renderMasterMenu()':'showMasterOrders()'}">← Назад</button>${o?`<article class="card"><h2>Заявка ${masterEsc(o.id)}</h2><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p><b>Техника:</b> ${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' '))}</p><p>${masterEsc(o.problem||'')}</p><button class="secondary" type="button" onclick="renderMasterActForm(null)">Создать акт без заявки</button></article>`:`<article class="card"><h2>Акт без заявки</h2><p>Для клиента, который обратился по телефону или лично. Telegram-регистрация клиента не требуется.</p></article>`}<form class="stack-list" onsubmit="event.preventDefault(); event.stopPropagation(); submitMasterAct(event, '${safeId}'); return false;"><article class="card">${manual?`<label>ФИО клиента</label><input id="actClientName" required maxlength="150" placeholder="Имя и фамилия"><label>Телефон клиента</label><input id="actClientPhone" required type="tel" maxlength="60" placeholder="+998 …">`:''}<label>Вид техники</label><select id="actDevice" required onchange="toggleActCustom('actDevice','actDeviceCustomWrap')"><option value="">— Выберите вид техники —</option><option value="Стиральная машина" ${o?.device==='Стиральная машина'?'selected':''}>🧺 Стиральная машина</option><option value="Холодильник" ${o?.device==='Холодильник'?'selected':''}>❄️ Холодильник</option><option value="Кондиционер" ${o?.device==='Кондиционер'?'selected':''}>🌬️ Кондиционер</option><option value="Микроволновка" ${o?.device==='Микроволновка'?'selected':''}>📻 Микроволновка</option><option value="Посудомоечная машина" ${o?.device==='Посудомоечная машина'?'selected':''}>🍽️ Посудомоечная машина</option><option value="Телевизор" ${o?.device==='Телевизор'?'selected':''}>📺 Телевизор</option><option value="Пылесос" ${o?.device==='Пылесос'?'selected':''}>🧹 Пылесос</option><option value="Водонагреватель" ${o?.device==='Водонагреватель'?'selected':''}>🚿 Водонагреватель</option><option value="__other__">✏️ Другое (ввести вручную)</option></select><div id="actDeviceCustomWrap" style="display:none"><label>Укажите вид техники</label><input id="actDeviceCustom" placeholder="Например: варочная панель"></div><label>Бренд</label><select id="actBrand" required onchange="toggleActCustom('actBrand','actBrandCustomWrap')"><option value="">— Выберите бренд —</option><option value="LG" ${o?.brand==='LG'?'selected':''}>🔴 LG</option><option value="Samsung" ${o?.brand==='Samsung'?'selected':''}>🔵 Samsung</option><option value="Indesit" ${o?.brand==='Indesit'?'selected':''}>Indesit</option><option value="Bosch" ${o?.brand==='Bosch'?'selected':''}>🔧 Bosch</option><option value="Beko" ${o?.brand==='Beko'?'selected':''}>Beko</option><option value="Haier" ${o?.brand==='Haier'?'selected':''}>Haier</option><option value="Artel" ${o?.brand==='Artel'?'selected':''}>Artel</option><option value="Whirlpool" ${o?.brand==='Whirlpool'?'selected':''}>Whirlpool</option><option value="__other__">✏️ Другое (ввести вручную)</option></select><div id="actBrandCustomWrap" style="display:none"><label>Укажите бренд</label><input id="actBrandCustom" placeholder="Введите бренд"></div><label>Модель (если есть)</label><input id="actModel" value="${masterEsc(o?.model||'')}" placeholder="Необязательно"><label>Выполненные работы</label><select id="actWorksSelect" required onchange="toggleActCustom('actWorksSelect','actWorksCustomWrap')"><option value="">— Выберите выполненную работу —</option><option value="Диагностика">🔍 Диагностика</option><option value="Ремонт">🛠️ Ремонт</option><option value="Замена детали">🔩 Замена детали</option><option value="Ремонт электронной платы">⚡ Ремонт электронной платы</option><option value="Чистка и обслуживание">🧽 Чистка и обслуживание</option><option value="Заправка хладагентом">❄️ Заправка хладагентом</option><option value="Установка и подключение">🔌 Установка и подключение</option><option value="Профилактика">🧰 Профилактика</option><option value="__other__">✏️ Другое (ввести вручную)</option></select><div id="actWorksCustomWrap" style="display:none"><label>Укажите выполненную работу</label><input id="actWorksCustom" placeholder="Описание работы"></div><label>Стоимость, сум</label><input id="actPrice" inputmode="numeric" autocomplete="off" required placeholder="Например, 500 000" oninput="formatActPrice(this)"><label>Срок гарантии</label><select id="actGuarantee"><option value="0">Без гарантии</option><option value="7">7 дней</option><option value="30" selected>1 месяц</option><option value="90">3 месяца</option><option value="180">6 месяцев</option></select><label>Дом *</label><input id="actHouse" required maxlength="80" placeholder="Например, 15А"><label>Квартира (если есть)</label><input id="actApartment" maxlength="80" placeholder="Например, 42"><button type="button" class="secondary" onclick="captureActLocation()">📍 Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Локация обязательна — нажмите кнопку и разрешите доступ к GPS</p><button id="actSubmit" type="button" onclick="submitMasterAct(null, '${safeId}')">📄 Создать акт и сохранить PDF</button><p id="actStatus" class="subtitle"></p></article></form>`);}
-function toggleActCustom(selectId,wrapId){const el=document.getElementById(selectId),wrap=document.getElementById(wrapId);if(wrap)wrap.style.display=el?.value==='__other__'?'block':'none';}
+/* Каждый список содержит 5 стандартных вариантов и шестой «Другое». */
+const masterAppliances=[
+ {value:'Стиральная машина',icon:'♻'},
+ {value:'Холодильник',icon:'❄'},
+ {value:'Кондиционер',icon:'◈'},
+ {value:'Микроволновая печь',icon:'▣'},
+ {value:'Пылесос',icon:'◉'},
+ {value:'__other__',label:'Другое',icon:'✎'}
+];
+const masterBrands=[{value:'LG',icon:'LG'},{value:'Samsung',icon:'S'},{value:'Indesit',icon:'I'},{value:'Bosch',label:'Bosh (Bosch)',icon:'B'},{value:'Атлант',icon:'А'},{value:'__other__',label:'Другое',icon:'✎'}];
+const masterWorksByDevice={
+ 'Стиральная машина':['Замена насоса','Замена нагревательного элемента','Профилактика','Замена подшипников','Ремонт платы'],
+ 'Холодильник':['Замена датчиков','Замена нагревательного элемента','Замена компрессора','Замена таймера','Устранение утечки'],
+ 'Кондиционер':['Замена датчиков','Профилактика','Замена компрессора','Заправка фреоном','Устранение утечки'],
+ 'Микроволновая печь':['Замена магнетрона','Замена трансформатора','Замена конденсатора','Ремонт платы','Профилактика'],
+ 'Пылесос':['Замена двигателя','Замена шланга','Замена мешка','Ремонт платы','Профилактика'],
+ '__other__':['Диагностика','Ремонт платы','Замена детали','Профилактика','Ремонт']
+};
+const masterWorkIcons=['◇','⚙','✧','◉','⌁'];
+const masterGuarantees=[{value:'0',label:'Без гарантии',icon:'⊘'},{value:'7',label:'7 дней',icon:'◷'},{value:'30',label:'1 месяц',icon:'◷'},{value:'90',label:'3 месяца',icon:'◷'},{value:'180',label:'6 месяцев',icon:'◷'},{value:'custom',label:'Своя гарантия, месяцев',icon:'✎'}];
+function masterChoiceMarkup(id,label,items,selected=''){
+ const current=items.find(i=>i.value===selected);
+ const options=items.map(i=>`<button type="button" class="bt-master-choice" role="option" data-value="${masterEsc(i.value)}" onclick="chooseMasterActItem(this,'${id}')"><span class="bt-master-choice-icon">${masterEsc(i.icon)}</span><span>${masterEsc(i.label||i.value)}</span><span class="bt-master-check">✓</span></button>`).join('');
+ return `<label id="${id}Label">${masterEsc(label)}</label><details class="bt-master-picker" id="${id}Picker"><summary role="button"><span id="${id}Summary">${current?masterEsc((current.icon||'')+' '+(current.label||current.value)):'Выберите вариант'}</span><span aria-hidden="true">⌄</span></summary><div class="bt-master-picker-options" role="listbox" aria-labelledby="${id}Label">${options}</div></details><input id="${id}" type="hidden" value="${masterEsc(selected)}">`;
+}
+function chooseMasterActItem(button,id){
+ const value=button.dataset.value||'';document.getElementById(id).value=value;
+ const list=document.getElementById(id+'Picker');if(list)list.open=false;
+ const summary=document.getElementById(id+'Summary');if(summary)summary.textContent=button.querySelector('span:nth-child(2)')?.textContent||value;
+ for(const other of document.querySelectorAll(`#${id}Picker .bt-master-choice`))other.classList.toggle('selected',other===button);
+ if(id==='actGuarantee')toggleMasterCustomGuarantee();else toggleActCustom(id,id+'CustomWrap');
+ if(id==='actDevice')renderMasterActWorks();
+}
+function toggleActCustom(selectId,wrapId){
+ const el=document.getElementById(selectId),wrap=document.getElementById(wrapId);
+ if(wrap)wrap.style.display=el?.value==='__other__'?'block':'none';
+}
+function renderMasterActWorks(){
+ const panel=document.getElementById('actWorksList');if(!panel)return;
+ const device=document.getElementById('actDevice')?.value||'__other__';
+ const works=masterWorksByDevice[device]||masterWorksByDevice.__other__;
+ panel.innerHTML=works.map((work,i)=>`<label class="bt-master-work-option"><input type="checkbox" name="actWork" value="${masterEsc(work)}"><span class="bt-master-choice-icon">${masterWorkIcons[i]}</span><span>${masterEsc(work)}</span><span class="bt-master-check">✓</span></label>`).join('')+`<label class="bt-master-work-option bt-master-custom-work"><input type="checkbox" id="actWorksOther" onchange="toggleMasterCustomWorks()"><span class="bt-master-choice-icon">✎</span><span>Другое (указать вручную)</span><span class="bt-master-check">✓</span></label>`;
+ document.getElementById('actWorksCustomWrap').style.display='none';
+}
+function toggleMasterCustomWorks(){
+ const wrap=document.getElementById('actWorksCustomWrap');if(wrap)wrap.style.display=document.getElementById('actWorksOther')?.checked?'block':'none';
+}
+function masterSelectedWorks(){
+ const works=[...document.querySelectorAll('input[name="actWork"]:checked')].map(e=>e.value);
+ if(document.getElementById('actWorksOther')?.checked){
+   const extra=document.getElementById('actWorksCustom')?.value.split(/[\n;]+/).map(s=>s.trim()).filter(Boolean)||[];
+   if(!extra.length)throw new Error('Укажите дополнительные выполненные работы. Каждую напишите с новой строки.');
+   works.push(...extra);
+ }
+ const result=[...new Set(works)];
+ if(!result.length)throw new Error('Выберите хотя бы одну выполненную работу.');
+ if(result.length>30)throw new Error('Можно указать не более 30 выполненных работ.');
+ if(result.some(w=>w.length>200))throw new Error('Описание одной работы не должно превышать 200 символов.');
+ return result;
+}
+function toggleMasterCustomGuarantee(){
+ const wrap=document.getElementById('actGuaranteeCustomWrap');if(wrap)wrap.style.display=document.getElementById('actGuarantee')?.value==='custom'?'block':'none';
+}
+function renderMasterActForm(o=null){
+ actGeoLocation=null;
+ const manual=!o, id=o?String(o.id):'', safeId=id.replace(/'/g,"\\'");
+ const device=o?.device==='Микроволновка'?'Микроволновая печь':o?.device||'';
+ const initialDevice=masterAppliances.some(i=>i.value===device)?device:(device?'__other__':'');
+ const brand=o?.brand||'';
+ const initialBrand=masterBrands.some(i=>i.value===brand)?brand:(brand?'__other__':'');
+ masterShell('Создать акт',`<button class="back-btn" onclick="${manual?'renderMasterMenu()':'showMasterOrders()'}">← Назад</button>${o?`<article class="card"><h2>Заявка ${masterEsc(o.id)}</h2><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'')}</p><p><b>Техника:</b> ${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' '))}</p><p>${masterEsc(o.problem||'')}</p><button class="secondary" type="button" onclick="renderMasterActForm(null)">Создать акт без заявки</button></article>`:`<article class="card"><h2>Акт без заявки</h2><p>Для клиента, обратившегося лично или по телефону. Регистрация в Telegram не обязательна.</p></article>`}<form class="stack-list" onsubmit="event.preventDefault();submitMasterAct(event,'${safeId}');return false;"><article class="card bt-master-act-form">${manual?`<label>ФИО клиента</label><input id="actClientName" maxlength="150" required placeholder="Имя и фамилия"><label>Телефон клиента</label><input id="actClientPhone" required type="tel" inputmode="tel" maxlength="60" placeholder="+998 …">`:''}
+ ${masterChoiceMarkup('actDevice','Вид техники',masterAppliances,initialDevice)}
+ <div id="actDeviceCustomWrap" style="display:none"><label>Укажите вид техники</label><input id="actDeviceCustom" maxlength="120" value="${masterEsc(initialDevice==='__other__'?device:'')}" placeholder="Введите технику"></div>
+ ${masterChoiceMarkup('actBrand','Бренд',masterBrands,initialBrand)}
+ <div id="actBrandCustomWrap" style="display:none"><label>Укажите бренд</label><input id="actBrandCustom" maxlength="120" value="${masterEsc(initialBrand==='__other__'?brand:'')}" placeholder="Введите бренд"></div>
+ <label>Модель (если есть)</label><input id="actModel" maxlength="120" value="${masterEsc(o?.model||'')}" placeholder="Модель техники">
+ <label>Выполненные работы <small class="subtitle">Можно выбрать несколько</small></label><div id="actWorksList" class="bt-master-works"></div>
+ <div id="actWorksCustomWrap" style="display:none"><label>Свои работы (каждая с новой строки)</label><textarea id="actWorksCustom" maxlength="3000" rows="4" placeholder="Дополнительная работа 1&#10;Дополнительная работа 2"></textarea></div>
+ <label>Стоимость, сум</label><input id="actPrice" inputmode="numeric" autocomplete="off" required placeholder="Например, 500 000" oninput="formatActPrice(this)">
+ ${masterChoiceMarkup('actGuarantee','Гарантия',masterGuarantees,'30')}
+ <div id="actGuaranteeCustomWrap" style="display:none"><label>Свой срок гарантии, месяцев</label><input id="actGuaranteeMonths" inputmode="numeric" type="number" min="1" max="120" step="1" placeholder="Например, 12"></div>
+ <div class="bt-master-address-row"><div><label>Дом *</label><input id="actHouse" required maxlength="80" value="${masterEsc(o?.house||'')}" placeholder="15А"></div><div><label>Квартира</label><input id="actApartment" maxlength="80" value="${masterEsc(o?.apartment||'')}" placeholder="42"></div></div>
+ <button type="button" class="secondary" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
+ <button id="actSubmit" type="submit">▣ Создать акт</button><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
+ toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();
+}
 function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';}
 let actGeoLocation=null;
 function captureActLocation(){const status=document.getElementById('actLocationStatus');if(!navigator.geolocation){if(status)status.textContent='Браузер не поддерживает определение локации.';return;}if(status)status.textContent='Определяем локацию…';navigator.geolocation.getCurrentPosition(pos=>{actGeoLocation={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy};if(status)status.textContent=`📍 Локация сохранена (точность около ${Math.round(pos.coords.accuracy)} м)`;},err=>{if(status)status.textContent=err.code===1?'Разрешите доступ к локации в браузере.':'Не удалось определить локацию. Повторите попытку — без GPS акт сохранить нельзя.';},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});}
-async function submitMasterAct(event, orderId){if(event){event.preventDefault();event.stopPropagation();}const form=document.querySelector('#masterContent form');if(form)form.addEventListener('submit',e=>{e.preventDefault();e.stopPropagation();},{once:true});const btn=document.getElementById('actSubmit'),st=document.getElementById('actStatus');if(!btn||!st){masterToast('Не найдена форма создания акта. Откройте её заново.',true);return false;}btn.disabled=true;btn.textContent='⏳ Создаём акт…';st.textContent='Отправляем данные и создаём PDF…';st.className='subtitle';try{const getChoice=(selectId,customId)=>{const v=document.getElementById(selectId).value;return v==='__other__'?document.getElementById(customId).value.trim():v;};const priceDigits=document.getElementById('actPrice').value.replace(/\D/g,'');const work=getChoice('actWorksSelect','actWorksCustom');const payload={device:getChoice('actDevice','actDeviceCustom'),brand:getChoice('actBrand','actBrandCustom'),model:document.getElementById('actModel').value.trim(),works:work?[work]:[],price:Number(priceDigits),guarantee_days:Number(document.getElementById('actGuarantee').value),guarantee_scope:'',guarantee_exclusions:'',house:document.getElementById('actHouse').value.trim(),apartment:document.getElementById('actApartment').value.trim(),location:actGeoLocation};if(orderId){payload.order_id=orderId;const linked=masterCache.orders.find(o=>String(o.id)===String(orderId));if(linked){payload.client_name=linked.client_name||'';payload.client_phone=linked.client_phone||'';}}else{payload.client_name=document.getElementById('actClientName').value.trim();payload.client_phone=document.getElementById('actClientPhone').value.trim();}if(!payload.device||!payload.brand||!work||!payload.price){throw new Error('Выберите технику, бренд и работу, укажите стоимость.');}if(!payload.house){throw new Error('Поле «Дом» обязательно для заполнения.');}if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number'){throw new Error('Укажите локацию: нажмите кнопку «Указать текущую локацию» и разрешите доступ к GPS.');}if(payload.device==='__other__'||payload.brand==='__other__'||work==='__other__')throw new Error('Укажите значение в поле «Другое».');const r=await masterApi('/api/master/act','POST',payload);st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);btn.textContent='✓ Акт создан';if(r.number) await downloadMasterAct(r.number, true);try{await loadMasterData();await showMasterActs();}catch(refreshError){/* Акт уже создан сервером: не показываем ошибку обновления как ошибку создания. */st.textContent=(r.message||'Акт создан.')+' Список актов не обновился — откройте «Все акты» вручную.';st.className='notice';btn.disabled=false;}}catch(e){
-  const networkFailure=(typeof navigator!=='undefined'&&navigator.onLine===false)||e instanceof TypeError||/failed to fetch|networkerror|load failed|fetch failed/i.test(String(e.message||''));
-  if(networkFailure&&typeof queueOperation==='function'){
-    const offline={event:'offline_create_act',client_name:payload.client_name||'',client_phone:payload.client_phone||'',device:payload.device,brand:payload.brand,model:payload.model||'—',works:payload.works,price:payload.price,guarantee_days:payload.guarantee_days,house:payload.house,apartment:payload.apartment,location:payload.location?{lat:payload.location.latitude,lon:payload.location.longitude}:null,order_id:payload.order_id||'',local_registration_id:(typeof getLocalRegistrationId==='function'?getLocalRegistrationId():'' )};
-    queueOperation(offline);
-    st.textContent='Сервер недоступен. Данные акта сохранены на устройстве в очереди; отправьте очередь после восстановления связи. Акт пока НЕ создан на сервере.';st.className='notice';btn.disabled=false;btn.textContent='📦 Акт в очереди';
-  }else{st.textContent=e.message||'Не удалось создать акт. Попробуйте ещё раз.';st.className='error';btn.disabled=false;btn.textContent='📄 Повторить создание акта';}
-}return false;}
+async function submitMasterAct(event,orderId){
+ if(event){event.preventDefault();event.stopPropagation();}
+ const btn=document.getElementById('actSubmit'),st=document.getElementById('actStatus');
+ if(!btn||!st)return false;
+ if(btn.disabled)return false;
+ let payload=null;
+ btn.disabled=true;btn.textContent='⌛ Создаём акт…';st.textContent='Сохраняем данные на сервере…';st.className='subtitle';
+ try{
+  const getChoice=(id,customId)=>{const v=document.getElementById(id)?.value||'';return v==='__other__'?document.getElementById(customId)?.value.trim():v;};
+  const digits=document.getElementById('actPrice').value.replace(/\D/g,'');
+  const guaranteeChoice=document.getElementById('actGuarantee').value;
+  const months=guaranteeChoice==='custom'?Number(document.getElementById('actGuaranteeMonths').value):null;
+  if(guaranteeChoice==='custom'&&(!Number.isInteger(months)||months<1||months>120))throw new Error('Укажите свой срок гарантии от 1 до 120 месяцев.');
+  const works=masterSelectedWorks();
+  payload={device:getChoice('actDevice','actDeviceCustom'),brand:getChoice('actBrand','actBrandCustom'),model:document.getElementById('actModel').value.trim(),works,price:Number(digits),guarantee_days:months===null?Number(guaranteeChoice):Math.min(months*30,3650),guarantee_scope:'',guarantee_exclusions:'',house:document.getElementById('actHouse').value.trim(),apartment:document.getElementById('actApartment').value.trim(),location:actGeoLocation};
+  if(months!==null)payload.guarantee_months=months;
+  if(orderId){payload.order_id=orderId;const linked=masterCache.orders.find(o=>String(o.id)===String(orderId));if(linked){payload.client_name=linked.client_name||'';payload.client_phone=linked.client_phone||'';}}
+  else{payload.client_name=document.getElementById('actClientName').value.trim();payload.client_phone=document.getElementById('actClientPhone').value.trim();}
+  if(!payload.device||!payload.brand||!payload.works.length||!payload.price||payload.price<=0)throw new Error('Заполните технику, бренд, работы и стоимость.');
+  if(!payload.house)throw new Error('Укажите дом.');
+  if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number')throw new Error('Укажите GPS-локацию нажатием соответствующей кнопки.');
+  const r=await masterApi('/api/master/act','POST',payload);
+  st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);
+  // Не скачиваем PDF автоматически: мастер открывает его в разделе «Акты».
+  try{await showMasterActs();}catch(e){st.textContent='Акт создан, но список не обновился. Откройте «Все акты». Через кнопку создавать его повторно не нужно.';}
+ }catch(e){
+   const networkFailure=(typeof navigator!=='undefined'&&navigator.onLine===false)||/failed to fetch|networkerror|load failed|fetch failed/i.test(String(e.message||''));
+   if(networkFailure&&payload&&typeof queueOperation==='function'){
+     const offline={event:'offline_create_act',client_name:payload.client_name||'',client_phone:payload.client_phone||'',device:payload.device,brand:payload.brand,model:payload.model||'—',works:payload.works,price:payload.price,guarantee_days:payload.guarantee_days,guarantee_months:payload.guarantee_months,house:payload.house,apartment:payload.apartment,location:{lat:payload.location.latitude,lon:payload.location.longitude},order_id:payload.order_id||'',local_registration_id:(typeof getLocalRegistrationId==='function'?getLocalRegistrationId():'')};
+     queueOperation(offline);st.textContent='Сервер недоступен. Акт помещён в очередь и пока НЕ создан на сервере.';st.className='notice';btn.textContent='▣ Акт ожидает отправки';btn.disabled=true;
+   }else{st.textContent=e.message||'Не удалось создать акт.';st.className='error';btn.textContent='▣ Повторить создание акта';btn.disabled=false;}
+ }
+ return false;
+}
 async function showMasterPromos(){try{await loadMasterData()}catch(e){return masterShell('Промокоды',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.promos.map(p=>`<article class="card"><div class="card-row"><b>${masterEsc(p.code)}</b><span class="status-pill">${p.active?'Активен':'Выключен'}</span></div><p>${masterEsc(p.partner_name)} · ${masterEsc(p.partner_contact)}</p><p>Скидка ${masterEsc(p.discount_percent)}% · вознаграждение ${masterEsc(p.reward_percent)}%</p><p class="subtitle">До: ${masterEsc(p.expires_at||'без срока')}</p></article>`).join('');masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);}
 function showCreateMasterPromo(){masterShell('Новый промокод',`<button class="back-btn" onclick="showMasterPromos()">← Назад</button><form class="card" onsubmit="event.preventDefault();submitMasterPromo()"><label>Код</label><input id="pCode" required maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" placeholder="PARTNER10"><label>Имя партнёра</label><input id="pName" required maxlength="150"><label>Telegram партнёра</label><input id="pContact" required maxlength="150" placeholder="@username"><label>Телефон рекламодателя</label><input id="pPartnerPhone" required type="tel" placeholder="+998901234567"><label>Номер карты</label><input id="pCard" required inputmode="numeric" maxlength="23" placeholder="16–19 цифр"><label>Скидка клиенту, %</label><input id="pDiscount" required type="number" min="1" max="50" value="5"><label>Вознаграждение партнёру, %</label><input id="pReward" required type="number" min="0" max="30" value="5"><label>Использований на клиента</label><input id="pLimit" required type="number" min="1" max="100" value="1"><label>Действует до</label><input id="pExpiry" required type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}"><button type="submit" id="promoSubmit">Создать промокод</button><p id="promoStatus" class="subtitle"></p></form>`);}
 async function submitMasterPromo(){const btn=document.getElementById('promoSubmit'),st=document.getElementById('promoStatus');btn.disabled=true;try{const r=await masterApi('/api/master/promo','POST',{code:document.getElementById('pCode').value.trim().toUpperCase(),partner_name:document.getElementById('pName').value.trim(),partner_contact:document.getElementById('pContact').value.trim(),partner_phone:document.getElementById('pPartnerPhone').value.trim(),partner_card:document.getElementById('pCard').value.replace(/\D/g,''),discount_percent:Number(document.getElementById('pDiscount').value),reward_percent:Number(document.getElementById('pReward').value),max_act:Number(document.getElementById('pLimit').value),expires_at:document.getElementById('pExpiry').value+'T23:59:59'});st.textContent=r.message;await showMasterPromos();}catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}}
