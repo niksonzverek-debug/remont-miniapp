@@ -104,7 +104,7 @@ function showExistingMasterHelp(message='') {
         if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
         localStorage.setItem('remontBT.master.session.v1',data.session);
         localStorage.setItem('remont_bt_phone',phone);
-        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261020-master-date-strict4');
+        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261020-master-pinfl-order-fix5');
         status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
         location.href=target.href;
       }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
@@ -315,8 +315,8 @@ async function submitMasterApplication(form){
     if(!/^\d{14}$/.test(data.pinfl))return showAlert('ПИНФЛ должен содержать ровно 14 цифр.');
     const first=Number(data.pinfl[0]); const map={3:['Мужской',1900],4:['Женский',1900],5:['Мужской',2000],6:['Женский',2000]}; const pin=map[first];
     if(!pin)return showAlert('Первая цифра ПИНФЛ не соответствует допустимому формату.');
-    // PINFL: first digit = century/gender, then YY.MM.DD (not DD.MM.YY).
-    const pinDate=`${data.pinfl.slice(5,7)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(1,3))}`;
+    // PINFL: first digit = century/gender, then DDMMYY. Example: 3 20 04 95 = 20.04.1995.
+    const pinDate=`${data.pinfl.slice(1,3)}.${data.pinfl.slice(3,5)}.${pin[1]+Number(data.pinfl.slice(5,7))}`;
     if(pin[0]!==data.gender||pinDate!==data.birth_date)return showAlert(`Проверьте данные: по ПИНФЛ указаны пол ${pin[0]} и дата рождения ${pinDate}.`);
     try {
       localStorage.setItem('remont_bt_phone',data.phone);
