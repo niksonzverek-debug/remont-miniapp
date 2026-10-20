@@ -583,3 +583,9 @@ input:focus,select:focus,textarea:focus,.master-app input:focus,.master-app sele
 @media(prefers-reduced-motion:reduce){
  *,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}
 }
+
+/* Remont BT Steel Chat — client conversation layout */
+.client-chat-history{display:flex;flex-direction:column;gap:8px;max-height:52vh;overflow:auto;padding:8px 2px 16px;scroll-behavior:smooth}
+.client-chat-history .message-bubble{display:block;width:fit-content;max-width:88%;margin:0}
+.client-chat-history .message-bubble.mine{align-self:flex-end}
+.client-chat-history .message-bubble.theirs{align-self:flex-start}

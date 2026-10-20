@@ -50,15 +50,9 @@ function renderClientMenu() {
           <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji">🎟️</span> Промокод</button>
           <button class="menu-btn" onclick="showProfile()"><span class="emoji">👤</span> Профиль</button>
           <button class="menu-btn" onclick="showMessages()"><span class="emoji">💬</span> Написать мастеру</button>
-          <button class="menu-btn" id="advertiserCabinetButton" style="display:none" onclick="showAdvertiserCabinet()"><span class="emoji">📣</span> Я рекламодатель</button>
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
-    // Рекламодатель определяется сервером по телефону из зарегистрированного профиля.
-    clientApi('/api/client/advertiser/status').then(d => {
-        const button = document.getElementById('advertiserCabinetButton');
-        if (button && d.is_advertiser) button.style.display = '';
-    }).catch(err => console.warn('Не удалось проверить статус рекламодателя:', err.message));
     // Use the authoritative profile name from the database, not Telegram's optional first_name.
     clientApi('/api/client/profile').then(d => {
         const name = String(d.profile?.name || '').trim();
@@ -67,20 +61,7 @@ function renderClientMenu() {
     }).catch(err => console.warn('Не удалось загрузить имя клиента из профиля:', err.message));
 }
 
-async function showAdvertiserCabinet() {
-    setPage('📣 Кабинет рекламодателя', '<p class="subtitle">Загружаем ваши промокоды и статистику…</p>');
-    try {
-        const d = await clientApi('/api/advertiser/dashboard');
-        const s = d.summary || {};
-        const promos = (d.promocodes || []).map(p => `<article class="card"><div class="card-row"><b>${escapeClient(p.code)}</b><span class="status-pill">${p.active ? 'Активен' : 'Отключён'}</span></div><p>Скидка клиенту: ${escapeClient(p.discount_percent)}% · Вознаграждение: ${escapeClient(p.reward_percent)}%</p><p class="subtitle">Использований: ${escapeClient(p.repairs)} · До: ${escapeClient(p.expires_at || 'без срока')}</p></article>`).join('');
-        const money = v => Number(v || 0).toLocaleString('ru-RU') + ' сум';
-        setPage('📣 Кабинет рекламодателя', `<div class="card"><h2>${escapeClient(d.advertiser?.name || 'Рекламодатель')}</h2><p>Привлечено клиентов: <b>${escapeClient(s.activations || 0)}</b></p><p>Завершённых ремонтов: <b>${escapeClient(s.repairs || 0)}</b></p><p>Начислено: <b>${escapeClient(money(s.accrued))}</b></p><p>В ожидании выплаты: <b>${escapeClient(money(s.pending))}</b></p><p>Баланс к выплате: <b>${escapeClient(money(s.balance))}</b></p></div><h2>Мои промокоды</h2>${promos || '<div class="card">Промокоды пока не найдены.</div>'}<button class="secondary" onclick="renderClientMenu()">← Вернуться в меню клиента</button>`);
-    } catch (e) {
-        setPage('📣 Кабинет рекламодателя', `<div class="card error">${escapeClient(e.message || 'Не удалось загрузить кабинет рекламодателя.')}</div><button class="secondary" onclick="renderClientMenu()">← Вернуться в меню клиента</button>`);
-    }
-}
-
-function requestMasterRole() { showMasterApplicationForm(); }
+function requestMasterRole() { showMasterChoice(); }
 
 function showMasterChoice() {
     setPage('🧑‍🔧 Кабинет мастера', `<div class="card master-choice-card">
@@ -461,20 +442,23 @@ async function saveClientProfile(event) {
     }
 }
 
-async function showMessages() {
-    setPage('💬 Написать мастеру', '<p class="subtitle">Загружаем переписку…</p>');
+async function showMessages(statusMessage = '') {
+    setPage('💬 Чат с мастером', '<p class="subtitle">Загружаем переписку…</p>');
     let history = '';
     try {
         const d = await clientApi('/api/client/dashboard');
-        const rows = d.messages || [];
-        history = rows.length ? rows.map(m => `<article class="card"><p><b>${String(m.from_id) === String(tg.initDataUnsafe?.user?.id) ? 'Вы' : 'Мастер'}</b> <span class="subtitle">${escapeClient(m.created_at || '')}</span></p><p>${escapeClient(m.text || (m.type === 'photo' ? 'Фото' : m.type === 'video' ? 'Видео' : 'Сообщение'))}</p></article>`).join('') : '<div class="card">Сообщений пока нет.</div>';
+        const rows = (d.messages || []).slice().sort((a,b) => String(a.created_at||'').localeCompare(String(b.created_at||'')));
+        history = rows.length ? `<div class="chat-history client-chat-history">${rows.map(m => `<article class="message-bubble ${String(m.from_id) === String(tg.initDataUnsafe?.user?.id) ? 'mine' : 'theirs'}"><p>${escapeClient(m.text || (m.type === 'photo' ? 'Фото' : m.type === 'video' ? 'Видео' : 'Сообщение'))}</p><small>${escapeClient((m.created_at || '').replace('T',' ').slice(0,16))}</small></article>`).join('')}</div>` : '<div class="card">Начните переписку с назначенным мастером.</div>';
     } catch (e) { history = `<div class="card error">${escapeClient(e.message)}</div>`; }
-    setPage('💬 Написать мастеру', `${history}<div class="card"><p>Напишите мастеру по вашей заявке.</p><textarea id="masterMessage" maxlength="1500" placeholder="Ваше сообщение"></textarea><button onclick="sendClientMessage()">Отправить сообщение</button><p id="messageStatus" class="subtitle"></p></div>`);
+    setPage('💬 Чат с мастером', `<p class="subtitle">Сообщения видны только вам и мастеру, привязанному к вашему профилю.</p>${history}<form class="card" onsubmit="event.preventDefault();sendClientMessage()"><label for="masterMessage">Сообщение мастеру</label><textarea id="masterMessage" maxlength="1500" required placeholder="Напишите сообщение…"></textarea><button id="clientMessageSend" type="submit">➤ Отправить сообщение</button><p id="messageStatus" class="subtitle" role="status">${escapeClient(statusMessage)}</p></form>`);
+    const h=document.querySelector('.client-chat-history'); if(h) h.scrollTop=h.scrollHeight;
 }
 async function sendClientMessage() {
-    const field = document.getElementById('masterMessage'); const status = document.getElementById('messageStatus');
-    try { const r = await clientApi('/api/client/message', 'POST', {text:field.value}); status.textContent = r.message || 'Сообщение отправлено.'; status.className='notice'; field.value=''; }
-    catch (e) { status.textContent = e.message; status.className='error'; }
+    const field = document.getElementById('masterMessage'); const status = document.getElementById('messageStatus'); const btn=document.getElementById('clientMessageSend');
+    const text=field?.value.trim(); if(!text) return;
+    if(btn) btn.disabled=true;
+    try { const r = await clientApi('/api/client/message', 'POST', {text}); await showMessages(r.message || 'Сообщение отправлено мастеру.'); }
+    catch (e) { if(status){status.textContent=e.message;status.className='error';} if(btn)btn.disabled=false; }
 }
 function escapeClient(value) { return String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
@@ -704,8 +688,7 @@ function showNewOrder() {
         <div class="card promo-card" id="orderPromoCard">
             <label>🎟️ Промокод (необязательно)</label>
             <input id="order_promo_code" placeholder="Например, REMONT10" maxlength="64" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase">
-            <button type="button" id="orderPromoCheck" onclick="checkOrderPromo()">Проверить промокод</button>
-            <p id="orderPromoStatus" class="subtitle">Активный промокод привяжется к вашему аккаунту автоматически при отправке заявки.</p>
+            <p class="subtitle">Есть промокод? Введите его здесь — проверим при отправке первой заявки.</p>
         </div>
 
         <button id="submit" onclick="submitOrder()">📤 Отправить заявку</button>
@@ -901,38 +884,9 @@ function getBrowserLocation() {
     );
 }
 
-// Проверка промокода в форме заявки: проверка не активирует и не списывает использование.
-async function checkOrderPromo() {
-    const input = document.getElementById('order_promo_code');
-    const status = document.getElementById('orderPromoStatus');
-    const button = document.getElementById('orderPromoCheck');
-    const code = (input?.value || '').trim().toUpperCase();
-    if (!code) { if (status) { status.textContent = 'Введите промокод.'; status.className = 'subtitle error'; } return false; }
-    if (button) { button.disabled = true; button.textContent = 'Проверяем…'; }
-    try {
-        const r = await clientApi('/api/client/promo/check', 'POST', {code});
-        const timeLeft = r.expires_at ? (r.expires_in_hours >= 24 ? `Осталось ${Math.floor(r.expires_in_hours / 24)} дн. ${r.expires_in_hours % 24} ч.` : `Осталось ${r.expires_in_hours} ч.`) : 'Срок действия не ограничен';
-        const usesLeft = r.remaining_uses === null || r.remaining_uses === undefined ? 'Лимит: без персонального ограничения' : `Осталось использований для вас: ${r.remaining_uses}`;
-        if (status) { status.textContent = `✅ Скидка ${r.discount_percent}% · ${usesLeft} · ${timeLeft}. При отправке заявки код привяжется к аккаунту.`; status.className = 'notice'; }
-        return true;
-    } catch (e) {
-        if (status) { status.textContent = e.message || 'Не удалось проверить промокод.'; status.className = 'subtitle error'; }
-        return false;
-    } finally {
-        if (button) { button.disabled = false; button.textContent = 'Проверить промокод'; }
-    }
-}
-
-function confirmPromoContinue(message) {
-    return new Promise(resolve => {
-        if (tg && typeof tg.showConfirm === 'function') tg.showConfirm(message, resolve);
-        else resolve(window.confirm(message));
-    });
-}
-
 // ============ ОТПРАВКА ЗАЯВКИ ============
 
-async function submitOrder() {
+function submitOrder() {
     let device = document.getElementById('device').value;
     let brand = document.getElementById('brand').value;
 
@@ -1011,19 +965,6 @@ async function submitOrder() {
         location: orderData.location || null,
     };
 
-    // Даже если клиент не нажал «Проверить», сервер проверит и привяжет активный код
-    // при обработке заявки. Неактивный/неизвестный код требует явного подтверждения.
-    if (order_promo_code) {
-        try {
-            await clientApi('/api/client/promo/check', 'POST', {code: order_promo_code});
-        } catch (e) {
-            const proceed = await confirmPromoContinue(`⚠️ ${e.message || 'Промокод не активен.'}\n\nНажмите OK, чтобы продолжить создание заявки без этой скидки, или Отмена, чтобы вернуться и изменить промокод.`);
-            if (!proceed) return;
-            data.promo_code = '';
-            data.promo_code_invalid_confirmed = true;
-        }
-    }
-
     console.log('Отправляем заявку:', data);
 
     const btn = document.getElementById('submit');
@@ -1056,22 +997,7 @@ async function showCallMaster() {
 
 async function startRemontApp(){
   const role = clientUrlParams.get('role') || 'client';
-  if (role === 'master_entry') {
-    // The master entry button opens the application directly for new users.
-    // If this Telegram account has since been approved, open the master cabinet instead.
-    try {
-      await clientApi('/api/master/dashboard');
-      const target = new URL('index.html', location.href);
-      target.searchParams.set('role', 'master');
-      target.searchParams.set('appv', '20261020-master-flow-fix6');
-      location.replace(target.href);
-      return;
-    } catch (_) {
-      // Not approved (or temporarily unavailable): keep the application form available.
-    }
-    showMasterApplicationForm();
-    return;
-  }
+  if (role === 'master_entry') { showMasterChoice(); return; }
 
   // Local storage is only a cache and may be stale/shared on the device.
   // Ask the server first; only a registered server profile may bypass registration.
