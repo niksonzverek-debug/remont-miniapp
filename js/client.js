@@ -348,6 +348,7 @@ function showRegistrationScreen() {
         <button id="registrationContinue" onclick="submitRegistration()">
             Сохранить
         </button>
+        <p id="registrationStatus" class="subtitle" role="status"></p>
     `;
 
     // Это экран первичной регистрации из /start: поля всегда пустые.
@@ -580,28 +581,43 @@ function showNewOrder() {
 // ============ РЕГИСТРАЦИЯ КЛИЕНТА ============
 
 async function submitRegistration() {
-    const nameEl=document.getElementById('client_name'), phoneEl=document.getElementById('client_phone');
-    const name=(nameEl?nameEl.value:'').trim(), phone=cleanPhone(phoneEl?phoneEl.value:'');
-    if(name.length<2)return showAlert('Введите ФИО не короче 2 символов.');
-    if(!validPhone(phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
-    try{localStorage.setItem('remont_bt_name',name);localStorage.setItem('remont_bt_phone',phone);localStorage.setItem('remont_bt_identity_saved','1');if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);}catch(_){}
-    const data={event:'register_client',name,phone,client_name:name,client_phone:phone,client_registration_id:getClientRegistrationId(phone),client_registration_no:getClientRegistrationNo(phone)};
-    // Open the client menu immediately; server synchronisation happens in the background.
-    try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
-    renderClientMenu();
+    const nameEl = document.getElementById('client_name');
+    const phoneEl = document.getElementById('client_phone');
+    const button = document.getElementById('registrationContinue');
+    const status = document.getElementById('registrationStatus');
+    const name = (nameEl ? nameEl.value : '').trim();
+    const phone = cleanPhone(phoneEl ? phoneEl.value : '');
+    if (name.length < 2) return showAlert('Введите ФИО не короче 2 символов.');
+    if (!validPhone(phone)) return showAlert('Введите корректный номер +998XXXXXXXXX.');
+
+    const data = {
+        name, phone,
+        client_registration_id: getClientRegistrationId(phone),
+        client_registration_no: getClientRegistrationNo(phone)
+    };
+    if (button) button.disabled = true;
+    if (status) { status.textContent = 'Сохраняем регистрацию на сервере…'; status.className = 'subtitle'; }
+
     try {
-      const registrationResult = await clientApi('/api/client/register','POST',{name,phone,client_registration_id:data.client_registration_id,client_registration_no:data.client_registration_no});
-      try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
-      showAlert(registrationResult.message || 'Регистрация сохранена на сервере.');
-    } catch(err) {
-      if(err.status && err.status !== 401 && err.status < 500){
-        try{localStorage.removeItem('remont_bt_registered');localStorage.removeItem('remont_bt_identity_saved');}catch(_){}
-        showAlert(err.message || 'Сервер отклонил регистрацию. Проверьте введённые данные.');
-        showRegistrationScreen();
-      } else if(typeof queueOperation==='function'){
-        queueOperation(data);
-        showAlert('Профиль открыт. Данные сохранены на устройстве и поставлены в очередь синхронизации.');
-      } else showAlert('Профиль открыт, но сервер недоступен и локальная очередь не загрузилась. Не закрывайте приложение до восстановления связи.');
+        // Registration is complete only after the server confirms a successful write.
+        const result = await clientApi('/api/client/register', 'POST', data);
+        localStorage.setItem('remont_bt_name', name);
+        localStorage.setItem('remont_bt_phone', phone);
+        localStorage.setItem('remont_bt_registered', '1');
+        localStorage.setItem('remont_bt_identity_saved', '1');
+        if (currentClientTelegramId) localStorage.setItem('remont_bt_profile_uid', currentClientTelegramId);
+        showAlert(result.message || 'Регистрация сохранена на сервере.');
+        renderClientMenu();
+    } catch (err) {
+        // Do not mark the client registered and do not silently put registration
+        // into an offline queue: the client must know the server did not confirm it.
+        if (button) button.disabled = false;
+        if (status) {
+            status.textContent = err.message || 'Не удалось сохранить регистрацию на сервере. Проверьте связь и повторите.';
+            status.className = 'error';
+        } else {
+            showAlert(err.message || 'Не удалось сохранить регистрацию на сервере. Проверьте связь и повторите.');
+        }
     }
 }
 
@@ -808,16 +824,29 @@ async function showCallMaster() {
 // ============ СТАРТ ============
 
 async function startRemontApp(){
-  const role=clientUrlParams.get('role')||'client';
-  if(role==='master_entry'){ showMasterChoice(); return; }
-  const localKnown=localStorage.getItem('remont_bt_identity_saved')==='1'||localStorage.getItem('remont_bt_registered')==='1';
-  if(localKnown||isKnownRegisteredClient){ renderClientMenu(); return; }
-  // Existing server-side client profiles should not be forced through registration again.
-  try{
-    const d=await clientApi('/api/client/profile');
-    const profile=d.profile||{};
-    if(profile.name&&profile.phone){localStorage.setItem('remont_bt_name',profile.name);localStorage.setItem('remont_bt_phone',profile.phone);localStorage.setItem('remont_bt_registered','1');localStorage.setItem('remont_bt_identity_saved','1');if(currentClientTelegramId)localStorage.setItem('remont_bt_profile_uid',currentClientTelegramId);renderClientMenu();return;}
-  }catch(_){}
+  const role = clientUrlParams.get('role') || 'client';
+  if (role === 'master_entry') { showMasterChoice(); return; }
+
+  // Local storage is only a cache and may be stale/shared on the device.
+  // Ask the server first; only a registered server profile may bypass registration.
+  try {
+    const d = await clientApi('/api/client/profile');
+    const profile = d.profile || {};
+    if (profile.name && profile.phone) {
+      try {
+        localStorage.setItem('remont_bt_name', profile.name);
+        localStorage.setItem('remont_bt_phone', profile.phone);
+        localStorage.setItem('remont_bt_registered', '1');
+        localStorage.setItem('remont_bt_identity_saved', '1');
+        if (currentClientTelegramId) localStorage.setItem('remont_bt_profile_uid', currentClientTelegramId);
+      } catch (_) {}
+      renderClientMenu();
+      return;
+    }
+  } catch (_) {
+    // A 403 means no server registration. Other errors also must not falsely
+    // open a registered menu; the form will report an error on submit if offline.
+  }
   showRegistrationScreen();
 }
 startRemontApp();
