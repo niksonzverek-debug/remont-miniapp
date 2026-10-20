@@ -48,11 +48,16 @@ function masterActSummary(number){
  const act=masterCache.acts.find(a=>String(a.number)===String(number));
  if(!act)return '<p class="subtitle">Сведения об акте можно посмотреть в разделе «Все акты».</p>';
  const works=Array.isArray(act.works)?act.works:[];
- const money=new Intl.NumberFormat('ru-RU').format(Number(act.final_price??act.price??0));
+ const fmt=n=>new Intl.NumberFormat('ru-RU').format(Number(n||0));
+ const money=fmt(act.final_price??act.price??0);
  return `<div class="bt-act-readable"><p><b>Клиент:</b> ${masterEsc(act.client_name||'—')}</p>
  <p><b>Телефон:</b> ${masterEsc(act.client_phone||'—')}</p><p><b>Техника:</b> ${masterEsc([act.device,act.brand,act.model].filter(Boolean).join(' '))}</p>
  <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${masterEsc(w)}</li>`).join('')||'<li>Не указаны</li>'}</ol>
- <p><b>Стоимость:</b> ${masterEsc(money)} сум</p><p><b>Гарантия:</b> ${masterEsc(act.guarantee_text||'—')}</p>
+ <p><b>Стоимость ремонта:</b> ${masterEsc(fmt(act.price))} сум</p>
+ ${Number(act.discount_amount||0)>0?`<p><b>Скидка:</b> −${masterEsc(fmt(act.discount_amount))} сум</p>`:''}
+ <p><b>Итого к оплате:</b> ${masterEsc(money)} сум</p>
+ ${act.amounts_need_review?'<p class="error">Внимание: сумма старого акта требует сверки администратором.</p>':''}
+ <p><b>Гарантия:</b> ${masterEsc(act.guarantee_text||'—')}</p>
  <p><b>Статус:</b> ${masterEsc(masterActStatus(act.status))}</p></div>`;
 }
 async function masterActPublicUrl(number,purpose='share-link'){
@@ -212,6 +217,7 @@ async function renderMasterMenu() {
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
   const s=masterCache.stats;
   masterShell('Панель мастера',`<div class="master-welcome card"><div><h2>Здравствуйте, ${masterEsc(masterCache.profile?.name || tg.initDataUnsafe?.user?.first_name || 'мастер')}!</h2><p class="subtitle">Ваш рабочий центр Remont BT</p></div><span class="status-pill">● Онлайн</span></div>
+  ${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
   <button class="bt-master-primary" onclick="showCreateAct()">▧ Создать акт</button>
   <div class="master-action-grid bt-master-feature-grid"><button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><span><b>Заявки</b><small>Все обращения</small></span></button><button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><span><b>Все акты</b><small>Документы</small></span></button><button class="menu-btn" onclick="showMasterMessages()"><span class="emoji">✉</span><span><b>Чаты</b><small>Сообщения клиентов</small></span></button><button class="menu-btn" onclick="showMasterClients()"><span class="emoji">♙</span><span><b>Клиенты</b><small>Контакты и история</small></span></button></div>
@@ -221,11 +227,11 @@ async function renderMasterMenu() {
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
- const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p><div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button></div></article>`).join('');
+ const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p>${o.status==='new'&&Date.now()-Date.parse(o.created_at||'')>2*3600*1000?'<p class="bt-overdue-note">⚠ Ожидает ответа более двух часов</p>':''}<div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button></div></article>`).join('');
  masterShell('Заявки',`<div class="section-heading"><p>Сначала показываются последние заявки. Действия доступны только по заявкам вашего кабинета.</p><select id="orderFilter" onchange="filterMasterOrders()"><option value="all">Все статусы</option><option value="new">Новые</option><option value="accepted">Принятые</option><option value="act_issued">Акт отправлен</option><option value="closed">Закрытые</option></select></div><div id="masterOrderList" class="stack-list">${rows||'<article class="card">Заявок пока нет.</article>'}</div>`);}
 function filterMasterOrders(){const f=document.getElementById('orderFilter')?.value||'all';document.querySelectorAll('#masterOrderList .order-card').forEach((el,i)=>{const o=masterCache.orders[i];el.style.display=f==='all'||o?.status===f?'':'none';});}
 async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/master/orders/${encodeURIComponent(id)}/decision`,'POST',{decision});masterToast(r.message);await showMasterOrders();}catch(e){masterToast(e.message,true);}}
-async function showMasterClients(){try{await loadMasterData();}catch(e){return masterShell('Клиенты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.clients.map(c=>`<article class="card"><div class="card-row"><b>${masterEsc(c.name||'Клиент')}</b><span class="status-pill">${c.registered?'Зарегистрирован':'Без регистрации'}</span></div><p>${masterEsc(c.phone||'Телефон не указан')}</p><p class="subtitle">${masterEsc(c.registration_no||'')}</p><div class="button-row"><button onclick="openMasterChat('${masterEsc(c.id)}')">💬 Написать</button>${c.phone?`<a class="secondary menu-btn" href="tel:${masterEsc(c.phone)}">📞 Позвонить</a>`:''}</div></article>`).join('');masterShell('Клиенты',`<input id="clientSearch" placeholder="Поиск по имени, телефону" oninput="filterMasterClients()"><div id="masterClientList" class="stack-list">${rows||'<article class="card">Клиентов пока нет.</article>'}</div>`);}
+async function showMasterClients(){try{await loadMasterData();}catch(e){return masterShell('Клиенты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.clients.map(c=>`<article class="card"><div class="card-row"><b>${masterEsc(c.name||'Клиент')}</b><span class="status-pill">${c.registered?'Зарегистрирован':'Без регистрации'}</span></div><p>${masterEsc(c.phone||'Телефон не указан')}</p><p class="subtitle">${masterEsc(c.public_name||c.registration_no||'')}</p><div class="button-row"><button onclick="openMasterChat('${masterEsc(c.id)}')">💬 Написать</button>${c.phone?`<a class="secondary menu-btn" href="tel:${masterEsc(c.phone)}">📞 Позвонить</a>`:''}</div></article>`).join('');masterShell('Клиенты',`<input id="clientSearch" placeholder="Поиск по имени, телефону" oninput="filterMasterClients()"><div id="masterClientList" class="stack-list">${rows||'<article class="card">Клиентов пока нет.</article>'}</div>`);}
 function filterMasterClients(){const q=(document.getElementById('clientSearch')?.value||'').toLowerCase();document.querySelectorAll('#masterClientList .card').forEach(el=>el.style.display=el.textContent.toLowerCase().includes(q)?'':'none');}
 async function showMasterMessages(){
     try{await loadMasterData();}catch(e){return masterShell('Чаты',`<article class="card error">${masterEsc(e.message)}</article>`)}
@@ -335,7 +341,7 @@ async function sendMasterReply(){
 async function showMasterActs(){
  try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
  clearMasterPdfUrl();
- const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>${masterEsc(fmtPrice(a.final_price??a.price??0))}</b> · гарантия: ${masterEsc(a.guarantee_text||'—')}</p><p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button></div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
+ const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button></div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
  masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);
 }
 async function showMasterCreateAct(orderId){try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
@@ -402,6 +408,42 @@ function masterSelectedWorks(){
 function toggleMasterCustomGuarantee(){
  const wrap=document.getElementById('actGuaranteeCustomWrap');if(wrap)wrap.style.display=document.getElementById('actGuarantee')?.value==='custom'?'block':'none';
 }
+function masterApplyWorkTemplate(template){
+    const options=[...document.querySelectorAll('input[name="actWork"]')];
+    if(!options.length)return;
+    for(const item of options){
+        item.checked=(template==='maintenance' ? /профилак/i.test(item.value) :
+                      template==='basic' ? /замена|диагностик|ремонт/i.test(item.value) && item===options.find(x=>/замена|диагностик|ремонт/i.test(x.value)) : false);
+    }
+    const status=document.getElementById('actTemplateStatus');
+    if(status)status.textContent=template==='maintenance'?'Выбрана профилактика. Проверьте список работ.':
+        template==='basic'?'Выбрана типовая работа. Дополните при необходимости.':'Выбор очищен.';
+}
+function masterPreviewDraftAct(){
+    try{
+        const works=masterSelectedWorks();
+        const device=document.getElementById('actDevice')?.value==='__other__'?document.getElementById('actDeviceCustom')?.value:document.getElementById('actDevice')?.value;
+        const brand=document.getElementById('actBrand')?.value==='__other__'?document.getElementById('actBrandCustom')?.value:document.getElementById('actBrand')?.value;
+        const priceRaw=String(document.getElementById('actPrice')?.value||'').replace(/\D/g,'');
+        const amount=Number(priceRaw);
+        if(!device||!brand||!Number.isSafeInteger(amount)||amount<=0)throw Error('Укажите технику, бренд и стоимость.');
+        const warranty=document.getElementById('actGuarantee')?.value==='custom'?(document.getElementById('actGuaranteeMonths')?.value+' мес.'):(masterGuarantees.find(x=>x.value===document.getElementById('actGuarantee')?.value)?.label||'—');
+        const container=document.getElementById('btMasterActDraftPreview');
+        if(!container)return;
+        container.hidden=false;
+        container.innerHTML=`<h3>Предварительный просмотр</h3><p>${masterEsc([device,brand,document.getElementById('actModel')?.value].filter(Boolean).join(' '))}</p>`+
+            `<p><b>Работы:</b> ${masterEsc(works.join(', '))}</p><p><b>Стоимость до скидки:</b> ${masterEsc(new Intl.NumberFormat('ru-RU').format(amount))} сум</p>`+
+            `<p><b>Гарантия:</b> ${masterEsc(warranty)}</p>`+
+            `<p class="subtitle">Это черновик. Промокод и окончательную сумму рассчитывает сервер после создания акта. PDF ещё не создан и клиенту не отправлен.</p>`;
+        container.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }catch(e){masterToast(e.message||'Не удалось показать черновик.',true);}
+}
+function btMasterOldOrders(){
+    const now=Date.now();
+    return (masterCache.orders||[]).filter(o=>o.status==='new').map(o=>({o,age:now-Date.parse(o.created_at||'')}))
+        .filter(x=>Number.isFinite(x.age)&&x.age>=2*3600*1000)
+        .sort((a,b)=>b.age-a.age).slice(0,5);
+}
 function renderMasterActForm(o=null){
  actGeoLocation=null;
  const manual=!o, id=o?String(o.id):'', safeId=id.replace(/'/g,"\\'");
@@ -416,12 +458,15 @@ function renderMasterActForm(o=null){
  <div id="actBrandCustomWrap" style="display:none"><label>Укажите бренд</label><input id="actBrandCustom" maxlength="120" value="${masterEsc(initialBrand==='__other__'?brand:'')}" placeholder="Введите бренд"></div>
  <label>Модель (если есть)</label><input id="actModel" maxlength="120" value="${masterEsc(o?.model||'')}" placeholder="Модель техники">
  <label>Выполненные работы <small class="subtitle">Можно выбрать несколько</small></label><div id="actWorksList" class="bt-master-works"></div>
+ <div class="bt-work-templates"><button type="button" class="secondary" onclick="masterApplyWorkTemplate('maintenance')">✧ Профилактика</button><button type="button" class="secondary" onclick="masterApplyWorkTemplate('basic')">⚙ Типовая работа</button><button type="button" class="secondary" onclick="masterApplyWorkTemplate('clear')">× Снять выбор</button></div><p id="actTemplateStatus" class="subtitle"></p>
  <div id="actWorksCustomWrap" style="display:none"><label>Свои работы (каждая с новой строки)</label><textarea id="actWorksCustom" maxlength="3000" rows="4" placeholder="Дополнительная работа 1&#10;Дополнительная работа 2"></textarea></div>
  <label>Стоимость, сум</label><input id="actPrice" inputmode="numeric" autocomplete="off" required placeholder="Например, 500 000" oninput="formatActPrice(this)">
  ${masterChoiceMarkup('actGuarantee','Гарантия',masterGuarantees,'30')}
  <div id="actGuaranteeCustomWrap" style="display:none"><label>Свой срок гарантии, месяцев</label><input id="actGuaranteeMonths" inputmode="numeric" type="number" min="1" max="120" step="1" placeholder="Например, 12"></div>
  <div class="bt-master-address-row"><div><label>Дом *</label><input id="actHouse" required maxlength="80" value="${masterEsc(o?.house||'')}" placeholder="15А"></div><div><label>Квартира</label><input id="actApartment" maxlength="80" value="${masterEsc(o?.apartment||'')}" placeholder="42"></div></div>
  <button type="button" class="secondary" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
+ <button type="button" class="secondary" onclick="masterPreviewDraftAct()">◫ Посмотреть черновик акта</button>
+ <div id="btMasterActDraftPreview" class="bt-act-draft-preview" hidden></div>
  <button id="actSubmit" type="submit">▣ Создать акт</button><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
  toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();
 }
@@ -562,5 +607,5 @@ async function saveMasterMarketingLink(){
  if(name.length<2){out.textContent='Введите название не короче двух символов.';return;}
  try{const saved=await masterApi('/api/master/settings','POST',{marketing_name:name}); const d=await masterApi('/api/master/marketing-link');
   if (String(d.master_id||'') !== String(masterCurrentUserId||'')) throw new Error('Ошибка: ссылка создана для другого мастера. Обновите кабинет.');
-  masterCache.profile.marketing_name=name; out.innerHTML=`<p><b>${masterEsc(name)}</b></p><input id="masterMarketingUrl" readonly value="${masterEsc(d.url)}"><button onclick="navigator.clipboard.writeText(document.getElementById('masterMarketingUrl').value).then(()=>masterToast('Ссылка скопирована')).catch(()=>document.getElementById('masterMarketingUrl').select())">Копировать ссылку</button><p class="subtitle">Отправьте эту ссылку клиентам. Переход закрепляется за вашим профилем мастера.</p>`;masterToast(saved.message||'Ссылка готова');}catch(e){out.textContent=e.message;}
+  masterCache.profile.marketing_name=name; out.innerHTML=`<p><b>${masterEsc(name)}</b> · ${masterEsc(d.public_name||'')}</p><input id="masterMarketingUrl" readonly value="${masterEsc(d.url)}"><button onclick="navigator.clipboard.writeText(document.getElementById('masterMarketingUrl').value).then(()=>masterToast('Ссылка скопирована')).catch(()=>document.getElementById('masterMarketingUrl').select())">Копировать ссылку</button><p class="subtitle">Отправьте эту ссылку клиентам. Переход закрепляется за вашим профилем мастера.</p>`;masterToast(saved.message||'Ссылка готова');}catch(e){out.textContent=e.message;}
 }

@@ -44,6 +44,18 @@ const isKnownRegisteredClient = hasJustRegisteredLocally || (!isNewClientFlow &&
 
 // ============ ГЛАВНОЕ МЕНЮ КЛИЕНТА ==========
 
+function btClientRecentOrder(d){
+    const orders=Array.isArray(d?.orders)?d.orders:[];
+    const panel=document.getElementById('btRecentOrder');if(!panel)return;
+    const recent=orders[0];if(!recent){panel.hidden=true;return;}
+    panel.hidden=false;
+    const status=String(recent.status||'').toLowerCase();
+    const step=['closed','completed'].includes(status)?4:status==='act_issued'?4:status==='in_progress'?3:status==='accepted'?2:1;
+    panel.querySelectorAll('.bt-circuit span').forEach((node,i)=>node.classList.toggle('bt-complete',i<step));
+    const statuses={new:'Новая',accepted:'Принята',in_progress:'В ремонте',act_issued:'Акт оформлен',closed:'Закрыта',completed:'Завершена',rejected:'Отклонена',cancelled:'Отменена'};
+    const label=document.getElementById('btOrderLabel');
+    if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника')+' · '+(statuses[recent.status]||recent.display_status||'Обрабатывается');
+}
 function renderClientMenu() {
     btStopOrderProgressRefresh();
     btStopChatRefresh();
@@ -60,6 +72,7 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><span>Промокоды</span></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><span>Профиль</span></button>
           </div>
+          <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
           <section class="bt-live-panel bt-home-chat" id="btHomeChat" aria-label="Чат с мастером">
             <div class="bt-section-title">✉ Живой чат <span class="bt-glow-dot">●</span></div>
             <div id="btChatHistory" class="bt-chat-history bt-home-chat-history" aria-live="polite"><p class="subtitle">Загружаем переписку…</p></div>
@@ -70,7 +83,6 @@ function renderClientMenu() {
               <p id="clientChatFileName" class="subtitle"></p><p id="messageStatus" class="subtitle" role="status"></p>
             </form>
           </section>
-          <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
           <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     clientApi('/api/advertiser/dashboard').then(d => {
@@ -81,13 +93,7 @@ function renderClientMenu() {
     }).catch(()=>{});
     clientApi('/api/client/dashboard').then(d => {
         const name=String(d.profile?.name||'').trim().replace(/\s+([.,!?])/g,'$1'); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
-        const orders=Array.isArray(d.orders)?d.orders:[]; if(!orders.length)return;
-        const recent=orders[0]; const panel=document.getElementById('btRecentOrder');if(!panel)return;
-        panel.hidden=false;
-        const status=String(recent.status||'').toLowerCase();
-        const step=/закры|заверш|готов|complete|closed|act_issued|акт/.test(status)?4:/ремонт|работ|progress/.test(status)?3:/принят|accepted|назначен/.test(status)?2:1;
-        panel.querySelectorAll('.bt-circuit span').forEach((node,i)=>node.classList.toggle('bt-complete',i<step));
-        const label=document.getElementById('btOrderLabel');if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника');
+        btClientRecentOrder(d);
     }).catch(()=>{});
     // Home chat is functional, not a separate navigation screen.
     btRefreshClientChat(true);
@@ -98,14 +104,7 @@ function renderClientMenu() {
     btHomeTimer=setInterval(()=>{
         if(!document.querySelector('.bt-client-home')){clearInterval(btHomeTimer);btHomeTimer=null;return;}
         clientApi('/api/client/dashboard').then(d=>{
-            const orders=Array.isArray(d.orders)?d.orders:[];
-            const recent=orders[0],panel=document.getElementById('btRecentOrder');
-            if(!recent||!panel)return;
-            panel.hidden=false;
-            const status=String(recent.status||'').toLowerCase();
-            const step=/closed|completed|act_issued|закры/.test(status)?4:/progress|ремонт/.test(status)?3:/accepted|принят/.test(status)?2:1;
-            panel.querySelectorAll('.bt-circuit span').forEach((node,i)=>node.classList.toggle('bt-complete',i<step));
-            const label=document.getElementById('btOrderLabel');if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника');
+            btClientRecentOrder(d);
         }).catch(()=>{});
     },20000);
 }
@@ -498,6 +497,7 @@ function btOrderCards(rows) {
             <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
             ${o.promocode?`<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>`:''}
             ${confirmationReady?`<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button>${deadline}`:''}
+            <button type="button" class="secondary" onclick="btRepeatOrder('${escapeClient(o.id)}')">↻ Повторить заявку</button>
         </article>`;
     }).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
 }
@@ -540,6 +540,14 @@ async function confirmClientActRequest(orderId) {
 
 let btClientActsCache=[];
 const btActMoney=value=>new Intl.NumberFormat('ru-RU').format(Number(value||0))+' сум';
+function btWarrantyIndicator(act){
+    const raw=String(act.guarantee_until||'');
+    const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw);
+    if(!m || Number(act.guarantee_days||0)===0)return '<p class="subtitle">Гарантия: согласно условиям акта.</p>';
+    const end=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),23,59,59);
+    const active=Number.isFinite(end.getTime())&&end>=new Date();
+    return `<p class="bt-warranty-note ${active?'bt-warranty-active':'bt-warranty-expired'}">${active?'✓ Гарантия действует':'Срок гарантии истёк'}</p>`;
+}
 async function showMyActs() {
     setPage('📄 Акты и документы', '<p class="subtitle">Загружаем документы…</p>');
     try {
@@ -549,8 +557,11 @@ async function showMyActs() {
         const content=btClientActsCache.length?btClientActsCache.map(a=>`<article class="card">
           <div class="card-row"><b>Акт № ${escapeClient(a.number||'—')}</b><span class="status-pill">${escapeClient(statuses[a.status]||a.status||'—')}</span></div>
           <p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p>
-          <p>Стоимость: <b>${escapeClient(btActMoney(a.final_price??a.price))}</b></p>
-          <p>Гарантия: ${escapeClient(a.guarantee_text||'—')}</p>
+          <p>Стоимость ремонта: ${escapeClient(btActMoney(a.price))}</p>
+          ${Number(a.discount_amount||0)>0?`<p>Скидка: −${escapeClient(btActMoney(a.discount_amount))}</p>`:''}
+          <p><b>Итого: ${escapeClient(btActMoney(a.final_price??a.price))}</b></p>
+          <p>Гарантия: ${escapeClient(a.guarantee_text||'—')} · до ${escapeClient(a.guarantee_until||'—')}</p>
+          ${btWarrantyIndicator(a)}
           <button type="button" onclick="showClientActPreview('${escapeClient(a.number)}')">📄 Посмотреть акт</button></article>`).join(''):'<div class="card">Актов пока нет.</div>';
         setPage('📄 Акты и документы',content);
     } catch(e){setPage('📄 Акты и документы',`<div class="card error">${escapeClient(e.message)}</div>`);}
@@ -562,7 +573,9 @@ function showClientActPreview(number){
     setPage('📄 Просмотр акта',`<article class="card bt-act-readable"><h2>Акт № ${escapeClient(act.number)}</h2>
       <p><b>Техника:</b> ${escapeClient([act.device,act.brand,act.model].filter(Boolean).join(' '))}</p>
       <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${escapeClient(w)}</li>`).join('')||'<li>Не указаны</li>'}</ol>
-      <p><b>Стоимость:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
+      <p><b>Стоимость ремонта:</b> ${escapeClient(btActMoney(act.price))}</p>
+      ${Number(act.discount_amount||0)>0?`<p><b>Скидка:</b> −${escapeClient(btActMoney(act.discount_amount))}</p>`:''}
+      <p><b>Итого к оплате:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
       <p><b>Гарантия:</b> ${escapeClient(act.guarantee_text||'—')} · до ${escapeClient(act.guarantee_until||'—')}</p>
       <p>Для просмотра оригинала нажмите «Открыть PDF».</p>
       <button type="button" onclick="openClientActPdf('${escapeClient(number)}')">📄 Открыть PDF</button>
@@ -622,7 +635,7 @@ async function showProfile() {
     setPage('👤 Профиль', '<p class="subtitle">Загружаем профиль…</p>');
     try {
         const d = await clientApi('/api/client/profile'); const p = d.profile || {};
-        setPage('👤 Профиль', `<form id="profileForm" class="card"><label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" inputmode="numeric" pattern="[0-9.]*" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
+        setPage('👤 Профиль', `<form id="profileForm" class="card">${p.public_name?`<p class="notice"><b>Ваш номер в Remont BT:</b> ${escapeClient(p.public_name)}</p>`:''}<label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" inputmode="numeric" pattern="[0-9.]*" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
         document.getElementById('profileForm').addEventListener('submit', saveClientProfile);
     } catch (e) {
         let p={}; try{p={name:localStorage.getItem('remont_bt_name')||'',phone:localStorage.getItem('remont_bt_phone')||''};}catch(_){}
@@ -699,10 +712,15 @@ async function btRefreshClientChat(silent=false){
         history.dataset.fingerprint=fingerprint;
         history.innerHTML=rows.length?rows.map(btChatBubble).join(''):'<p class="subtitle">Пока нет сообщений. Напишите мастеру прямо здесь.</p>';
         for(const slot of history.querySelectorAll('[data-media-id]'))btLoadChatMedia(slot,slot.dataset.mediaId,slot.dataset.mediaKind);
-        const anchor=document.createElement('a'); anchor.href=url; anchor.download=`Akt_${String(number).replace(/[^a-zA-Z0-9_-]/g,'_')}.pdf`;
-        document.body.appendChild(anchor); anchor.click(); anchor.remove();
-        setTimeout(()=>URL.revokeObjectURL(url),60000);
-    }catch(e){showAlert(e.message);}
+        // Polling обновляет только историю сообщений. PDF здесь не создаём и не скачиваем.
+    }catch(e){
+        if(!silent){
+            const history=document.getElementById('btChatHistory');
+            if(history)history.innerHTML=`<p class="subtitle">${escapeClient(e.message||'Чат временно недоступен')}</p>`;
+        }
+        const status=document.getElementById('messageStatus');
+        if(status && !silent)status.textContent=e.message||'Не удалось загрузить чат.';
+    }
 }
 async function showMessages(){
     btStopChatRefresh();
@@ -820,6 +838,64 @@ function showRegistrationScreen() {
     attachPhoneMask(phoneInput);
 }
 
+// Быстрые адреса принадлежат конкретному Telegram ID. GPS-позицию не сохраняем.
+function btClientAddressStorageKey(){
+    return currentClientTelegramId ? 'remont_bt_addresses_v1_'+currentClientTelegramId : '';
+}
+function btSavedAddresses(){
+    const key=btClientAddressStorageKey();if(!key)return {};
+    try{const data=JSON.parse(localStorage.getItem(key)||'{}');return data&&typeof data==='object'&&!Array.isArray(data)?data:{};}catch(_){return {};}
+}
+function btAddressOptions(){
+    const addresses=btSavedAddresses();
+    return Object.entries({home:'Дом',work:'Работа'}).filter(([key])=>addresses[key]?.house)
+        .map(([key,label])=>`<option value="${key}">${label} · ${escapeClient(addresses[key].house)}</option>`).join('');
+}
+function btUseSavedAddress(){
+    const choice=document.getElementById('btSavedAddressPicker')?.value;
+    const saved=btSavedAddresses()[choice];if(!saved)return;
+    document.getElementById('house').value=saved.house||'';
+    document.getElementById('apartment').value=saved.apartment||'';
+    const status=document.getElementById('location_status');
+    if(status)status.textContent='Адрес заполнен. Для отправки новой GPS-точки нажмите «Отправить мою локацию».';
+}
+function btSaveCurrentAddress(which){
+    const key=btClientAddressStorageKey();
+    if(!key)return showAlert('Откройте приложение через Telegram для сохранения адреса.');
+    const house=String(document.getElementById('house')?.value||'').trim();
+    const apartment=String(document.getElementById('apartment')?.value||'').trim();
+    if(!house)return showAlert('Сначала укажите дом.');
+    try{
+        const addresses=btSavedAddresses();addresses[which]={house,apartment};
+        localStorage.setItem(key,JSON.stringify(addresses));
+        const picker=document.getElementById('btSavedAddressPicker');
+        if(picker){picker.innerHTML='<option value="">— Выбрать адрес —</option>'+btAddressOptions();picker.value=which;}
+        const status=document.getElementById('btAddressSaveStatus');
+        if(status)status.textContent='Адрес сохранён на этом устройстве (без GPS).';
+    }catch(_){showAlert('Не удалось сохранить адрес на устройстве.');}
+}
+async function btRepeatOrder(orderId){
+    try{
+        const result=await clientApi('/api/client/dashboard');
+        const previous=(result.orders||[]).find(o=>String(o.id)===String(orderId));
+        if(!previous)throw new Error('Прошлая заявка не найдена.');
+        // Новый идентификатор операции: повторная заявка — самостоятельный заказ.
+        showNewOrder();
+        for(const [field,custom] of [['device','device_custom'],['brand','brand_custom']]){
+            const select=document.getElementById(field),value=String(previous[field]||'');
+            if(!select||!value)continue;
+            const existing=[...select.options].some(option=>option.value===value);
+            select.value=existing?value:'__other__';
+            if(field==='device')onDeviceChange();else onBrandChange();
+            if(!existing){const input=document.getElementById(custom);if(input)input.value=value;}
+        }
+        for(const name of ['problem','house','apartment']){
+            const input=document.getElementById(name);if(input)input.value=String(previous[name]||'');
+        }
+        // Дата и время намеренно новые, прежние промокод и GPS не копируются.
+        showAlert('Данные техники и адрес перенесены. Проверьте дату, время и при необходимости укажите локацию.');
+    }catch(e){showAlert(e.message||'Не удалось повторить заявку.');}
+}
 // ============ НОВАЯ ЗАЯВКА ============
 
 function showNewOrder() {
@@ -938,6 +1014,11 @@ function showNewOrder() {
 
         <div class="card">
             <div class="bt-client-address-row"><div><label for="house">Дом *</label><input id="house" maxlength="80" placeholder="15А" autocomplete="off"></div><div><label for="apartment">Квартира</label><input id="apartment" maxlength="80" placeholder="42" autocomplete="off"></div></div>
+            <div class="bt-saved-address-box"><label for="btSavedAddressPicker">Сохранённый адрес</label>
+                <select id="btSavedAddressPicker" class="bt-client-select" onchange="btUseSavedAddress()"><option value="">— Выбрать адрес —</option>${btAddressOptions()}</select>
+                <div class="bt-saved-address-actions"><button type="button" class="secondary" onclick="btSaveCurrentAddress('home')">⌂ Запомнить как дом</button><button type="button" class="secondary" onclick="btSaveCurrentAddress('work')">⌂ Запомнить как работу</button></div>
+                <p id="btAddressSaveStatus" class="subtitle" role="status">Адреса сохраняются только на этом устройстве.</p>
+            </div>
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
             </button>

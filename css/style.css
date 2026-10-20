@@ -747,3 +747,20 @@ body.bt-inner-page .card.error{border-color:#bd5870!important}
 
 .bt-home-chat-history{overscroll-behavior-y:auto!important;-webkit-overflow-scrolling:touch!important}
 body.bt-inner-page{overscroll-behavior-x:contain}
+
+/* 21.10.2026: Audit13 usability update. */
+.bt-saved-address-box{margin-top:14px;padding:14px;border:1px solid #28608e;border-radius:14px;background:linear-gradient(125deg,#0d2139,#0b1c32)}
+.bt-saved-address-box>label{display:block;margin-bottom:8px;color:#c9e6ff}
+.bt-saved-address-box .bt-client-select{width:100%;min-height:48px}
+.bt-saved-address-actions,.bt-work-templates{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+.bt-saved-address-actions button,.bt-work-templates button{min-height:44px;flex:1 1 145px;white-space:normal;padding:10px}
+.bt-act-draft-preview{margin:12px 0;padding:16px;border:1px solid #3a9eea;border-radius:15px;background:#0a233b;box-shadow:0 0 15px #1475d438}
+.bt-act-draft-preview[hidden]{display:none!important}
+.bt-overdue-orders{border:2px solid #f17b3a!important;box-shadow:0 0 17px #dd672d55}
+.bt-overdue-orders button{min-height:46px}
+.bt-overdue-note{color:#ffb58f;font-weight:700}
+.bt-warranty-active{color:#80e4ab;font-weight:700}.bt-warranty-expired{color:#fac3c3;font-weight:700}
+.bt-order-progress-card button.secondary{width:100%;margin-top:10px;min-height:44px}
+.bt-order-label{overflow-wrap:anywhere}
+@media(max-width:400px){.bt-saved-address-actions,.bt-work-templates{display:grid;grid-template-columns:minmax(0,1fr)}
+ .bt-client-home .bt-circuit{gap:2px}.bt-client-home .bt-circuit>span{min-width:0;font-size:12px}}
