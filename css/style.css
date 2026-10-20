@@ -480,3 +480,45 @@ label,.subtitle,.muted,.hint,small{color:var(--rb-muted)}
 .master-auth-card input{width:100%;box-sizing:border-box;margin:0 0 7px}
 .master-auth-card button{width:100%;margin-top:6px;white-space:normal;line-height:1.35;min-height:48px}
 .master-auth-card p{line-height:1.5;overflow-wrap:anywhere}
+
+
+/* REMONT BT — ELECTRIC STEEL BLUE · visual-only theme · 2026-10-20 */
+:root {
+  --bg:#050b16;--text:#eef7ff;--hint:#98afce;--link:#62d5ff;
+  --button:#168bff;--button_text:#fff;--secondary_bg:#0d2037;
+  --card_bg:#0b192d;--navy:#f1f8ff;--line:#24517f;
+  --bt-electric:#00d8ff;--bt-glow:rgba(22,139,255,.34);
+}
+html{background:#050b16}
+body{background:radial-gradient(ellipse at 50% -12%,#123d74 0,transparent 48%),linear-gradient(180deg,#08172b,#050b16 75%);background-attachment:fixed;color:var(--text)}
+h1,h2,h3{color:#f1f8ff;text-shadow:0 0 18px rgba(22,139,255,.18)}
+.card,.menu-btn,.panel,.section,.stat-card,.info-card,.promo-card,.request-card,.act-card,
+[class*="-card"], [class*="_card"] {
+  border-color:#275b90!important;
+  background:linear-gradient(145deg,#10243e,#081527)!important;
+  box-shadow:0 8px 25px rgba(0,0,0,.25),0 0 15px rgba(22,139,255,.16),inset 0 0 13px rgba(22,139,255,.06);
+  transition:border-color .2s ease,box-shadow .25s ease,transform .2s ease;
+}
+.card:hover,.menu-btn:hover,.promo-card:hover,.request-card:hover,.act-card:hover {
+  border-color:#48baff!important;
+  box-shadow:0 8px 25px rgba(0,0,0,.3),0 0 19px rgba(22,139,255,.3),inset 0 0 13px rgba(22,139,255,.08);
+}
+button,.menu-btn,[role="button"]{transition:transform .16s ease,box-shadow .22s ease,border-color .22s ease;touch-action:manipulation}
+button:active,.menu-btn:active,[role="button"]:active{transform:scale(.985)}
+button:not(:disabled):focus-visible,.menu-btn:focus-visible,a:focus-visible{outline:2px solid #6de7ff;outline-offset:3px}
+button:not(:disabled):hover,.menu-btn:hover{box-shadow:0 0 18px rgba(22,139,255,.34)}
+#submit,.primary-btn,button.primary,.btn-primary,[type="submit"]:not(.secondary){
+  background:linear-gradient(115deg,#064da9,#168bff 53%,#0963c6)!important;
+  color:#fff!important;border:1px solid #4dbdff!important;
+  box-shadow:0 0 19px rgba(22,139,255,.45),inset 0 1px rgba(220,248,255,.36)!important;
+}
+input,select,textarea{background:#081527;color:#edf8ff;border-color:#315982}
+input:focus,select:focus,textarea:focus{border-color:#47caff;box-shadow:0 0 0 2px rgba(22,139,255,.2),0 0 14px rgba(0,200,255,.2)}
+/* Animated current stays on prominent menu surfaces; no extra DOM or event listeners. */
+.menu-btn{position:relative;overflow:hidden;isolation:isolate}
+.menu-btn::before{content:"";position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+ background:linear-gradient(115deg,transparent 34%,rgba(110,231,255,.02) 43%,rgba(110,231,255,.22) 50%,transparent 58%);
+ transform:translateX(-160%);animation:btElectricSweep 5.8s ease-in-out infinite;z-index:1}
+@keyframes btElectricSweep{0%,67%{transform:translateX(-160%)}92%,100%{transform:translateX(160%)}}
+@media(prefers-reduced-motion:reduce){.menu-btn::before{animation:none}*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+@media(max-width:480px){body{padding-left:13px;padding-right:13px}.card{border-radius:16px}}

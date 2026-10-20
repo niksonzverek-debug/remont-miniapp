@@ -53,6 +53,17 @@ function renderClientMenu() {
         </div>
         <p class="subtitle">Статусы и история обновляются в приложении. В Telegram приходят только важные уведомления.</p>
     `;
+    clientApi('/api/advertiser/dashboard').then(d => {
+        if (!d || !d.advertiser || document.getElementById('clientAdvertiserBtn')) return;
+        const grid = document.querySelector('.client-home-grid');
+        if (!grid) return;
+        const btn = document.createElement('button');
+        btn.id = 'clientAdvertiserBtn';
+        btn.className = 'menu-btn';
+        btn.innerHTML = '<span class="emoji">📣</span> Я рекламодатель';
+        btn.onclick = () => { window.location.href = 'advertiser.html'; };
+        grid.appendChild(btn);
+    }).catch(() => {});
     // Use the authoritative profile name from the database, not Telegram's optional first_name.
     clientApi('/api/client/profile').then(d => {
         const name = String(d.profile?.name || '').trim();
