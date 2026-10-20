@@ -91,7 +91,7 @@ function showExistingMasterHelp(message='') {
       if(!validPhone(phone)){status.textContent='Введите корректный номер +998XXXXXXXXX.';status.className='error';return;}
       const initData=String(window.Telegram?.WebApp?.initData || '');
       const query=new URLSearchParams(location.search);
-      const sessionUid=query.get('session_uid')||query.get('master_uid')||'';const sessionExp=query.get('session_exp')||query.get('master_exp')||'';const sessionSig=query.get('session_sig')||query.get('master_sig')||'';
+      const sessionUid=query.get('session_uid')||'';const sessionExp=query.get('session_exp')||'';const sessionSig=query.get('session_sig')||'';
       const signedSession=sessionUid&&sessionExp&&sessionSig?`${sessionUid}:${sessionExp}:${sessionSig}`:String(localStorage.getItem('remontBT.master.session.v1')||'');
       if(!initData&&!signedSession){status.textContent='Откройте приложение кнопкой из чата с ботом Telegram. Обычная HTTPS-ссылка не подтверждает ваш Telegram ID.';status.className='error';return;}
       const apiBase=String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/,'');
@@ -104,18 +104,7 @@ function showExistingMasterHelp(message='') {
         if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
         localStorage.setItem('remontBT.master.session.v1',data.session);
         localStorage.setItem('remont_bt_phone',phone);
-        const target=new URL('index.html',location.href);
-        target.searchParams.set('role','master');
-        target.searchParams.set('appv','20261019-masterflow4');
-        // Keep the signed session in the redirect URL. index.html needs it to
-        // select the master app when Telegram's initData is empty; master.js
-        // also retains the same verified session in localStorage for API calls.
-        const sessionParts=String(data.session).split(':');
-        if(sessionParts.length===3 && /^\d+$/.test(sessionParts[0]) && /^\d+$/.test(sessionParts[1]) && /^[a-f0-9]{64}$/i.test(sessionParts[2])){
-          target.searchParams.set('master_uid',sessionParts[0]);
-          target.searchParams.set('master_exp',sessionParts[1]);
-          target.searchParams.set('master_sig',sessionParts[2]);
-        }
+        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261019-masterpinfl1');
         status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
         location.href=target.href;
       }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
@@ -164,15 +153,12 @@ async function submitMasterApplication(form){
       if(result.already_master) showExistingMasterHelp('Кабинет мастера уже зарегистрирован. Подтвердите телефон для входа.');
       else if(button){button.textContent='✓ Заявка отправлена';}
     } catch(err) {
-      if(err.status === 401){
-        if(status){status.textContent='Telegram не подтвердил ваш аккаунт. Закройте Mini App и откройте его заново кнопкой из чата с ботом. Заявка не отправлена и не помещена в очередь.';status.className='error';}
-        if(button){button.textContent='Повторить после повторного открытия';button.disabled=false;}
-      } else if(err.status && err.status < 500){
+      if(err.status && err.status !== 401 && err.status < 500){
         if(status){status.textContent=err.message||'Сервер отклонил заявку. Проверьте данные.';status.className='error';}
         if(button){button.textContent='Исправить данные и повторить';button.disabled=false;}
       } else if(typeof queueOperation==='function'){
         queueOperation(data);
-        if(status){status.textContent='Сервер временно недоступен. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
+        if(status){status.textContent='Сервер сейчас недоступен или не подтвердил Telegram. Заявка сохранена в очереди на этом устройстве и отправится после восстановления связи.';status.className='notice';}
         if(button){button.textContent='📦 Заявка сохранена в очереди';button.disabled=false;}
       } else {if(status){status.textContent='Не удалось отправить заявку. Проверьте связь и повторите.';status.className='error';} if(button)button.disabled=false;}
     }
@@ -183,11 +169,9 @@ async function clientApi(path, method='GET', body=null) {
     try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
     const initData = String(window.Telegram?.WebApp?.initData || '');
     const query = new URLSearchParams(window.location.search);
-    // The /start application buttons use session_*; the dedicated master button
-    // uses master_* for the same signed session format.
-    const sessionUid = query.get('session_uid') || query.get('master_uid') || '';
-    const sessionExp = query.get('session_exp') || query.get('master_exp') || '';
-    const sessionSig = query.get('session_sig') || query.get('master_sig') || '';
+    const sessionUid = query.get('session_uid') || '';
+    const sessionExp = query.get('session_exp') || '';
+    const sessionSig = query.get('session_sig') || '';
     const signedSession = sessionUid && sessionExp && sessionSig ? `${sessionUid}:${sessionExp}:${sessionSig}` : '';
     if (!initData && !signedSession) throw new Error('Telegram не передал данные авторизации. Нажмите /start в чате с ботом, чтобы обновить кнопку приложения.');
     const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/, '');
@@ -606,9 +590,9 @@ async function submitRegistration() {
     try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
     renderClientMenu();
     try {
-      await clientApi('/api/client/register','POST',{name,phone,client_registration_id:data.client_registration_id,client_registration_no:data.client_registration_no});
+      const registrationResult = await clientApi('/api/client/register','POST',{name,phone,client_registration_id:data.client_registration_id,client_registration_no:data.client_registration_no});
       try{localStorage.setItem('remont_bt_registered','1');}catch(_){}
-      showAlert('Регистрация сохранена на сервере.');
+      showAlert(registrationResult.message || 'Регистрация сохранена на сервере.');
     } catch(err) {
       if(err.status && err.status !== 401 && err.status < 500){
         try{localStorage.removeItem('remont_bt_registered');localStorage.removeItem('remont_bt_identity_saved');}catch(_){}
