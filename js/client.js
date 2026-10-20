@@ -104,7 +104,7 @@ function showExistingMasterHelp(message='') {
         if(!data.session || !data.user_id)throw new Error('Сервер не подтвердил кабинет мастера.');
         localStorage.setItem('remontBT.master.session.v1',data.session);
         localStorage.setItem('remont_bt_phone',phone);
-        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261020-master-date-pinfl-fix3');
+        const target=new URL('index.html',location.href);target.searchParams.set('role','master');target.searchParams.set('appv','20261020-master-date-strict4');
         status.textContent='Доступ подтверждён. Открываем кабинет…';status.className='notice';
         location.href=target.href;
       }catch(err){status.textContent=err.message || 'Не удалось проверить доступ.';status.className='error';button.disabled=false;}
@@ -118,23 +118,14 @@ function normalizeMasterBirthDate(value) {
     const raw = String(value || '').trim();
     if (!raw) return '';
     let day, month, year;
-    let m = raw.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})$/);
-    if (m) { year = Number(m[1]); month = Number(m[2]); day = Number(m[3]); }
-    else {
-        m = raw.match(/^(\d{1,2})\D+(\d{1,2})\D+(\d{2}|\d{4})$/);
-        if (m) {
-            day = Number(m[1]); month = Number(m[2]); year = Number(m[3]);
-            if (year < 100) year += year < 30 ? 2000 : 1900;
-        } else {
-            const digits = raw.replace(/\D/g, '');
-            if (digits.length === 8) {
-                if (Number(digits.slice(0,4)) >= 1900 && Number(digits.slice(0,4)) <= 2099) {
-                    year=Number(digits.slice(0,4)); month=Number(digits.slice(4,6)); day=Number(digits.slice(6,8));
-                } else { day=Number(digits.slice(0,2)); month=Number(digits.slice(2,4)); year=Number(digits.slice(4,8)); }
-            } else if (digits.length === 6) {
-                day=Number(digits.slice(0,2)); month=Number(digits.slice(2,4)); year=Number(digits.slice(4,6)); year += year < 30 ? 2000 : 1900;
-            } else return '';
-        }
+    let m = raw.match(/^(\d{2})(\d{2})(\d{4})$/);
+    if (m) {
+        day = Number(m[1]); month = Number(m[2]); year = Number(m[3]);
+    } else {
+        // Разрешены только ДД,ММ,ГГГГ / ДД.ММ.ГГГГ / ДД/ММ/ГГГГ / ДД\\ММ\\ГГГГ.
+        m = raw.match(/^(\d{2})([.,/\\])(\d{2})\2(\d{4})$/);
+        if (!m) return '';
+        day = Number(m[1]); month = Number(m[3]); year = Number(m[4]);
     }
     const date = new Date(year, month - 1, day);
     if (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear() ||
@@ -284,7 +275,7 @@ function showMasterApplicationForm() {
         <label for="masterApplicationName">ФИО *</label><input id="masterApplicationName" name="name" required minlength="2" maxlength="150" autocomplete="name" value="${escapeClient(saved.name || localStorage.getItem('remont_bt_name') || '')}">
         <label for="masterApplicationPhone">Телефон *</label><input id="masterApplicationPhone" name="phone" required type="tel" inputmode="tel" autocomplete="tel" placeholder="+998 90 123 45 67" value="${escapeClient(saved.phone || localStorage.getItem('remont_bt_phone') || '')}">
         <label for="masterApplicationGender">Пол *</label><select id="masterApplicationGender" name="gender" required><option value="">Выберите пол</option><option value="Мужской" ${saved.gender==='Мужской'?'selected':''}>Мужской</option><option value="Женский" ${saved.gender==='Женский'?'selected':''}>Женский</option></select>
-        <label for="masterApplicationBirthDate">Дата рождения *</label><input id="masterApplicationBirthDate" name="birth_date" required inputmode="text" autocomplete="bday" placeholder="ДДММГГГГ, ДД.ММ.ГГГГ или ГГГГ-ММ-ДД" value="${escapeClient(saved.birth_date || '')}">
+        <label for="masterApplicationBirthDate">Дата рождения *</label><input id="masterApplicationBirthDate" name="birth_date" required inputmode="text" autocomplete="bday" placeholder="ДДММГГГГ или ДД.ММ.ГГГГ" value="${escapeClient(saved.birth_date || '')}">
         <label for="masterApplicationPinfl">ПИНФЛ (14 цифр) *</label><input id="masterApplicationPinfl" name="pinfl" required inputmode="numeric" autocomplete="off" minlength="14" maxlength="14" pattern="[0-9]{14}" placeholder="14 цифр" value="${escapeClient(saved.pinfl || '')}">
         <button type="submit">Проверить данные и отправить заявку</button><p id="masterApplicationStatus" class="subtitle" role="status"></p>
       </form>`);
@@ -319,7 +310,7 @@ async function submitMasterApplication(form){
     if(data.name.length<2)return showAlert('Введите ФИО.');
     if(!validPhone(data.phone))return showAlert('Введите корректный номер +998XXXXXXXXX.');
     if(!['Мужской','Женский'].includes(data.gender))return showAlert('Выберите пол.');
-    if(!data.birth_date)return showAlert('Не удалось распознать дату. Введите, например, 01021990, 01/02/1990, 1-2-1990 или 1990-02-01.');
+    if(!data.birth_date)return showAlert('Не удалось распознать дату. Используйте только ДДММГГГГ, ДД,ММ,ГГГГ, ДД.ММ.ГГГГ, ДД/ММ/ГГГГ или ДД\\ММ\\ГГГГ.');
     const [birthDay,birthMonth,birthYear]=data.birth_date.split('.').map(Number);
     if(!/^\d{14}$/.test(data.pinfl))return showAlert('ПИНФЛ должен содержать ровно 14 цифр.');
     const first=Number(data.pinfl[0]); const map={3:['Мужской',1900],4:['Женский',1900],5:['Мужской',2000],6:['Женский',2000]}; const pin=map[first];
