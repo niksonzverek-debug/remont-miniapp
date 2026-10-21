@@ -9,12 +9,19 @@ function masterAuthHeaders() {
   const initData = String((tg && tg.initData) || '').trim();
   if (initData) headers['X-Telegram-Init-Data'] = initData;
   const savedSession = String(localStorage.getItem('remontBT.master.session.v1') || '');
+  const launch = new URLSearchParams(location.search);
+  const launchUid = launch.get('master_uid') || '';
+  const launchExp = launch.get('master_exp') || '';
+  const launchSig = launch.get('master_sig') || '';
+  const launchSession = /^\d{1,20}$/.test(launchUid) && /^\d{1,20}$/.test(launchExp) && /^[a-f0-9]{64}$/i.test(launchSig)
+    ? `${launchUid}:${launchExp}:${launchSig}` : '';
   const telegramId = String(tg?.initDataUnsafe?.user?.id || '');
   const savedId = savedSession.split(':')[0];
   if (initData && telegramId && savedSession && savedId !== telegramId) {
     localStorage.removeItem('remontBT.master.session.v1');
   } else if (savedSession) headers['X-Remont-Session'] = savedSession;
-  if (!initData && !savedSession) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
+  if (launchSession) headers['X-Remont-Session'] = launchSession;
+  if (!initData && !headers['X-Remont-Session']) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
   return headers;
 }
 function masterApi(path, method='GET', payload=null) {
@@ -183,7 +190,9 @@ async function submitMasterLogin() {
 
 async function bootMasterApp() {
   const saved=String(localStorage.getItem('remontBT.master.session.v1')||'');
-  if(!String(tg?.initData||'')&&!saved) return showMasterLogin();
+  const qp=new URLSearchParams(location.search);
+  const hasLaunchSession=/^\d{1,20}$/.test(qp.get('master_uid')||'') && /^\d{1,20}$/.test(qp.get('master_exp')||'') && /^[a-f0-9]{64}$/i.test(qp.get('master_sig')||'');
+  if(!String(tg?.initData||'')&&!saved&&!hasLaunchSession) return showMasterLogin();
   try { await loadMasterData(); await renderMasterMenu(); }
   catch(e) {
     if(saved && !String(tg?.initData||'')) localStorage.removeItem('remontBT.master.session.v1');

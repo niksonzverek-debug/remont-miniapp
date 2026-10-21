@@ -61,7 +61,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     }
     // Existing applications are loaded only after server-side role discovery.
     const script=document.createElement('script');
-    script.src=role==='master'?'js/master.js?v=20261021-fullscreen-v1':'js/client.js?v=20261021-fullscreen-v1';
+    script.src=role==='master'?'js/master.js?v=20261021-master-authfix1':'js/client.js?v=20261021-fullscreen-v1';
     script.onerror=()=>show('Не удалось открыть кабинет','Не удалось загрузить файлы приложения. Проверьте публикацию GitHub Pages.',[{text:'Повторить',run:()=>location.reload()}]);
     // Remove the loader so existing client/master scripts own the body.
     area.remove(); document.body.appendChild(script);
@@ -75,7 +75,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     return;
   }
   const headers={'X-Telegram-Init-Data':String(tg.initData||'')};
-  const signedUid=params.get('session_uid'),signedExp=params.get('session_exp'),signedSig=params.get('session_sig');
+  const signedUid=params.get('session_uid')||params.get('master_uid'),signedExp=params.get('session_exp')||params.get('master_exp'),signedSig=params.get('session_sig')||params.get('master_sig');
   if (/^\d{1,20}$/.test(signedUid||'') && /^\d{1,20}$/.test(signedExp||'') && /^[0-9a-f]{64}$/i.test(signedSig||''))
     headers['X-Remont-Session']=signedUid+':'+signedExp+':'+signedSig;
   if(!headers['X-Remont-Session']) {
