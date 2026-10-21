@@ -103,7 +103,7 @@ function renderClientMenu() {
     document.body.classList.remove('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <main class="bt-client-home">
-          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header>
+          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header>
           <button class="bt-client-promo-banner" type="button" onclick="showEnterPromo()"><span>🎁</span><span><b>У вас есть промокод?</b><small>Получите скидку на ремонт</small></span><span aria-hidden="true">›</span></button>
           <div class="client-home-grid bt-home-tiles">
             <button class="menu-btn" onclick="showNewOrder()"><span class="emoji bt-line-icon">⊕</span><b>Создать заявку</b><small>Новый ремонт</small></button>
@@ -163,7 +163,7 @@ function showClientFAQ(){
       ['Как применить промокод?','Перейдите в «Промокоды» и введите код. Условия скидки зависят от промокода.'],
       ['Можно ли повторить прошлую заявку?','Откройте прошлую заявку и выберите повторное обращение. Проверьте данные перед отправкой.']
     ];
-    setPage('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Частые вопросы о пользовании Remont BT.</p>${items.map(([q,a])=>`<details><summary>${escapeClient(q)}</summary><p>${escapeClient(a)}</p></details>`).join('')}<button type="button" onclick="renderClientMenu()">← Главная</button></article>`);
+    setPage('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Частые вопросы о пользовании ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${escapeClient(q)}</summary><p>${escapeClient(a)}</p></details>`).join('')}<button type="button" onclick="renderClientMenu()">← Главная</button></article>`);
 }
 function btFocusHomeChat(){
     const chat=document.getElementById('btHomeChat');
@@ -679,7 +679,7 @@ async function btCopyReferralLink() {
 }
 function btShareReferralLink(){
     const link=document.getElementById('btReferralLink')?.value||''; if(!link)return;
-    const share='https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('Приглашаю в Remont BT!');
+    const share='https://t.me/share/url?url='+encodeURIComponent(link)+'&text='+encodeURIComponent('Приглашаю в ТехСервис!');
     if(tg?.openTelegramLink)tg.openTelegramLink(share);else window.open(share,'_blank','noopener');
 }
 async function submitPromoFromApp() {
@@ -694,7 +694,7 @@ async function showProfile() {
     setPage('👤 Профиль', '<p class="subtitle">Загружаем профиль…</p>');
     try {
         const d = await clientApi('/api/client/profile'); const p = d.profile || {};
-        setPage('👤 Профиль', `<form id="profileForm" class="card">${p.public_name?`<p class="notice"><b>Ваш номер в Remont BT:</b> ${escapeClient(p.public_name)}</p>`:''}<label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" inputmode="numeric" pattern="[0-9.]*" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><button type="button" class="secondary" onclick="showClientFAQ()">♧ F.A.Q. — Помощь</button><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
+        setPage('👤 Профиль', `<form id="profileForm" class="card">${p.public_name?`<p class="notice"><b>Ваш номер в ТехСервис:</b> ${escapeClient(p.public_name)}</p>`:''}<label>ФИО</label><input name="name" required minlength="2" value="${escapeClient(p.name || '')}"><label>Телефон</label><input name="phone" type="tel" required value="${escapeClient(p.phone || '')}"><label>Пол</label><select name="gender"><option value="">Не указан</option><option ${p.gender==='Мужской'?'selected':''}>Мужской</option><option ${p.gender==='Женский'?'selected':''}>Женский</option></select><label>Дата рождения (ДД.ММ.ГГГГ)</label><input name="birth_date" inputmode="numeric" pattern="[0-9.]*" placeholder="25.04.1995" value="${escapeClient(p.birth_date || '')}"><label>ПИНФЛ (14 цифр)</label><input name="pinfl" inputmode="numeric" maxlength="14" value="${escapeClient(p.pinfl || '')}"><button type="submit">Сохранить профиль</button><p id="profileStatus" class="subtitle"></p></form><button type="button" class="secondary" onclick="showClientFAQ()">♧ F.A.Q. — Помощь</button><p class="subtitle">При активной рассрочке изменение профиля блокируется до полного погашения.</p>`);
         document.getElementById('profileForm').addEventListener('submit', saveClientProfile);
     } catch (e) {
         let p={}; try{p={name:localStorage.getItem('remont_bt_name')||'',phone:localStorage.getItem('remont_bt_phone')||''};}catch(_){}

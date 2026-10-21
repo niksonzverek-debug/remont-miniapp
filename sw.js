@@ -1,4 +1,4 @@
-/* Remont BT Service Worker — 20261021-compact-i18n-v1
+/* ТехСервис Service Worker — 20261021-compact-i18n-v1
  * Network-first for navigation and static assets; cache is only an offline fallback.
  * Only this app's own caches are cleaned. API and user-specific requests are never cached.
  */
@@ -34,7 +34,7 @@ self.addEventListener('install', event => {
         }
       } catch (error) {
         // Keep installation possible during temporary CDN/network failures.
-        console.warn('[Remont BT SW] Precache skipped:', path, error);
+        console.warn('[ТехСервис SW] Precache skipped:', path, error);
       }
     }));
     await self.skipWaiting();

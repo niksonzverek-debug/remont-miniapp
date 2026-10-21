@@ -1,6 +1,6 @@
 {
-  "name": "Remont BT — заявки и акты",
-  "short_name": "Remont BT",
+  "name": "ТехСервис — заявки и акты",
+  "short_name": "ТехСервис",
   "start_url": "./index.html?launch=main",
   "scope": "./",
   "display": "standalone",

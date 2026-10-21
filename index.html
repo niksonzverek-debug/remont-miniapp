@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>Remont BT — Открыть кабинет</title>
+<title>ТехСервис — Открыть кабинет</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="css/style.css?v=20261021-fullscreen-v1">
 <link rel="manifest" href="manifest.webmanifest">
@@ -22,7 +22,7 @@
 </style>
 </head>
 <body>
-<main id="btEntry" class="bt-entry"><section class="bt-entry-card" role="status"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="Remont BT"><h1>Открываем Remont BT</h1><p>Проверяем Telegram и ваш кабинет…</p></section></main>
+<main id="btEntry" class="bt-entry"><section class="bt-entry-card" role="status"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="ТехСервис"><h1>Открываем ТехСервис</h1><p>Проверяем Telegram и ваш кабинет…</p></section></main>
 <script>
 // launch=keyboard is used by existing bot keyboard links. BotFather's Main
 // Mini App launches the same index without role or signed URL parameters.
@@ -41,7 +41,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
   try { tg.ready(); tg.expand(); } catch (_) {}
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const show = (heading, text, buttons = []) => {
-    area.innerHTML = '<section class="bt-entry-card"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="Remont BT">'
+    area.innerHTML = '<section class="bt-entry-card"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="ТехСервис">'
       +'<h1>'+esc(heading)+'</h1><p>'+esc(text)+'</p><div class="bt-entry-actions" id="btEntryActions"></div></section>';
     const actions = document.getElementById('btEntryActions');
     for (const b of buttons) {

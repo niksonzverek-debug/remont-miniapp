@@ -1,4 +1,4 @@
-/* Remont BT — мастерский WebApp. Act button click fix 20261020. */
+/* ТехСервис — мастерский WebApp. Act button click fix 20261020. */
 const masterApiBase = window.REMONT_ADVERTISER_API_BASE || 'http://127.0.0.1:8767';
 let masterCache = {orders:[], clients:[], messages:[], acts:[], promos:[], stats:{}};
 let activeChatClientId = null;
@@ -97,7 +97,7 @@ async function copyMasterActLink(number){
 async function shareMasterAct(number){
  try{
   const url=await masterActPublicUrl(number);
-  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(`Акт выполненных работ № ${number} — Remont BT. Ссылка действительна 24 часа.`);
+  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(`Акт выполненных работ № ${number} — ТехСервис. Ссылка действительна 24 часа.`);
   const app=window.Telegram?.WebApp;
   if(app&&typeof app.openTelegramLink==='function')app.openTelegramLink(shareUrl);
   else window.open(shareUrl,'_blank','noopener,noreferrer');
@@ -149,7 +149,7 @@ function masterShell(title, body) {
   const name=String(masterCache.profile?.name||tg.initDataUnsafe?.user?.first_name||'Мастер').trim().replace(/\s+([.,!?])/g,'$1');
   const home=title==='Панель мастера';
   document.body.innerHTML = `<main class="master-app"><header class="portal-head bt-compact-header bt-master-header">
-     <img class="bt-header-logo" src="img/remont-bt-icon.png" alt="Remont BT">
+     <img class="bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис">
      <div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name">${masterEsc(name)}</strong></div>
      <span class="bt-header-role">🧰 <span>Мастер</span></span>
    </header><section id="masterContent">${home?'':`<h1 class="bt-screen-heading">${masterEsc(title)}</h1>`}${body}</section>
@@ -297,7 +297,7 @@ function showMasterFAQ(){
    ['Как исправить акт?','Откройте нужный акт, выберите «Заявка на исправление» и отправьте описание администратору.'],
    ['Где моя рекламная ссылка?','Откройте «Профиль» → «Рекламная ссылка». Там можно скопировать персональную ссылку мастера.']
   ];
-  masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в Remont BT.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
+  masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
@@ -633,7 +633,7 @@ async function showMasterPayout(code){
   <p><b>Рекламодатель:</b> ${masterEsc(promo.partner_name||'—')}</p>
   <p><b>Карта:</b> ${promo.card_last4?'•••• '+masterEsc(promo.card_last4):'Уточните реквизиты'}</p>
   <p><b>Задолженность:</b> ${new Intl.NumberFormat('ru-RU').format(balance)} сум</p>
-  <p class="subtitle">Переведите деньги рекламодателю через свой банк. Remont BT не списывает деньги с карты.
+  <p class="subtitle">Переведите деньги рекламодателю через свой банк. ТехСервис не списывает деньги с карты.
   После перевода укажите сумму и прикрепите скриншот/фото чека.</p>
   <form class="bt-payout-row" onsubmit="event.preventDefault();submitMasterPayout('${masterEsc(code)}')">
    <label>Сумма перевода, сум</label><input id="btPayoutAmount" required inputmode="numeric" pattern="[0-9 ]*" value="${balance}" data-max="${balance}">
@@ -729,7 +729,7 @@ async function saveMasterSettings(){
   }catch(e){st.textContent=e.message;st.className='error'}finally{btn.disabled=false}
 }
 function showMasterSupport(){
-  masterShell('Написать в поддержку',`<article class="card"><h2>💬 Поддержка Remont BT</h2><p class="subtitle">Опишите вопрос или проблему. Сообщение сохранится на сервере и будет передано администратору.</p>
+  masterShell('Написать в поддержку',`<article class="card"><h2>💬 Поддержка ТехСервис</h2><p class="subtitle">Опишите вопрос или проблему. Сообщение сохранится на сервере и будет передано администратору.</p>
   <label for="masterSupportMessage">Ваше сообщение</label><textarea id="masterSupportMessage" rows="6" maxlength="1500" placeholder="Что не работает? Что требуется исправить?"></textarea>
   <button type="button" id="masterSupportSend" onclick="sendMasterSupport()">Отправить в поддержку</button><p id="masterSupportStatus" class="subtitle" role="status"></p>
   <button class="secondary" type="button" onclick="renderMasterMenu()">← На главную</button></article>`);

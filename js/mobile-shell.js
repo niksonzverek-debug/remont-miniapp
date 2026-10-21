@@ -1,4 +1,4 @@
-/* Remont BT: one mobile shell for Telegram viewport and gesture/back navigation.
+/* ТехСервис: one mobile shell for Telegram viewport and gesture/back navigation.
  * No business/API data is persisted by this module. Version 20261021-fullscreen-v1.
  */
 (function (win, doc) {
@@ -36,10 +36,10 @@
     root.classList.toggle('rb-fullscreen', !!(tg && tg.isFullscreen));
   }
   function initTelegram() {
-    try {tg?.ready?.();tg?.expand?.();} catch(e) {console.warn('[Remont BT] Expand:',e);}
+    try {tg?.ready?.();tg?.expand?.();} catch(e) {console.warn('[ТехСервис] Expand:',e);}
     try {
       if (tg?.isVersionAtLeast?.('7.7')) tg.disableVerticalSwipes?.();
-    } catch(e) {console.warn('[Remont BT] Vertical swipe setting:',e);}
+    } catch(e) {console.warn('[ТехСервис] Vertical swipe setting:',e);}
     if(tg?.onEvent) {
       for(const [event, cb] of [
         ['viewportChanged',viewport], ['safeAreaChanged',viewport], ['contentSafeAreaChanged',viewport],
@@ -52,7 +52,7 @@
     // Fullscreen is a best-effort feature, one request per document only.
     if(tg?.isVersionAtLeast?.('8.0') && typeof tg.requestFullscreen === 'function' && !state.fullscreenRequested) {
       state.fullscreenRequested=true;
-      try {if(!tg.isFullscreen)tg.requestFullscreen();}catch(e){state.fullscreenFailed=true;console.info('[Remont BT] Fullscreen unavailable; using Expand.');}
+      try {if(!tg.isFullscreen)tg.requestFullscreen();}catch(e){state.fullscreenFailed=true;console.info('[ТехСервис] Fullscreen unavailable; using Expand.');}
     }
     viewport();
   }
@@ -172,13 +172,13 @@
     state.moving=true;state.restoring=true;
     try {
       const result=previous.restore();
-      if(result && typeof result.catch==='function') result.catch(e=>console.warn('[Remont BT] Back restore:',e));
+      if(result && typeof result.catch==='function') result.catch(e=>console.warn('[ТехСервис] Back restore:',e));
       restoreFields(previous.fields || state.drafts.get(previous.key));
       state.dirty=!!state.drafts.has(previous.key);syncClosing();
       const settle=()=>win.setTimeout(()=>{state.restoring=false;syncBackButton();},120);
       if(result && typeof result.finally==='function') result.finally(settle).catch(()=>{});
       else settle();
-    }catch(e){state.stack.push(leaving);state.restoring=false;console.error('[Remont BT] Navigation:',e);}
+    }catch(e){state.stack.push(leaving);state.restoring=false;console.error('[ТехСервис] Navigation:',e);}
     finally{state.moving=false;syncBackButton();}
     return true;
   }
