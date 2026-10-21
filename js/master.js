@@ -116,7 +116,14 @@ async function sendMasterActCorrection(number){
 function masterShell(title, body) {
   if(title!=='Диалог' && typeof btMasterStopChatMedia==='function') btMasterStopChatMedia();
   btMasterCurrentScreen=title;
-  document.body.innerHTML = `<main class="master-app"><header class="portal-head"><div><div class="bt-master-title"><img class="bt-master-logo" src="img/remont-bt-icon.png" alt="Remont BT"><div><div class="eyebrow">REMONT BT · ELECTRIC STEEL BLUE</div><h1>${masterEsc(title)}</h1></div></div><p class="subtitle">Заявки, клиенты и документы — в одном месте</p></div><button class="secondary refresh-btn" onclick="masterRefresh()">↻ Обновить</button></header><section id="masterContent">${body}</section><nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button id="btMasterOrdersNav" onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button id="btMasterChatsNav" onclick="showMasterMessages()"><span>✉</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
+  const name=String(masterCache.profile?.name||tg.initDataUnsafe?.user?.first_name||'Мастер').trim().replace(/\s+([.,!?])/g,'$1');
+  const home=title==='Панель мастера';
+  document.body.innerHTML = `<main class="master-app"><header class="portal-head bt-compact-header bt-master-header">
+     <img class="bt-header-logo" src="img/remont-bt-icon.png" alt="Remont BT">
+     <div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name">${masterEsc(name)}</strong></div>
+     <span class="bt-header-role">🧰 <span>Мастер</span></span>
+   </header><section id="masterContent">${home?'':`<h1 class="bt-screen-heading">${masterEsc(title)}</h1>`}${body}</section>
+   <nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button id="btMasterOrdersNav" onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button id="btMasterChatsNav" onclick="showMasterMessages()"><span>✉</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
   btUpdateMasterAttention();
 }
 function masterToast(message, error=false) { const e=document.getElementById('masterToast'); if(e){e.textContent=message;e.className=error?'error':'notice';} else showAlert(message); }
@@ -183,7 +190,7 @@ function btUpdateMasterAttention(){
   msgBtn?.classList.toggle('bt-attention-urgent',Number(s.unread_messages)>0);
   if(newBtn)newBtn.querySelector('.count-bubble').textContent=String(s.new_orders||0);
   if(msgBtn){msgBtn.querySelector('.count-bubble').textContent=String(s.unread_messages||0);
-    const small=msgBtn.querySelector('small');if(small)small.textContent=`${s.unread_messages||0} непрочитанных · Открыть переписку →`;}
+}
 }
 function btStartMasterAttention(){
   if(btMasterAttentionTimer)return;
@@ -194,6 +201,11 @@ function btStartMasterAttention(){
       const d=await masterApi('/api/master/dashboard');
       masterCache.stats=d.stats||{};
       btUpdateMasterAttention();
+      if(btMasterCurrentScreen==='Панель мастера' && document.getElementById('btMasterRecentThreads')){
+        try {const inbox=await masterApi('/api/master/messages'); masterCache.messages=inbox.messages||[];
+          const el=document.getElementById('btMasterRecentThreads');if(el)el.innerHTML=btMasterRecentThreadsMarkup();
+        }catch(_){ /* сохраняем последние сообщения при сетевом сбое */ }
+      }
       if(btMasterCurrentScreen==='Чаты'&&Number(d.stats?.unread_messages)>0){
         await showMasterMessages();
       }
@@ -213,17 +225,59 @@ function btStartMasterAttention(){
    }
  },{passive:false});
 })();
+function btMasterRecentThreads(limit=3){
+  const grouped=new Map();
+  for(const message of masterCache.messages||[]){
+    const clientId=String(message.client_id||'');
+    if(!/^\d{1,20}$/.test(clientId)||String(message.from_id)===String(masterCurrentUserId))continue;
+    const last=grouped.get(clientId);
+    if(!last || String(message.created_at||'')>=String(last.created_at||''))grouped.set(clientId,message);
+  }
+  return [...grouped.entries()].map(([id,last])=>{
+    const client=masterCache.clients.find(c=>String(c.id)===id);
+    const name=String(client?.name||last.client_name||'Клиент').trim();
+    const unread=(masterCache.messages||[]).filter(msg=>String(msg.client_id)===id&&String(msg.to_id)===String(masterCurrentUserId)&&!msg.read_by_master).length;
+    const preview=String(last.text||({photo:'📷 Фото',video:'🎬 Видео'}[last.type]||'Сообщение'));
+    return {id,name,preview,unread,created_at:String(last.created_at||'')};
+  }).sort((a,b)=>b.created_at.localeCompare(a.created_at)).slice(0,limit);
+}
+function btMasterRecentThreadsMarkup(){
+  const list=btMasterRecentThreads(3);
+  return list.length?list.map(t=>`<button class="bt-recent-chat ${t.unread?'bt-unread-thread':''}" type="button" onclick="openMasterChat('${t.id}')" aria-label="Открыть чат: ${masterEsc(t.name)}">
+    <span class="bt-recent-avatar">${masterEsc(t.name.charAt(0).toUpperCase()||'К')}</span>
+    <span class="bt-recent-main"><b>${masterEsc(t.name)}</b><small>${masterEsc(t.preview.slice(0,100))}</small></span>
+    <span class="bt-recent-side">${t.unread?`<em>${t.unread}</em>`:''}<small>${masterEsc(t.created_at.replace('T',' ').slice(11,16))}</small></span>
+  </button>`).join(''):'<p class="subtitle bt-recent-empty">Сообщений пока нет.</p>';
+}
 async function renderMasterMenu() {
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
-  const s=masterCache.stats;
-  masterShell('Панель мастера',`<div class="master-welcome card"><div><h2>Здравствуйте, ${masterEsc(masterCache.profile?.name || tg.initDataUnsafe?.user?.first_name || 'мастер')}!</h2><p class="subtitle">Ваш рабочий центр Remont BT</p></div><span class="status-pill">● Онлайн</span></div>
-  ${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
+  const s=masterCache.stats||{};
+  masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
-  <button class="bt-master-primary" onclick="showCreateAct()">▧ Создать акт</button>
-  <div class="master-action-grid bt-master-feature-grid"><button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><span><b>Заявки</b><small>Все обращения</small></span></button><button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><span><b>Все акты</b><small>Документы</small></span></button><button class="menu-btn" onclick="showMasterMessages()"><span class="emoji">✉</span><span><b>Чаты</b><small>Сообщения клиентов</small></span></button><button class="menu-btn" onclick="showMasterClients()"><span class="emoji">♙</span><span><b>Клиенты</b><small>Контакты и история</small></span></button></div>
-  <button class="bt-master-message-panel ${Number(s.unread_messages)>0?'bt-attention-urgent':''}" onclick="showMasterMessages()"><span><b>✉ Последние сообщения</b><small>${s.unread_messages||0} непрочитанных · Открыть переписку →</small></span><span class="count-bubble">${s.unread_messages||0}</span></button>
-  <div class="bt-master-extra"><button onclick="showMasterPromos()">◇ Промокоды</button><button onclick="showMasterMarketingLink()">↗ Рекламная ссылка</button><button onclick="showMasterProfile()">⚙ Настройки</button></div>
-  <div class="bt-master-progress"><b>⚡ Электрическая цепь ремонта</b><p>Заявка → Принято → Ремонт → Акт</p><div class="bt-master-progress-track"><span>✓</span><span>⚡</span><span>⚙</span><span>▤</span></div></div>`);
+  <button class="bt-master-primary" onclick="showCreateAct()">＋ Создать акт</button>
+  <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
+    <button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><b>Заявки</b><small>Все обращения</small></button>
+    <button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><b>Акты</b><small>Документы</small></button>
+    <button class="menu-btn" onclick="showMasterClients()"><span class="emoji">♙</span><b>Клиенты</b><small>Контакты</small></button>
+    <button class="menu-btn" onclick="showMasterMessages()"><span class="emoji">✉</span><b>Чаты</b><small>Переписка</small></button>
+    <button class="menu-btn" onclick="showMasterPromos()"><span class="emoji">◇</span><b>Промокоды</b><small>Скидки</small></button>
+    <button class="menu-btn" onclick="showMasterFAQ()"><span class="emoji">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
+  </div>
+  <section class="bt-master-message-panel ${Number(s.unread_messages)>0?'bt-attention-urgent':''}" aria-label="Последние сообщения">
+    <div class="bt-recent-head"><button type="button" class="bt-recent-all" onclick="showMasterMessages()"><b>✉ Последние сообщения</b><small>Все чаты →</small></button><span class="count-bubble">${s.unread_messages||0}</span></div>
+    <div id="btMasterRecentThreads" class="bt-recent-list">${btMasterRecentThreadsMarkup()}</div>
+  </section>`);
+}
+function showMasterFAQ(){
+  const items=[
+   ['Как принимать заявки?','Откройте «Заявки», выберите обращение и нажмите «Принять». Новые обращения выделяются цветом.'],
+   ['Как создать акт?','Нажмите «Создать акт», выберите технику, работы, стоимость и гарантию. Проверьте итоговую сумму и отправьте акт клиенту.'],
+   ['Где посмотреть сообщения?','На главной отображаются три последних клиента. Нажмите имя или сообщение для открытия диалога. Все остальные переписки — в разделе «Чаты».'],
+   ['Как работают промокоды?','Откройте «Промокоды». Система промокодов работает отдельно от реферальной программы; отключение промокода доступно администратору.'],
+   ['Как исправить акт?','Откройте нужный акт, выберите «Заявка на исправление» и отправьте описание администратору.'],
+   ['Где моя рекламная ссылка?','Откройте «Профиль» → «Рекламная ссылка». Там можно скопировать персональную ссылку мастера.']
+  ];
+  masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в Remont BT.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
@@ -593,7 +647,7 @@ function showCreatePromoForm(){showCreateMasterPromo();}
 function sendEvent(){showAlert('Это действие теперь выполняется в мастерской панели. Выберите раздел в меню.');return false;}
 bootMasterApp();
 
-async function showMasterProfile(){try{await loadMasterData()}catch(e){return masterShell('Настройки профиля',`<article class="card error">${masterEsc(e.message)}</article>`)}const p=masterCache.profile||{},r=p.referral_settings||{};masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Настройки сохраняются в текущем профиле, данные заказов не изменяются.</p></article><form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()"><article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"></article><article class="card"><h2>Отзывы</h2><p class="subtitle">Разрешить показ отзывов в публичном профиле, если он подключён.</p><label class="toggle-row"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${p.show_reviews!==false?'checked':''}></label></article><article class="card"><h2>Реферальная программа</h2><p class="subtitle">Ссылка приглашения формируется для каждого клиента отдельно. Здесь можно включать программу и менять условия.</p><label class="toggle-row"><span>Реферальная программа включена</span><input id="masterReferralEnabled" type="checkbox" ${r.enabled!==false?'checked':''}></label><label>Скидка новому клиенту, %</label><input id="masterReferralDiscount" type="number" min="0" max="100" step="0.5" value="${Number(r.new_client_discount_percent??5)}"><label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}"><label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}"><p class="subtitle">Клиенты получают свою ссылку через команду /referral. Глобальное отключение программы администратором имеет приоритет.</p></article><article class="card"><button id="masterSettingsSave" type="submit">Сохранить настройки</button><p id="masterSettingsStatus" class="subtitle" role="status"></p></article></form>`)}
+async function showMasterProfile(){try{await loadMasterData()}catch(e){return masterShell('Настройки профиля',`<article class="card error">${masterEsc(e.message)}</article>`)}const p=masterCache.profile||{},r=p.referral_settings||{};masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Настройки сохраняются в текущем профиле, данные заказов не изменяются.</p><button type="button" class="secondary" onclick="showMasterMarketingLink()">↗ Рекламная ссылка</button><button type="button" class="secondary" onclick="showMasterFAQ()">♧ F.A.Q. — Помощь</button></article><form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()"><article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"></article><article class="card"><h2>Отзывы</h2><p class="subtitle">Разрешить показ отзывов в публичном профиле, если он подключён.</p><label class="toggle-row"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${p.show_reviews!==false?'checked':''}></label></article><article class="card"><h2>Реферальная программа</h2><p class="subtitle">Ссылка приглашения формируется для каждого клиента отдельно. Здесь можно включать программу и менять условия.</p><label class="toggle-row"><span>Реферальная программа включена</span><input id="masterReferralEnabled" type="checkbox" ${r.enabled!==false?'checked':''}></label><label>Скидка новому клиенту, %</label><input id="masterReferralDiscount" type="number" min="0" max="100" step="0.5" value="${Number(r.new_client_discount_percent??5)}"><label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}"><label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}"><p class="subtitle">Клиенты получают свою ссылку через команду /referral. Глобальное отключение программы администратором имеет приоритет.</p></article><article class="card"><button id="masterSettingsSave" type="submit">Сохранить настройки</button><p id="masterSettingsStatus" class="subtitle" role="status"></p></article></form>`)}
 async function saveMasterSettings(){const btn=document.getElementById('masterSettingsSave'),st=document.getElementById('masterSettingsStatus');btn.disabled=true;st.textContent='Сохраняем…';try{const r=await masterApi('/api/master/settings','POST',{name:document.getElementById('masterProfileName').value.trim(),phone:document.getElementById('masterProfilePhone').value.trim(),show_reviews:document.getElementById('masterShowReviews').checked,referral_settings:{enabled:document.getElementById('masterReferralEnabled').checked,new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)}});st.textContent=r.message;await loadMasterData();masterCache.profile.name=document.getElementById('masterProfileName').value.trim();masterCache.profile.phone=document.getElementById('masterProfilePhone').value.trim();masterCache.profile.show_reviews=document.getElementById('masterShowReviews').checked;masterCache.profile.referral_settings={enabled:document.getElementById('masterReferralEnabled').checked,new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)};masterToast(r.message)}catch(e){st.textContent=e.message;st.className='error'}finally{btn.disabled=false}}
 
 

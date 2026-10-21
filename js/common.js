@@ -228,50 +228,9 @@ function fmtPhone(p) {
 function cleanPhone(p) { return (p || '').replace(/\D/g, ''); }
 function validPhone(p) { return /^998\d{9}$/.test(cleanPhone(p)); }
 
-// Базовая двуязычность интерфейса Mini App. Язык хранится локально на устройстве.
-const REMONT_UZ = [
- ['Создать заявку','Buyurtma yaratish'],['Новая заявка','Yangi buyurtma'],['Вид техники','Texnika turi'],['Ваше имя / ФИО','Ism-familiyangiz'],['Как к вам обращаться','Ismingiz'],['Номер телефона','Telefon raqami'],['Сохранить регистрацию отдельно','Roʻyxatdan oʻtishni alohida saqlash'],['Эти данные помогают зарегистрировать клиента и восстановить связь с заказом даже после временного сбоя.','Bu maʼlumotlar mijozni roʻyxatdan oʻtkazish va uzilishdan keyin buyurtmani topishga yordam beradi.'],['Бренд','Brend'],['Модель','Model'],['Описание проблемы','Muammo tavsifi'],['Когда удобно?','Qachon qulay?'],['Дата','Sana'],['Время','Vaqt'],['Дом / улица','Koʻcha va uy'],['Номер дома','Uy raqami'],['Квартира','Xonadon'],['Комментарий','Izoh'],['Отправить заявку','Buyurtmani yuborish'],['Отправить','Yuborish'],['Стоимость (сум)','Narxi (soʻm)'],['На что распространяется гарантия?','Kafolat nimaga tegishli?'],['Исключения / ограничения гарантии','Kafolat istisnolari / cheklovlari'],['Срок гарантии','Kafolat muddati'],['Работы выполнены','Bajarilgan ishlar'],['Добавить работу','Ish qoʻshish'],['Сохранить акт','Dalolatnomani saqlash'],['Создать акт','Dalolatnoma yaratish'],['Новый акт','Yangi dalolatnoma'],['ФИО клиента (если известно)','Mijozning F.I.Sh. (maʼlum boʻlsa)'],['Введите имя клиента','Mijoz ismini kiriting'],['Введите номер телефона +998XXXXXXXXX','+998XXXXXXXXX telefon raqamini kiriting'],['Неверный номер телефона (998XXXXXXXXX)','Telefon raqami notoʻgʻri (998XXXXXXXXX)'],['Запись сохранена на этом устройстве и ожидает отправки. Когда появится связь, откройте форму кнопкой в клавиатуре чата с ботом и нажмите «Передать сохранённые записи».','Yozuv qurilmada saqlandi va yuborishni kutmoqda. Aloqa tiklangach, bot chatidagi tugma orqali formani ochib, «Saqlangan yozuvlarni yuborish» tugmasini bosing.'],['🔄 Локальная очередь:','🔄 Mahalliy navbat:'],['Ожидают отправки:','Yuborishni kutmoqda:'],['Переданы в Telegram:','Telegramga yuborildi:'],['Передать сохранённые записи','Saqlangan yozuvlarni yuborish'],['Повторить отправленные','Yuborilganlarni qayta yuborish'],['Очистить подтверждённые','Tasdiqlanganlarni tozalash'],['Регистрация синхронизирована','Roʻyxatdan oʻtish sinxronlandi'],['Заявка отправлена','Buyurtma yuborildi'],['Нет соединения','Ulanish yoʻq'],['Откройте приложение из Telegram. Вне Telegram отправка данных боту недоступна.','Ilovani Telegram ichidan oching. Telegramdan tashqarida botga maʼlumot yuborib boʻlmaydi.']
-];
-function currentMiniLang() { try { return localStorage.getItem('remont_bt_lang') || 'ru'; } catch (_) { return 'ru'; } }
-function translateMiniText(value) {
-    if (currentMiniLang() !== 'uz') return value;
-    let out = String(value);
-    for (const [ru, uz] of REMONT_UZ) out = out.split(ru).join(uz);
-    return out;
-}
-function translateMiniDom() {
-    if (currentMiniLang() !== 'uz' || !document.body) return;
-    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
-        acceptNode(node) {
-            const parent = node.parentElement;
-            if (!parent || ['SCRIPT','STYLE','TEXTAREA'].includes(parent.tagName) || parent.id === 'remontLangToggle') return NodeFilter.FILTER_REJECT;
-            return node.nodeValue.trim() ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
-        }
-    });
-    const nodes=[]; while(walker.nextNode()) nodes.push(walker.currentNode);
-    nodes.forEach(node => { const translated = translateMiniText(node.nodeValue); if (translated !== node.nodeValue) node.nodeValue = translated; });
-    document.querySelectorAll('input[placeholder],textarea[placeholder]').forEach(el => { if (!el.dataset.remontOriginalPlaceholder) el.dataset.remontOriginalPlaceholder=el.placeholder; el.placeholder=translateMiniText(el.dataset.remontOriginalPlaceholder); });
-}
-function toggleMiniLanguage() {
-    const next = currentMiniLang() === 'ru' ? 'uz' : 'ru';
-    try { localStorage.setItem('remont_bt_lang', next); } catch (_) {}
-    if (document.documentElement) document.documentElement.lang = next === 'uz' ? 'uz' : 'ru';
-    const btn = document.getElementById('remontLangToggle');
-    if (btn) btn.textContent = next === 'ru' ? 'Oʻzbekcha' : 'Русский';
-    if (next === 'ru') location.reload(); else translateMiniDom();
-}
-function ensureMiniLanguageButton() {
-    if (!document.body || document.getElementById('remontLangToggle')) return;
-    const btn=document.createElement('button'); btn.id='remontLangToggle'; btn.type='button';
-    btn.textContent=currentMiniLang()==='ru'?'Oʻzbekcha':'Русский';
-    btn.style.cssText='position:sticky;top:6px;float:right;z-index:99999;margin:6px 8px 0 0;padding:8px 11px;border:1px solid #7b8d87;border-radius:12px;background:var(--card_bg,#fff);color:var(--text,#17231f);font:600 13px sans-serif;';
-    btn.onclick=toggleMiniLanguage; document.body.prepend(btn);
-}
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { ensureMiniLanguageButton(); translateMiniDom(); });
-else { ensureMiniLanguageButton(); translateMiniDom(); }
-try { new MutationObserver(() => { ensureMiniLanguageButton(); if (!document.getElementById('offlineQueueBanner')) renderOfflineQueueBanner(); translateMiniDom(); }).observe(document.body, {childList:true,subtree:true}); } catch (_) {}
-
-
+// Локализация RU / UZ / EN загружается из js/ui-language.js.
+// Безопасная заглушка нужна для ранних уведомлений, пока файл не загружен.
+function translateMiniText(value) { return window.btTranslateText ? window.btTranslateText(String(value)) : String(value); }
 // Навигация Mini App: системная кнопка Telegram «Назад» + свайп от левого края.
 (function installMiniAppBackNavigation(){
   if (window.__remontBackNavigationInstalled) return;

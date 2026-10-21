@@ -1,8 +1,8 @@
-/* Remont BT Service Worker — 20261021-auto-role-v2
+/* Remont BT Service Worker — 20261021-compact-i18n-v1
  * Network-first for navigation and static assets; cache is only an offline fallback.
  * Only this app's own caches are cleaned. API and user-specific requests are never cached.
  */
-const RELEASE = '20261021-auto-role-v2';
+const RELEASE = '20261021-compact-i18n-v1';
 const CACHE_NAME = `remont-bt-miniapp-${RELEASE}`;
 const CACHE_PREFIX = 'remont-bt-miniapp-';
 const STATIC_ASSETS = [
@@ -11,6 +11,7 @@ const STATIC_ASSETS = [
   './css/style.css',
   './js/advertiser-config.js',
   './js/common.js',
+  './js/ui-language.js',
   './js/client.js',
   './js/master.js',
   './js/advertiser.js',
