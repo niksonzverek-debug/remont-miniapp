@@ -6,7 +6,7 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>Remont BT — Открыть кабинет</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="css/style.css?v=20261021-main-auth-fix1">
+<link rel="stylesheet" href="css/style.css?v=20261021-auto-role-v2">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 .bt-entry {min-height:100dvh;max-width:500px;margin:auto;padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px;justify-content:center}
@@ -31,8 +31,8 @@ const launchMode = params.get('launch') || 'main';
 const roleFromUrl = params.get('role');
 window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
 </script>
-<script src="js/advertiser-config.js?v=20261021-main-auth-fix1"></script>
-<script src="js/common.js?v=20261021-main-auth-fix1"></script>
+<script src="js/advertiser-config.js?v=20261021-auto-role-v2"></script>
+<script src="js/common.js?v=20261021-auto-role-v2"></script>
 <script>
 (async function bootRemontBT(){
   const area = document.getElementById('btEntry');
@@ -59,7 +59,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     }
     // Existing applications are loaded only after server-side role discovery.
     const script=document.createElement('script');
-    script.src=role==='master'?'js/master.js?v=20261021-main-auth-fix1':'js/client.js?v=20261021-main-auth-fix1';
+    script.src=role==='master'?'js/master.js?v=20261021-auto-role-v2':'js/client.js?v=20261021-auto-role-v2';
     script.onerror=()=>show('Не удалось открыть кабинет','Не удалось загрузить файлы приложения. Проверьте публикацию GitHub Pages.',[{text:'Повторить',run:()=>location.reload()}]);
     // Remove the loader so existing client/master scripts own the body.
     area.remove(); document.body.appendChild(script);
@@ -96,14 +96,24 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
       throw new Error(detail+(why?' ('+why+')':''));
     }
     const r=data.roles||{};
-    const roles=[...(r.master?['master']:[]),...(r.client_registered?['client']:[]),...(r.advertiser?['advertiser']:[])];
+    // A user may have multiple roles. BotFather's single Main Mini App button
+    // must open one landing page without an extra role-selector screen.
+    // Role checks are obtained from the verified server response, never from
+    // initDataUnsafe or untrusted URL parameters.
     const permitted={client:!!r.client,master:!!r.master,advertiser:!!r.advertiser};
-    if(['client','master','advertiser'].includes(queryRole) && permitted[queryRole]){loadRole(queryRole);return;}
-    if(roles.length===0){loadRole('client');return;}
-    if(roles.length===1){loadRole(roles[0]);return;}
-    const options=[{id:'client',text:'👤 Кабинет клиента'}, {id:'master',text:'🧰 Кабинет мастера'}, {id:'advertiser',text:'📊 Кабинет рекламодателя'}];
-    show('Выберите кабинет','У вашего Telegram-аккаунта несколько ролей. Выберите, куда перейти.',
-      options.filter(o=>roles.includes(o.id)).map(o=>({text:o.text,run:()=>loadRole(o.id)})));
+    // Preserve specific buttons from /start: ?role=client or ?role=advertiser.
+    if(['client','master','advertiser'].includes(queryRole) && permitted[queryRole]){
+      loadRole(queryRole);
+      return;
+    }
+    // For the common «Открыть» button, a registered master goes to master,
+    // a registered client to client, and an advertiser-only user to advertiser.
+    // A not-yet-registered user starts the client onboarding.
+    const landingRole = r.master ? 'master'
+      : r.client_registered ? 'client'
+      : r.advertiser ? 'advertiser'
+      : 'client';
+    loadRole(landingRole);
   }catch(err){
     show('Не удалось открыть кабинет',err.message||'Ошибка связи с сервером.',[{text:'Повторить',run:()=>location.reload()}]);
   }
@@ -111,7 +121,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
 </script>
 <script>
 if('serviceWorker' in navigator){window.addEventListener('load',async()=>{try{
- const reg=await navigator.serviceWorker.register('./sw.js?release=20261021-main-auth-fix1',{scope:'./',updateViaCache:'none'});await reg.update();
+ const reg=await navigator.serviceWorker.register('./sw.js?release=20261021-auto-role-v2',{scope:'./',updateViaCache:'none'});await reg.update();
 }catch(e){console.warn('SW update failed:',e)}},{once:true});}
 </script>
 </body>
