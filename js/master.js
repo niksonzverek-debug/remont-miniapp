@@ -9,19 +9,12 @@ function masterAuthHeaders() {
   const initData = String((tg && tg.initData) || '').trim();
   if (initData) headers['X-Telegram-Init-Data'] = initData;
   const savedSession = String(localStorage.getItem('remontBT.master.session.v1') || '');
-  const launch = new URLSearchParams(location.search);
-  const launchUid = launch.get('master_uid') || '';
-  const launchExp = launch.get('master_exp') || '';
-  const launchSig = launch.get('master_sig') || '';
-  const launchSession = /^\d{1,20}$/.test(launchUid) && /^\d{1,20}$/.test(launchExp) && /^[a-f0-9]{64}$/i.test(launchSig)
-    ? `${launchUid}:${launchExp}:${launchSig}` : '';
   const telegramId = String(tg?.initDataUnsafe?.user?.id || '');
   const savedId = savedSession.split(':')[0];
   if (initData && telegramId && savedSession && savedId !== telegramId) {
     localStorage.removeItem('remontBT.master.session.v1');
   } else if (savedSession) headers['X-Remont-Session'] = savedSession;
-  if (launchSession) headers['X-Remont-Session'] = launchSession;
-  if (!initData && !headers['X-Remont-Session']) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
+  if (!initData && !savedSession) throw new Error('Откройте кабинет кнопкой из чата с ботом Telegram.');
   return headers;
 }
 function masterApi(path, method='GET', payload=null) {
@@ -138,6 +131,8 @@ function btMasterRestoreRoute(title){
    'Настройки профиля':()=>showMasterProfile(),
    'Написать в поддержку':()=>showMasterSupport(),
    'Рекламная ссылка':()=>showMasterMarketingLink(),
+   'Моя ссылка для клиентов':()=>showMasterInviteLink(),
+   'Мой QR для оплаты':()=>showMasterPaymentQr(),
    'Диалог':()=>openMasterChat(clientId),
    'Просмотр акта':()=>previewMasterAct(actNumber),
    'Исправление акта':()=>showMasterActCorrection(actNumber),
@@ -190,9 +185,7 @@ async function submitMasterLogin() {
 
 async function bootMasterApp() {
   const saved=String(localStorage.getItem('remontBT.master.session.v1')||'');
-  const qp=new URLSearchParams(location.search);
-  const hasLaunchSession=/^\d{1,20}$/.test(qp.get('master_uid')||'') && /^\d{1,20}$/.test(qp.get('master_exp')||'') && /^[a-f0-9]{64}$/i.test(qp.get('master_sig')||'');
-  if(!String(tg?.initData||'')&&!saved&&!hasLaunchSession) return showMasterLogin();
+  if(!String(tg?.initData||'')&&!saved) return showMasterLogin();
   try { await loadMasterData(); await renderMasterMenu(); }
   catch(e) {
     if(saved && !String(tg?.initData||'')) localStorage.removeItem('remontBT.master.session.v1');
@@ -283,6 +276,10 @@ async function renderMasterMenu() {
   masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
   <button class="bt-master-primary" onclick="showCreateAct()">＋ Создать акт</button>
+  <div class="stack-list" style="margin:12px 0">
+    <button type="button" class="bt-master-primary" onclick="showMasterInviteLink()">🔗 Моя ссылка для клиентов</button>
+    <button type="button" class="secondary" onclick="showMasterPaymentQr()">💳 Мой QR для оплаты</button>
+  </div>
   <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
     <button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><b>Заявки</b><small>Все обращения</small></button>
     <button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><b>Акты</b><small>Документы</small></button>
@@ -304,7 +301,8 @@ function showMasterFAQ(){
    ['Где посмотреть сообщения?','На главной отображаются три последних клиента. Нажмите имя или сообщение для открытия диалога. Все остальные переписки — в разделе «Чаты».'],
    ['Как работают промокоды?','Откройте «Промокоды». Система промокодов работает отдельно от реферальной программы; отключение промокода доступно администратору.'],
    ['Как исправить акт?','Откройте нужный акт, выберите «Заявка на исправление» и отправьте описание администратору.'],
-   ['Где моя рекламная ссылка?','Откройте «Профиль» → «Рекламная ссылка». Там можно скопировать персональную ссылку мастера.']
+   ['Где моя ссылка для клиентов?','На главной странице мастера нажмите «Моя ссылка для клиентов».'],
+   ['Где загрузить QR для оплаты?','На главной странице мастера нажмите «Мой QR для оплаты» и загрузите изображение QR из вашего платёжного приложения.']
   ];
   masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
@@ -766,4 +764,55 @@ async function saveMasterMarketingLink(){
  try{const saved=await masterApi('/api/master/settings','POST',{marketing_name:name}); const d=await masterApi('/api/master/marketing-link');
   if (String(d.master_id||'') !== String(masterCurrentUserId||'')) throw new Error('Ошибка: ссылка создана для другого мастера. Обновите кабинет.');
   masterCache.profile.marketing_name=name; out.innerHTML=`<p><b>${masterEsc(name)}</b> · ${masterEsc(d.public_name||'')}</p><input id="masterMarketingUrl" readonly value="${masterEsc(d.url)}"><button onclick="navigator.clipboard.writeText(document.getElementById('masterMarketingUrl').value).then(()=>masterToast('Ссылка скопирована')).catch(()=>document.getElementById('masterMarketingUrl').select())">Копировать ссылку</button><p class="subtitle">Отправьте эту ссылку клиентам. Переход закрепляется за вашим профилем мастера.</p>`;masterToast(saved.message||'Ссылка готова');}catch(e){out.textContent=e.message;}
+}
+
+
+// ТехСервис: отдельные инструменты привлечения клиентов и показа платёжного QR.
+async function showMasterInviteLink(){
+  masterShell('Моя ссылка для клиентов',`<article class="card"><h2>Приглашайте клиентов</h2><p class="subtitle">Клиенты по этой ссылке закрепляются за вами. Их приглашённые друзья также сохраняют привязку к вашему кабинету.</p><div id="btInviteLinkStatus">Получаем ссылку…</div><button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
+  const out=document.getElementById('btInviteLinkStatus');
+  try{
+    const d=await masterApi('/api/master/marketing-link');
+    if(!out)return;
+    out.innerHTML=`<label for="btInviteLinkUrl">Ваша ссылка</label><input id="btInviteLinkUrl" readonly value="${masterEsc(d.url||'')}"><button type="button" onclick="btCopyMasterInviteLink()">🔗 Копировать ссылку</button><p class="subtitle">${masterEsc(d.public_name||'')}</p>`;
+  }catch(e){
+    if(out)out.innerHTML=`<p class="error">${masterEsc(e.message)}</p><p class="subtitle">Если название мастерской ещё не заполнено, настройте его ниже.</p><button type="button" onclick="showMasterMarketingLink()">Настроить название мастерской</button>`;
+  }
+}
+async function btCopyMasterInviteLink(){
+ const value=document.getElementById('btInviteLinkUrl')?.value;
+ if(!value)return;
+ try{await navigator.clipboard.writeText(value);masterToast('Ссылка скопирована');}
+ catch(_){document.getElementById('btInviteLinkUrl')?.select();masterToast('Выделите ссылку и скопируйте');}
+}
+async function showMasterPaymentQr(){
+ masterShell('Мой QR для оплаты',`<article class="card"><h2>QR для оплаты</h2><p class="subtitle">Загрузите готовый QR-код из вашего банка или платёжного приложения. Это только изображение для показа клиенту: оплата не подтверждается автоматически.</p><div id="btPaymentQrPreview">Загружаем…</div><label for="btPaymentQrFile">Выбрать изображение QR</label><input id="btPaymentQrFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="btUploadPaymentQr(this)"><div id="btPaymentQrStatus" role="status"></div><button type="button" class="secondary" onclick="btDeletePaymentQr()">Удалить QR</button><button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
+ await btRefreshPaymentQr();
+}
+async function btRefreshPaymentQr(){
+ const el=document.getElementById('btPaymentQrPreview');if(!el)return;
+ try{const d=await masterApi('/api/master/payment-qr');
+  if(!document.getElementById('btPaymentQrPreview'))return;
+  el.innerHTML=d.image?`<img alt="QR-код для оплаты мастеру" src="${masterEsc(d.image)}" style="display:block;width:100%;max-width:340px;margin:10px auto;image-rendering:auto"><p class="subtitle">Покажите этот QR клиенту для оплаты.</p>`:'<p class="subtitle">QR ещё не загружен.</p>';
+ }catch(e){el.textContent=e.message;}
+}
+async function btUploadPaymentQr(input){
+ const file=input.files?.[0],status=document.getElementById('btPaymentQrStatus');if(!file)return;
+ if(!['image/png','image/jpeg','image/webp'].includes(file.type)){status.textContent='Выберите PNG, JPEG или WebP.';return;}
+ if(file.size>5*1024*1024){status.textContent='Файл слишком большой (максимум 5 МБ).';return;}
+ status.textContent='Подготавливаем изображение…';input.disabled=true;
+ try{
+  const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');
+  const ratio=Math.min(1,700/Math.max(bitmap.width,bitmap.height));canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
+  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
+  // PNG сохраняет резкие границы QR без JPEG-артефактов.
+  const image=canvas.toDataURL('image/png');
+  if(image.length>250000)throw new Error('QR слишком сложный для хранения. Обрежьте изображение до самого QR и повторите.');
+  await masterApi('/api/master/payment-qr','POST',{image});status.textContent='QR сохранён.';await btRefreshPaymentQr();
+ }catch(e){status.textContent='Ошибка: '+e.message;}finally{input.disabled=false;input.value='';}
+}
+async function btDeletePaymentQr(){
+ const status=document.getElementById('btPaymentQrStatus');
+ try{await masterApi('/api/master/payment-qr','POST',{image:null});if(status)status.textContent='QR удалён.';await btRefreshPaymentQr();}
+ catch(e){if(status)status.textContent=e.message;}
 }
