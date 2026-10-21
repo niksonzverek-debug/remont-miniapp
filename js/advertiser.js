@@ -1,5 +1,6 @@
 (() => {
  const tg = window.Telegram && window.Telegram.WebApp;
+ window.RemontMobile?.enter('advertiser/home',()=>{}, {root:true});
  const $ = id => document.getElementById(id);
  let lang = (['ru','uz','en'].includes(localStorage.getItem('remont_bt_lang')) ? localStorage.getItem('remont_bt_lang') : 'ru'); let dashboard = null;
  function filteredPayouts(){

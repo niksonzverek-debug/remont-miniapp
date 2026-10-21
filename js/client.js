@@ -1,7 +1,5 @@
 // miniapp/js/client.js
 
-try { if (window.Telegram?.WebApp) { window.Telegram.WebApp.ready(); window.Telegram.WebApp.expand(); } } catch (_) {}
-
 // ============ СОСТОЯНИЕ ============
 let btOrderOperationId = null;
 let btHomeTimer = null;
@@ -63,6 +61,24 @@ function btRenderReferralPanel(box,r){
   box.hidden=false;
   box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Приглашено: ${Number(r.invited_count)||0}.</p><input id="btReferralLink" readonly value="${escapeClient(url)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`;
 }
+function btRefreshClientReviewsEntry(){
+ const el=document.getElementById('btClientReviewsEntry');if(!el)return;
+ el.hidden=true;
+ clientApi('/api/client/master-reviews').then(data=>{
+   if(el.isConnected)el.hidden=!data.enabled;
+ }).catch(()=>{if(el.isConnected)el.hidden=true});
+}
+function showClientMasterReviews(){
+ setPage('⭐ Отзывы о мастере','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
+ clientApi('/api/client/master-reviews').then(data=>{
+   const el=document.getElementById('btMasterReviewsPanel');if(!el)return;
+   if(!data.enabled){el.innerHTML='<p class="subtitle">Мастер пока не включил показ отзывов.</p>';return;}
+   const reviews=Array.isArray(data.reviews)?data.reviews:[];
+   const title='<h2>Отзывы о '+escapeClient(data.master_name||'мастере')+'</h2>';
+   const summary=reviews.length?'<p class="subtitle">Оценка '+escapeClient(data.average_rating)+' из 5 · отзывов: '+escapeClient(data.count)+'</p>':'<p class="subtitle">Показ отзывов включён, но опубликованных отзывов ещё нет.</p>';
+   el.innerHTML=title+summary+reviews.map(r=>'<div class="bt-public-review"><b>'+('⭐'.repeat(Math.min(5,Math.max(1,Number(r.rating)||1))))+'</b><small>'+escapeClient([r.device,r.brand].filter(Boolean).join(' · '))+' · '+escapeClient(String(r.created_at||'').slice(0,10))+'</small><p>'+escapeClient(r.text||'Без комментария')+'</p></div>').join('');
+ }).catch(()=>{const el=document.getElementById('btMasterReviewsPanel');if(el)el.textContent='Не удалось загрузить отзывы. Повторите позже.'});
+}
 function btRefreshClientReferralEntry(){
  const el=document.getElementById('btClientReferralEntry');if(!el)return;
  el.hidden=true;
@@ -80,6 +96,7 @@ function showClientReferral(){
  }).catch(()=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent='Не удалось проверить программу. Повторите позже.'});
 }
 function renderClientMenu() {
+    window.RemontMobile?.enter('client/home',()=>renderClientMenu(),{root:true});
     btStopOrderProgressRefresh();
     btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
@@ -93,6 +110,7 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showMyOrders()"><span class="emoji bt-line-icon">▤</span><b>Мои заявки</b><small>История</small></button>
             <button class="menu-btn" onclick="showMyActs()"><span class="emoji bt-line-icon">◫</span><b>Мои акты</b><small>Гарантия</small></button>
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><b>Промокоды</b><small>Скидки</small></button>
+            <button class="menu-btn bt-reviews-entry" id="btClientReviewsEntry" type="button" onclick="showClientMasterReviews()" hidden><span class="emoji bt-line-icon">☆</span><b>Отзывы о мастере</b><small>Оценки клиентов</small></button>
             <button class="menu-btn bt-referral-entry" id="btClientReferralEntry" type="button" onclick="showClientReferral()" hidden><span class="emoji bt-line-icon">↗</span><b>Пригласить друга</b><small>Рефералы</small></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><b>Профиль</b><small>Мои данные</small></button>
             <button class="menu-btn" onclick="showClientFAQ()"><span class="emoji bt-line-icon">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
@@ -111,6 +129,7 @@ function renderClientMenu() {
           <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     btRefreshClientReferralEntry();
+    btRefreshClientReviewsEntry();
     clientApi('/api/advertiser/dashboard').then(d => {
         if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
         const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
@@ -154,6 +173,7 @@ function btFocusHomeChat(){
     if(input)setTimeout(()=>input.focus({preventScroll:true}),250);
 }
 function openAdvertiserCabinet(){
+    if(window.RemontMobile?.confirmNavigation && !window.RemontMobile.confirmNavigation())return;
     const url=new URL('advertiser.html',location.href);
     const params=new URLSearchParams(location.search);
     for(const key of ['session_uid','session_exp','session_sig']){
@@ -475,23 +495,27 @@ async function clientApi(path, method='GET', body=null) {
     return data;
 }
 
-// Swipe-back on inner pages; Telegram/Android owns system-level edge gestures.
+// Unified mobile navigation replaces legacy client-specific touch handlers.
 let btClientPageBack=()=>renderClientMenu();
-(function setupBtClientSwipe(){
-    let start=null;
-    document.addEventListener('touchstart',e=>{
-        const t=e.touches?.[0];
-        start=t&&t.clientX<=70?{x:t.clientX,y:t.clientY,target:e.target}:null;
-    },{passive:true});
-    document.addEventListener('touchend',e=>{
-        if(!start||!document.body.classList.contains('bt-inner-page'))return;
-        const t=e.changedTouches?.[0],dx=t? t.clientX-start.x:0,dy=t?Math.abs(t.clientY-start.y):0;
-        const interactive=start.target?.closest?.('input,textarea,select,[contenteditable],.bt-chat-history');
-        start=null;
-        if(!interactive&&dx>90&&dy<70){e.preventDefault();btClientPageBack();}
-    },{passive:false});
-})();
+let btClientActPreviewNumber='';
+function btClientRestoreRoute(title){
+    if(title.includes('Отзывы о мастере'))return ()=>showClientMasterReviews();
+    if(title.includes('Пригласить друга'))return ()=>showClientReferral();
+    if(title.includes('F.A.Q.'))return ()=>showClientFAQ();
+    if(title.includes('Кабинет мастера'))return ()=>showMasterChoice();
+    if(title.includes('Вход мастера'))return ()=>showExistingMasterHelp();
+    if(title.includes('Заявка мастера'))return ()=>showMasterApplicationForm();
+    if(title.includes('Мои заявки'))return ()=>showMyOrders();
+    if(title.includes('Акты и документы'))return ()=>showMyActs();
+    if(title.includes('Просмотр акта')){const number=btClientActPreviewNumber;return ()=>showClientActPreview(number);}
+    if(title.includes('Промокоды'))return ()=>showEnterPromo();
+    if(title.includes('Профиль'))return ()=>showProfile();
+    if(title.includes('Живой чат'))return ()=>showMessages();
+    if(title.includes('Контакты мастера'))return ()=>showCallMaster();
+    return ()=>renderClientMenu();
+}
 function setPage(title, body) {
+    window.RemontMobile?.enter('client/page/'+title+(title.includes('Просмотр акта')?'/'+btClientActPreviewNumber:''),btClientRestoreRoute(title));
     btStopOrderProgressRefresh();
     if(!String(title).includes('Живой чат'))btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
@@ -604,6 +628,7 @@ async function showMyActs() {
     } catch(e){setPage('📄 Акты и документы',`<div class="card error">${escapeClient(e.message)}</div>`);}
 }
 function showClientActPreview(number){
+    btClientActPreviewNumber=number;
     const act=btClientActsCache.find(a=>String(a.number)===String(number));
     if(!act){showMyActs();return;}
     const works=Array.isArray(act.works)?act.works:[];
@@ -686,7 +711,7 @@ async function saveClientProfile(event) {
     if(data.name.length<2||!validPhone(data.phone)){status.textContent='Проверьте ФИО и номер +998XXXXXXXXX.';status.className='error';return;}
     try { localStorage.setItem('remont_bt_name',data.name); localStorage.setItem('remont_bt_phone',data.phone); } catch(_){}
     try {
-      const r = await clientApi('/api/client/profile', 'POST', data); status.textContent = r.message || 'Профиль сохранён на сервере.'; status.className = 'notice';
+      const r = await clientApi('/api/client/profile', 'POST', data);window.RemontMobile?.clearDirty(); status.textContent = r.message || 'Профиль сохранён на сервере.'; status.className = 'notice';
     } catch (e) {
       if(typeof queueOperation==='function') queueOperation({event:'register_client',client_name:data.name,client_phone:data.phone,client_registration_id:getClientRegistrationId(data.phone),client_registration_no:getClientRegistrationNo(data.phone)});
       status.textContent='Данные сохранены на устройстве и поставлены в очередь. Передайте очередь через кнопку внизу приложения.'; status.className='notice';
@@ -796,7 +821,7 @@ async function sendClientMessage(){
         }else response=await clientApi('/api/client/message','POST',{text});
         status.textContent=response.message||'Сообщение сохранено.';status.className='notice';
         if(field)field.value='';const input=document.getElementById('clientChatFile');if(input)input.value='';
-        btDescribeChatFile();await btRefreshClientChat();
+        btDescribeChatFile();window.RemontMobile?.clearDirty();await btRefreshClientChat();
     }catch(e){status.textContent=e.message;status.className='error';}
     finally{if(btn?.isConnected)btn.disabled=false;}
 }
@@ -831,6 +856,7 @@ function attachPhoneMask(input, onInput) {
 // ============ ПЕРВИЧНАЯ РЕГИСТРАЦИЯ ============
 
 function showRegistrationScreen() {
+    window.RemontMobile?.enter('client/registration',()=>showRegistrationScreen());
     document.body.innerHTML = `
         <h1>👤 Регистрация клиента</h1>
         <p class="subtitle">Введите ФИО и телефон, чтобы продолжить оформление заявки.</p>
@@ -933,6 +959,7 @@ async function btRepeatOrder(orderId){
 // ============ НОВАЯ ЗАЯВКА ============
 
 function showNewOrder() {
+    window.RemontMobile?.enter('client/new-order',()=>showNewOrder());
     btOrderOperationId=uuidV4();
     orderData = {
         device: "",
@@ -1131,6 +1158,7 @@ async function submitRegistration() {
         localStorage.setItem('remont_bt_registered', '1');
         localStorage.setItem('remont_bt_identity_saved', '1');
         if (currentClientTelegramId) localStorage.setItem('remont_bt_profile_uid', currentClientTelegramId);
+        window.RemontMobile?.clearDirty();
         showAlert(result.message || 'Регистрация сохранена на сервере.');
         renderClientMenu();
     } catch (err) {
@@ -1406,6 +1434,7 @@ async function submitOrder() {
         localStorage.setItem('remont_bt_registered','1');
         btOrderOperationId=null;
         // Остаёмся в Mini App: Telegram-чат не открывается автоматически.
+        window.RemontMobile?.clearDirty();
         renderClientMenu();
         const notice=document.createElement('div');
         notice.className='bt-order-success-notice';

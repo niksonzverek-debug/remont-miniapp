@@ -74,6 +74,7 @@ async function openMasterActPdf(number){
  catch(e){masterToast(e.message,true)}
 }
 async function previewMasterAct(number){
+ btMasterLastActNumber=number;
  clearMasterPdfUrl();
  masterShell('Просмотр акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2>
  <p class="subtitle">Содержимое акта отображается сразу. PDF откроется в просмотрщике телефона или браузере.</p>
@@ -104,6 +105,7 @@ async function shareMasterAct(number){
  }catch(e){masterToast(e.message,true)}
 }
 function showMasterActCorrection(number){
+ btMasterLastActNumber=number;
   masterShell('Исправление акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2><p class="subtitle">Напишите, что нужно исправить. Запрос будет сохранён на сервере и передан администратору. Сам акт мастер изменить не может.</p><label for="masterCorrectionReason">Что изменить?</label><textarea id="masterCorrectionReason" maxlength="1500" required rows="6" placeholder="Например: исправить модель, сумму, выполненные работы…"></textarea><button type="button" id="masterCorrectionSend" onclick="sendMasterActCorrection('${masterEsc(number)}')">Отправить администратору</button><p id="masterCorrectionResult" role="status" class="subtitle"></p><button type="button" class="back-btn" onclick="showMasterActs()">← Акты</button></article>`);
 }
 async function sendMasterActCorrection(number){
@@ -113,7 +115,35 @@ async function sendMasterActCorrection(number){
   try{const r=await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/correction`,'POST',{reason});status.textContent=r.message||'Заявка отправлена.';status.className='notice';masterToast(status.textContent);}
   catch(e){status.textContent=e.message;status.className='error';button.disabled=false;}
 }
+let btMasterLastActNumber='';
+let btMasterActOrder=null;
+let btMasterLastPayoutCode='';
+function btMasterRestoreRoute(title){
+ const actNumber=btMasterLastActNumber, clientId=activeChatClientId, actOrder=btMasterActOrder, promoCode=btMasterLastPayoutCode;
+ const map={
+   'Панель мастера':()=>renderMasterMenu(),
+   'Заявки':()=>showMasterOrders(),
+   'Клиенты':()=>showMasterClients(),
+   'Чаты':()=>showMasterMessages(),
+   'Акты':()=>showMasterActs(),
+   'Промокоды':()=>showMasterPromos(),
+   'Новый промокод':()=>showCreateMasterPromo(),
+   'Настройки профиля':()=>showMasterProfile(),
+   'Написать в поддержку':()=>showMasterSupport(),
+   'Рекламная ссылка':()=>showMasterMarketingLink(),
+   'Диалог':()=>openMasterChat(clientId),
+   'Просмотр акта':()=>previewMasterAct(actNumber),
+   'Исправление акта':()=>showMasterActCorrection(actNumber),
+   'Создать акт':()=>renderMasterActForm(actOrder),
+   'Выплата рекламодателю':()=>showMasterPayout(promoCode),
+   'F.A.Q. — Помощь':()=>showMasterFAQ(),
+   'Вход мастера':()=>showMasterLogin()
+ };
+ return map[title]||(()=>renderMasterMenu());
+}
 function masterShell(title, body) {
+ const routeSuffix=title==='Диалог'?String(activeChatClientId||''):['Просмотр акта','Исправление акта'].includes(title)?String(btMasterLastActNumber||''):title==='Выплата рекламодателю'?String(btMasterLastPayoutCode||''):'';
+ window.RemontMobile?.enter('master/page/'+title+'/'+routeSuffix,btMasterRestoreRoute(title),{root:title==='Панель мастера'});
   if(title!=='Диалог' && typeof btMasterStopChatMedia==='function') btMasterStopChatMedia();
   btMasterCurrentScreen=title;
   const name=String(masterCache.profile?.name||tg.initDataUnsafe?.user?.first_name||'Мастер').trim().replace(/\s+([.,!?])/g,'$1');
@@ -213,18 +243,7 @@ function btStartMasterAttention(){
     finally{btMasterAttentionInFlight=false;}
   },12000);
 }
-// Finger-swipe within the app, preserving the native Android/Telegram edge gesture.
-(function setupBtMasterSwipe(){
- let origin=null;
- document.addEventListener('touchstart',e=>{const t=e.touches?.[0];origin=t&&t.clientX<=70?{x:t.clientX,y:t.clientY,target:e.target}:null;},{passive:true});
- document.addEventListener('touchend',e=>{
-   if(!origin)return; const t=e.changedTouches?.[0],dx=t?t.clientX-origin.x:0,dy=t?Math.abs(t.clientY-origin.y):0;
-   const src=origin.target;origin=null;
-   if(dx>90&&dy<70&&!src?.closest?.('input,textarea,select,[contenteditable],.bt-chat-history')&&btMasterCurrentScreen!=='Панель мастера'){
-     e.preventDefault(); if(btMasterCurrentScreen==='Диалог')showMasterMessages();else renderMasterMenu();
-   }
- },{passive:false});
-})();
+// All edge gestures and Telegram BackButton events are handled centrally.
 function btMasterRecentThreads(limit=3){
   const grouped=new Map();
   for(const message of masterCache.messages||[]){
@@ -388,7 +407,7 @@ async function sendMasterReply(){
         let response;
         if(file){const data=await btMasterFileBase64(file);response=await masterApi('/api/master/message-media','POST',{client_id:activeChatClientId,text,media_type:file.type,file_name:file.name,data});}
         else response=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});
-        status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
+        window.RemontMobile?.clearDirty();status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
         await btMasterRefreshOpenChat();
     }catch(e){status.textContent=e.message;status.className='error';}
     finally{if(btn?.isConnected)btn.disabled=false;}
@@ -507,6 +526,7 @@ function btMasterOldOrders(){
         .sort((a,b)=>b.age-a.age).slice(0,5);
 }
 function renderMasterActForm(o=null){
+ btMasterActOrder=o;
  actGeoLocation=null;
  const manual=!o, id=o?String(o.id):'', safeId=id.replace(/'/g,"\\'");
  const device=o?.device==='Микроволновка'?'Микроволновая печь':o?.device||'';
@@ -557,6 +577,7 @@ async function submitMasterAct(event,orderId){
   if(!payload.house)throw new Error('Укажите дом.');
   if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number')throw new Error('Укажите GPS-локацию нажатием соответствующей кнопки.');
   const r=await masterApi('/api/master/act','POST',payload);
+  window.RemontMobile?.clearDirty();
   st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);
   // Не скачиваем PDF автоматически: мастер открывает его в разделе «Акты».
   try{await showMasterActs();}catch(e){st.textContent='Акт создан, но список не обновился. Откройте «Все акты». Через кнопку создавать его повторно не нужно.';}
@@ -601,6 +622,7 @@ async function showMasterPromos(){
 }
 let btMasterPayoutRequestId='';
 async function showMasterPayout(code){
+ btMasterLastPayoutCode=code;
  try{await loadMasterData();}catch(e){return masterToast(e.message,true)}
  const promo=masterCache.promos.find(x=>x.code===code);
  if(!promo)return masterToast('Промокод не найден.',true);
@@ -658,7 +680,7 @@ bootMasterApp();
 async function showMasterProfile(){
   try{await loadMasterData()}catch(e){return masterShell('Настройки профиля',`<article class="card error">${masterEsc(e.message)}</article>`)}
   const p=masterCache.profile||{},r=p.referral_settings||{};
-  const reviews=p.show_reviews!==false;
+  const reviews=!!p.show_reviews;
   const localEnabled=r.master_enabled!==undefined?!!r.master_enabled:(r.enabled!==false);
   const adminEnabled=r.admin_enabled!==false;
   masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Переключатели сохраняются сразу после нажатия. Остальные поля сохраняются кнопкой ниже.</p></article>
@@ -667,7 +689,7 @@ async function showMasterProfile(){
   <article class="card"><h2>Отзывы</h2><p class="subtitle">Показывать отзывы в публичном профиле мастера.</p><label class="toggle-row bt-setting-toggle"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${reviews?'checked':''} onchange="btSaveMasterToggle(this,'reviews')"></label><p id="masterReviewsToggleState" class="subtitle" role="status">${reviews?'Отзывы включены':'Отзывы скрыты'}</p></article>
   <article class="card"><h2>Реферальная программа</h2><p class="subtitle">Рефералы работают отдельно от промокодов. Настройка мастера и разрешение администратора проверяются сервером.</p>
   <label class="toggle-row bt-setting-toggle"><span>Разрешить рефералы моим клиентам</span><input id="masterReferralEnabled" type="checkbox" ${localEnabled?'checked':''} onchange="btSaveMasterToggle(this,'referrals')"></label>
-  <p id="masterReferralToggleState" class="subtitle" role="status">${!adminEnabled?(localEnabled?'Настройка мастера включена и сохранится, но администратор временно отключил программу для всех.':'Рефералы выключены у мастера; администратор также отключил программу для всех.'):localEnabled?'Рефералы включены':'Рефералы выключены — клиенты не увидят кнопку приглашения.'}</p>
+  <p id="masterReferralToggleState" class="subtitle" role="status">${!adminEnabled?'⛔ Администратор отключил программу для всех. Ваша галочка сохраняется, но клиенты не увидят ссылку, пока администратор не включит программу.':localEnabled?'✅ Программа доступна клиентам, привязанным к вам.':'Рефералы выключены — клиенты не увидят кнопку приглашения.'}</p>
   <label>Скидка новому клиенту, %</label><input id="masterReferralDiscount" type="number" min="0" max="100" step="0.5" value="${Number(r.new_client_discount_percent??5)}">
   <label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}">
   <label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}">
@@ -683,9 +705,10 @@ async function btSaveMasterToggle(el,kind){
     const body=kind==='reviews'?{show_reviews:desired}:{referral_settings:{enabled:desired}};
     const result=await masterApi('/api/master/settings','POST',body);
     if(!masterCache.profile)masterCache.profile={};
+    window.RemontMobile?.clearDirty();
     if(kind==='reviews')masterCache.profile.show_reviews=desired;
     else masterCache.profile.referral_settings={...(masterCache.profile.referral_settings||{}),master_enabled:desired,enabled:desired};
-    if(status){status.textContent=kind==='reviews'?(desired?'Отзывы включены и сохранены':'Отзывы скрыты и сохранены'):(desired?(masterCache.profile?.referral_settings?.admin_enabled===false?'Настройка сохранена. Пока рефералы отключены администратором.':'Рефералы включены и сохранены'):'Рефералы отключены: клиентская кнопка приглашения скрыта');status.className='notice'}
+    if(status){status.textContent=kind==='reviews'?(desired?'Отзывы включены и сохранены':'Отзывы скрыты и сохранены'):(desired?(masterCache.profile?.referral_settings?.admin_enabled===false?'Галочка сохранена, но администратор отключил программу. Клиентской кнопки пока не будет.':'Рефералы включены. Клиенты с привязкой к вам увидят ссылку.'):'Рефералы отключены: клиентская кнопка приглашения скрыта');status.className='notice'}
   }catch(e){
     el.checked=old;
     if(status){status.textContent='Не удалось сохранить: '+e.message;status.className='error'}
@@ -701,6 +724,7 @@ async function saveMasterSettings(){
     if(!masterCache.profile)masterCache.profile={};
     masterCache.profile.name=data.name;masterCache.profile.phone=data.phone;
     masterCache.profile.referral_settings={...(masterCache.profile.referral_settings||{}),...data.referral_settings};
+    window.RemontMobile?.clearDirty();
     st.textContent=r.message||'Настройки сохранены';st.className='notice';
   }catch(e){st.textContent=e.message;st.className='error'}finally{btn.disabled=false}
 }

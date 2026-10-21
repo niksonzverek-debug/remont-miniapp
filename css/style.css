@@ -838,3 +838,75 @@ body.bt-inner-page{overscroll-behavior-x:contain}
 }
 /* CSS button styles override the browser's hidden attribute; enforce it explicitly. */
 [hidden],.client-home-grid .menu-btn[hidden],#btReferralPanel[hidden]{display:none!important;}
+
+/* Patch 15: master feedback public page */
+.bt-public-review{padding:13px 0;border-top:1px solid rgba(77,159,230,.28);overflow-wrap:anywhere}
+.bt-public-review b{display:block;font-size:17px;margin-bottom:4px}
+.bt-public-review small{display:block;color:#a6c7e2;font-size:12px}
+.bt-public-review p{margin:8px 0 0;white-space:pre-wrap;overflow-wrap:anywhere}
+.bt-client-home .bt-reviews-entry[hidden]{display:none!important}
+
+/* Remont BT Fullscreen & safe-area adaptation, 20261021-fullscreen-v1.
+   Telegram owns its chrome; these offsets protect our own interface only. */
+:root {
+  --rb-viewport-height: 100dvh;
+  --rb-viewport-stable-height: 100dvh;
+  --rb-top: 0px;
+  --rb-bottom: 0px;
+  --rb-left: 0px;
+  --rb-right: 0px;
+  --rb-content-top: 0px;
+  --rb-content-bottom: 0px;
+  --rb-content-left: 0px;
+  --rb-content-right: 0px;
+  --rb-safe-top: max(env(safe-area-inset-top, 0px), var(--rb-top, 0px), var(--rb-content-top, 0px));
+  --rb-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--rb-bottom, 0px), var(--rb-content-bottom, 0px));
+  --rb-safe-left: max(env(safe-area-inset-left, 0px), var(--rb-left, 0px), var(--rb-content-left, 0px));
+  --rb-safe-right: max(env(safe-area-inset-right, 0px), var(--rb-right, 0px), var(--rb-content-right, 0px));
+}
+html { min-height: var(--rb-viewport-height); overscroll-behavior-x: none; }
+body {
+  min-height: var(--rb-viewport-height) !important;
+  max-width: 100%;
+  padding-top: max(12px, var(--rb-safe-top)) !important;
+  padding-left: max(12px, var(--rb-safe-left)) !important;
+  padding-right: max(12px, var(--rb-safe-right)) !important;
+  padding-bottom: calc(112px + var(--rb-safe-bottom)) !important;
+  overscroll-behavior-x: none;
+}
+.bt-client-home, .master-app, .bt-inner-content {
+  min-height: var(--rb-viewport-height);
+  max-width: 100%;
+  box-sizing: border-box;
+}
+body.bt-inner-page { padding-bottom: calc(112px + var(--rb-safe-bottom)) !important; }
+body.bt-order-page { padding-bottom: calc(186px + var(--rb-safe-bottom)) !important; }
+.bt-client-bottom-nav, .master-app .master-bottom-nav {
+  bottom: 0 !important;
+  padding-bottom: calc(8px + var(--rb-safe-bottom)) !important;
+  padding-left: max(8px, var(--rb-safe-left)) !important;
+  padding-right: max(8px, var(--rb-safe-right)) !important;
+}
+body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !important; }
+.bt-chat-history { max-height: max(180px, calc(var(--rb-viewport-height) - 370px)); }
+.bt-chat-shell { min-height: max(300px, calc(var(--rb-viewport-height) - 230px)); }
+.bt-client-home { min-height: calc(var(--rb-viewport-height) + 64px) !important; }
+/* A visible keyboard must never hide form controls beneath a fixed footer. */
+.rb-keyboard-open .bt-client-bottom-nav,
+.rb-keyboard-open .master-app .master-bottom-nav { display: none !important; }
+.rb-keyboard-open body.bt-order-page #submit {
+  position: static !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 12px auto 28px !important;
+}
+.rb-keyboard-open body { padding-bottom: calc(24px + var(--rb-safe-bottom)) !important; }
+.rb-keyboard-open .bt-chat-history { max-height: max(130px, calc(var(--rb-viewport-height) - 300px)); }
+@media (orientation: landscape) {
+  .bt-client-home,.master-app { min-height: var(--rb-viewport-height); }
+  .bt-client-bottom-nav button,.master-app .master-bottom-nav button { min-height: 44px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto !important; }
+}
