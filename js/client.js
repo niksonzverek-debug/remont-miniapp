@@ -56,6 +56,29 @@ function btClientRecentOrder(d){
     const label=document.getElementById('btOrderLabel');
     if(label)label.textContent='Заявка '+String(recent.id||'')+' · '+String(recent.device||'Техника')+' · '+(statuses[recent.status]||recent.display_status||'Обрабатывается');
 }
+function btRenderReferralPanel(box,r){
+  if(!box)return;
+  const url=String(r?.link||'');
+  if(!r?.enabled||!url){box.hidden=true;box.replaceChildren();return;}
+  box.hidden=false;
+  box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Приглашено: ${Number(r.invited_count)||0}.</p><input id="btReferralLink" readonly value="${escapeClient(url)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`;
+}
+function btRefreshClientReferralEntry(){
+ const el=document.getElementById('btClientReferralEntry');if(!el)return;
+ el.hidden=true;
+ clientApi('/api/client/referral').then(r=>{
+   if(!el.isConnected)return;
+   el.hidden=!(r.enabled&&r.link);
+ }).catch(()=>{if(el.isConnected)el.hidden=true});
+}
+function showClientReferral(){
+ setPage('🎁 Пригласить друга','<article class="card" id="btReferralPanel"><p class="subtitle">Проверяем доступность приглашений…</p></article>');
+ clientApi('/api/client/referral').then(r=>{
+   const box=document.getElementById('btReferralPanel');if(!box)return;
+   if(!r.enabled||!r.link){box.innerHTML='<p class="subtitle">Реферальная программа у вашего мастера сейчас недоступна.</p>';return;}
+   btRenderReferralPanel(box,r);
+ }).catch(()=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent='Не удалось проверить программу. Повторите позже.'});
+}
 function renderClientMenu() {
     btStopOrderProgressRefresh();
     btStopChatRefresh();
@@ -70,6 +93,7 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showMyOrders()"><span class="emoji bt-line-icon">▤</span><b>Мои заявки</b><small>История</small></button>
             <button class="menu-btn" onclick="showMyActs()"><span class="emoji bt-line-icon">◫</span><b>Мои акты</b><small>Гарантия</small></button>
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><b>Промокоды</b><small>Скидки</small></button>
+            <button class="menu-btn bt-referral-entry" id="btClientReferralEntry" type="button" onclick="showClientReferral()" hidden><span class="emoji bt-line-icon">↗</span><b>Пригласить друга</b><small>Рефералы</small></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><b>Профиль</b><small>Мои данные</small></button>
             <button class="menu-btn" onclick="showClientFAQ()"><span class="emoji bt-line-icon">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
           </div>
@@ -86,6 +110,7 @@ function renderClientMenu() {
           </section>
           <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
+    btRefreshClientReferralEntry();
     clientApi('/api/advertiser/dashboard').then(d => {
         if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
         const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
@@ -616,15 +641,12 @@ async function downloadClientActPdf(number){
 }
 
 function showEnterPromo() {
-    setPage('🎟️ Промокоды и приглашения', '<div class="card"><label>Введите промокод</label><input id="promo_code" placeholder="REMONT10" maxlength="64" autocapitalize="characters"><button id="promoSubmit" onclick="submitPromoFromApp()">Активировать</button><p id="promoStatus" class="subtitle"></p></div><div class="card" id="btReferralPanel"><p class="subtitle">Проверяем реферальную программу…</p></div>');
-    clientApi('/api/client/referral').then(r=>{
-        const box=document.getElementById('btReferralPanel'); if(!box)return;
-        if(!r.enabled){box.innerHTML=`<b>Пригласить друга</b><p class="subtitle">${escapeClient(r.message||'Реферальная программа сейчас отключена.')}</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}</p>`;return;}
-        const link=String(r.link||'');
-        box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Приглашено: ${Number(r.invited_count)||0}.</p>`+
-          (link?`<input id="btReferralLink" readonly value="${escapeClient(link)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`:`<p class="subtitle">${escapeClient(r.message||'Ссылка пока недоступна.')}</p>`);
-    }).catch(e=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent=e.message||'Данные рефералов недоступны.';});
+    // Promo codes must remain usable even when referrals are disabled.
+    setPage('🎟️ Промокоды', '<div class="card"><label>Введите промокод</label><input id="promo_code" placeholder="REMONT10" maxlength="64" autocapitalize="characters"><button id="promoSubmit" onclick="submitPromoFromApp()">Активировать</button><p id="promoStatus" class="subtitle"></p></div><div class="card" id="btReferralPanel" hidden></div>');
+    clientApi('/api/client/referral').then(r=>btRenderReferralPanel(document.getElementById('btReferralPanel'),r))
+       .catch(()=>{const box=document.getElementById('btReferralPanel');if(box){box.hidden=true;box.replaceChildren();}});
 }
+
 async function btCopyReferralLink() {
     const text=document.getElementById('btReferralLink')?.value||''; if(!text)return;
     try { await navigator.clipboard.writeText(text); showAlert('Ссылка скопирована.'); }
