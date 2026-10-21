@@ -1,78 +1,118 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Панель ремонта</title>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <script>
-      // Register the actual worker filename used by this project (sw.js).
-      // This must be served over HTTPS (or localhost).
-      (function () {
-        if (!('serviceWorker' in navigator)) return;
-        window.addEventListener('load', async function () {
-          try {
-            const workerUrl = new URL('./sw.js?release=20261021-fix13-chat-money-ux', document.baseURI);
-            const scopeUrl = new URL('./', document.baseURI);
-            const registration = await navigator.serviceWorker.register(workerUrl.href, {
-              scope: scopeUrl.pathname,
-              updateViaCache: 'none'
-            });
-            await registration.update();
-            console.info('[Remont BT] SW registered:', registration.scope);
-          } catch (error) {
-            console.error('[Remont BT] SW registration failed:', error);
-          }
-        }, { once: true });
-      })();
-    </script>
-    <link rel="stylesheet" href="css/style.css?v=20261021-fix13-chat-money-ux">
-    <link rel="manifest" href="manifest.webmanifest">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Remont BT — Открыть кабинет</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="css/style.css?v=20261021-main-auth-fix1">
+<link rel="manifest" href="manifest.webmanifest">
+<style>
+.bt-entry {min-height:100dvh;max-width:500px;margin:auto;padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px;justify-content:center}
+.bt-entry-card {border:1px solid #285987;border-radius:20px;padding:24px 18px;background:linear-gradient(155deg,#102946,#08192c);color:#f2f8ff;box-shadow:0 8px 38px #06172b88;text-align:center}
+.bt-entry-card h1{font-size:23px;line-height:1.3;margin:10px 0}
+.bt-entry-card p{line-height:1.5;color:#bdd5eb;font-size:15px}
+.bt-entry-icon{width:66px;height:66px;object-fit:contain}
+.bt-entry-actions{display:grid;gap:10px;margin-top:20px}
+.bt-entry-actions button{width:100%;min-height:54px;border:1px solid #54baf6;border-radius:14px;background:linear-gradient(120deg,#0757b3,#1688e3);color:white;font-size:16px;font-weight:650;cursor:pointer}
+.bt-entry-actions button.secondary{background:#183956;border-color:#346791}
+.bt-entry-actions button:focus-visible{outline:3px solid #90e0ff;outline-offset:3px}
+.bt-entry-muted{font-size:13px;color:#a9c3d9;white-space:pre-wrap;overflow-wrap:anywhere}
+</style>
 </head>
 <body>
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const launchMode = params.get('launch') || 'main';
-        const roleFromUrl = params.get('role');
-        // sendData is available only when opened from a reply-keyboard WebApp button.
-        window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
-    </script>
-    <script src="js/advertiser-config.js?v=20261021-fix13-chat-money-ux"></script>
-    <script src="js/common.js?v=20261021-fix13-chat-money-ux"></script>
-    <script>
-        const rawUserId = tg.initDataUnsafe && tg.initDataUnsafe.user
-            ? tg.initDataUnsafe.user.id : null;
-        const userId = rawUserId === null || rawUserId === undefined || rawUserId === ''
-            ? null : Number(rawUserId);
-        const hasMasterSession = Boolean(params.get('master_uid') && params.get('master_exp') && params.get('master_sig'));
-        // A session returned by /api/master/login is only a credential candidate.
-        // js/master.js must still verify it with the server before showing data.
-        const savedMasterSession = (() => {
-            try {
-                const value = localStorage.getItem('remontBT.master.session.v1') || '';
-                return /^\d{1,20}:\d{1,20}:[^:]+$/.test(value);
-            } catch (_) { return false; }
-        })();
-
-        console.log('Mini App build 20261021-audit12', {rawUserId, userId, roleFromUrl, launchMode, hasMasterSession});
-
-        // The master URL is signed server-side and checked by the API. Never invent an identity client-side.
-        let role = null;
-        if (roleFromUrl === 'master' && (hasMasterSession || savedMasterSession)) role = 'master';
-        else if ((roleFromUrl === 'master' || roleFromUrl === 'client') && Number.isFinite(userId)) role = roleFromUrl;
-        else if (Number.isFinite(userId)) role = 'client';
-
-        if (!role) {
-            document.body.innerHTML = `<main style="padding:24px;font:16px sans-serif;line-height:1.5"><h2>Не удалось определить аккаунт Telegram</h2><p>Закройте Mini App. В чате с ботом отправьте /start и откройте приложение новой кнопкой «Открыть кабинет мастера». Если кнопки нет, перезапустите бота. Не открывайте обычную HTTPS-ссылку.</p><p style="opacity:.7">Техническая причина: нет проверяемых данных Telegram или сохранённой сессии мастера.</p></main>`;
-        } else {
-            const script = document.createElement('script');
-            script.src = role === 'master' ? 'js/master.js?v=20261021-fix13-chat-money-ux' : 'js/client.js?v=20261021-fix13-chat-money-ux';
-            script.onerror = () => { document.body.innerHTML = '<main style="padding:24px;font:16px sans-serif"><h2>Не удалось загрузить форму</h2><p>Проверьте публикацию файлов Mini App.</p></main>'; };
-            document.body.appendChild(script);
-        }
-    </script>
+<main id="btEntry" class="bt-entry"><section class="bt-entry-card" role="status"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="Remont BT"><h1>Открываем Remont BT</h1><p>Проверяем Telegram и ваш кабинет…</p></section></main>
+<script>
+// launch=keyboard is used by existing bot keyboard links. BotFather's Main
+// Mini App launches the same index without role or signed URL parameters.
+const params = new URLSearchParams(location.search);
+const launchMode = params.get('launch') || 'main';
+const roleFromUrl = params.get('role');
+window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
+</script>
+<script src="js/advertiser-config.js?v=20261021-main-auth-fix1"></script>
+<script src="js/common.js?v=20261021-main-auth-fix1"></script>
+<script>
+(async function bootRemontBT(){
+  const area = document.getElementById('btEntry');
+  try { tg.ready(); tg.expand(); } catch (_) {}
+  const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const show = (heading, text, buttons = []) => {
+    area.innerHTML = '<section class="bt-entry-card"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="Remont BT">'
+      +'<h1>'+esc(heading)+'</h1><p>'+esc(text)+'</p><div class="bt-entry-actions" id="btEntryActions"></div></section>';
+    const actions = document.getElementById('btEntryActions');
+    for (const b of buttons) {
+      const el = document.createElement('button'); el.type='button';el.textContent=b.text;
+      if (b.secondary) el.className='secondary';
+      el.addEventListener('click', b.run); actions.appendChild(el);
+    }
+  };
+  const loadRole = (role) => {
+    if(role === 'advertiser'){
+      // Keep initData across same-origin navigation for Telegram clients that
+      // do not repeat it on every document reload. It is still verified by API.
+      try { if(tg.initData) sessionStorage.setItem('remontbt_adv_auth',JSON.stringify({data:tg.initData,uid:String(tg.initDataUnsafe?.user?.id||''),time:Date.now()})); }catch(_){}
+      const target=new URL('advertiser.html',location.href);
+      for(const key of ['session_uid','session_exp','session_sig']) if(params.has(key)) target.searchParams.set(key,params.get(key));
+      location.replace(target.href);return;
+    }
+    // Existing applications are loaded only after server-side role discovery.
+    const script=document.createElement('script');
+    script.src=role==='master'?'js/master.js?v=20261021-main-auth-fix1':'js/client.js?v=20261021-main-auth-fix1';
+    script.onerror=()=>show('Не удалось открыть кабинет','Не удалось загрузить файлы приложения. Проверьте публикацию GitHub Pages.',[{text:'Повторить',run:()=>location.reload()}]);
+    // Remove the loader so existing client/master scripts own the body.
+    area.remove(); document.body.appendChild(script);
+  };
+  const queryRole = roleFromUrl === 'master_entry' ? 'master_entry' : roleFromUrl;
+  // Existing master application links must remain usable for unregistered users.
+  if (queryRole === 'master_entry') {loadRole('client');return;}
+  const base = String(window.REMONT_ADVERTISER_API_BASE || '').replace(/\/$/,'');
+  if (!base) {
+    show('Сервер не настроен','Не найден адрес API. Запустите панель и обновите адрес Cloudflare в GitHub Pages.',[{text:'Повторить',run:()=>location.reload()}]);
+    return;
+  }
+  const headers={'X-Telegram-Init-Data':String(tg.initData||'')};
+  const signedUid=params.get('session_uid'),signedExp=params.get('session_exp'),signedSig=params.get('session_sig');
+  if (/^\d{1,20}$/.test(signedUid||'') && /^\d{1,20}$/.test(signedExp||'') && /^[0-9a-f]{64}$/i.test(signedSig||''))
+    headers['X-Remont-Session']=signedUid+':'+signedExp+':'+signedSig;
+  if(!headers['X-Remont-Session']) {
+    try { const saved=localStorage.getItem('remontBT.master.session.v1')||'';
+      if(/^\d{1,20}:\d{1,20}:[0-9a-f]{64}$/i.test(saved)) headers['X-Remont-Session']=saved;
+    }catch(_){}
+  }
+  if(!headers['X-Telegram-Init-Data'] && !headers['X-Remont-Session']) {
+    show('Откройте через Telegram','Обычная ссылка в браузере не передаёт подпись Telegram. Нажмите «Открыть» в профиле бота.',[{text:'Повторить',run:()=>location.reload()}]);return;
+  }
+  try {
+    const response=await fetch(base+'/api/session/roles',{method:'GET',headers,cache:'no-store'});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok){
+      const why=String(data.reason||'');
+      const detail=why==='hash_mismatch'
+       ?'Не совпала подпись Telegram. Проверьте, что в BotFather Main Mini App включён для того же бота, чей токен используется сервером.'
+       :why==='auth_date_expired'?'Данные входа устарели. Закройте Mini App и откройте его заново.'
+       :data.error||'Проверка Telegram завершилась ошибкой.';
+      throw new Error(detail+(why?' ('+why+')':''));
+    }
+    const r=data.roles||{};
+    const roles=[...(r.master?['master']:[]),...(r.client_registered?['client']:[]),...(r.advertiser?['advertiser']:[])];
+    const permitted={client:!!r.client,master:!!r.master,advertiser:!!r.advertiser};
+    if(['client','master','advertiser'].includes(queryRole) && permitted[queryRole]){loadRole(queryRole);return;}
+    if(roles.length===0){loadRole('client');return;}
+    if(roles.length===1){loadRole(roles[0]);return;}
+    const options=[{id:'client',text:'👤 Кабинет клиента'}, {id:'master',text:'🧰 Кабинет мастера'}, {id:'advertiser',text:'📊 Кабинет рекламодателя'}];
+    show('Выберите кабинет','У вашего Telegram-аккаунта несколько ролей. Выберите, куда перейти.',
+      options.filter(o=>roles.includes(o.id)).map(o=>({text:o.text,run:()=>loadRole(o.id)})));
+  }catch(err){
+    show('Не удалось открыть кабинет',err.message||'Ошибка связи с сервером.',[{text:'Повторить',run:()=>location.reload()}]);
+  }
+})();
+</script>
+<script>
+if('serviceWorker' in navigator){window.addEventListener('load',async()=>{try{
+ const reg=await navigator.serviceWorker.register('./sw.js?release=20261021-main-auth-fix1',{scope:'./',updateViaCache:'none'});await reg.update();
+}catch(e){console.warn('SW update failed:',e)}},{once:true});}
+</script>
 </body>
 </html>
