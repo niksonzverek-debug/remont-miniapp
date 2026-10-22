@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://meditation-treatments-minolta-former.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://admission-fri-metadata-owns.trycloudflare.com";
