@@ -133,6 +133,7 @@ function btMasterRestoreRoute(title){
    'Рекламная ссылка':()=>showMasterMarketingLink(),
    'Моя ссылка для клиентов':()=>showMasterInviteLink(),
    'Мой QR для оплаты':()=>showMasterPaymentQr(),
+   'Мой депозит':()=>showMasterFinance(),
    'Диалог':()=>openMasterChat(clientId),
    'Просмотр акта':()=>previewMasterAct(actNumber),
    'Исправление акта':()=>showMasterActCorrection(actNumber),
@@ -279,6 +280,7 @@ async function renderMasterMenu() {
   <div class="stack-list" style="margin:12px 0">
     <button type="button" class="bt-master-primary" onclick="showMasterInviteLink()">🔗 Моя ссылка для клиентов</button>
     <button type="button" class="secondary" onclick="showMasterPaymentQr()">💳 Мой QR для оплаты</button>
+    <button type="button" class="secondary" onclick="showMasterFinance()">💰 Мой депозит</button>
   </div>
   <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
     <button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><b>Заявки</b><small>Все обращения</small></button>
@@ -344,7 +346,7 @@ function btMasterStopChatMedia(){
     btMasterChatUrls.forEach(u=>URL.revokeObjectURL(u));btMasterChatUrls=[];
 }
 function btMasterChatBubble(m){
-    const mine=String(m.from_id)===String(masterCurrentUserId);
+    const mine=m.sender_role==='master' || (m.sender_role!=='client' && String(m.from_id)===String(masterCurrentUserId));
     const mid=String(m.media_id||'');
     const kind=m.type==='video'?'video':m.type==='photo'?'photo':'';
     return `<div class="message-bubble ${mine?'mine':'theirs'}"><b>${mine?'Вы':'Клиент'}</b>`+
@@ -815,4 +817,33 @@ async function btDeletePaymentQr(){
  const status=document.getElementById('btPaymentQrStatus');
  try{await masterApi('/api/master/payment-qr','POST',{image:null});if(status)status.textContent='QR удалён.';await btRefreshPaymentQr();}
  catch(e){if(status)status.textContent=e.message;}
+}
+
+/* Finance module: read-only balance and manual Paynet Xolis receipt request.
+   The API is opt-in and never changes legacy act issuance until cutover. */
+async function showMasterFinance(){
+  masterShell('Мой депозит', '<article class="card"><p id="financeStatus">Загружаем баланс…</p></article>');
+  try {
+    const d = await masterApi('/api/master/finance');
+    const fmt = t => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(t||0)/100);
+    const labels={admin_credit:'Пополнение администратором',receipt_credit:'Подтверждённый чек',act_commission:'Комиссия за акт',correction:'Корректировка'};
+    const operations=(d.operations||[]).map(o=>`<div class="card"><b>${masterEsc(labels[o.kind]||o.kind)}</b><p>${masterEsc(fmt(o.amount_tiyin))} сум ${o.act_number?'· акт '+masterEsc(o.act_number):''}</p><small>${masterEsc(o.created_at||'')}</small></div>`).join('');
+    const receipts=(d.receipts||[]).map(r=>`<p>${masterEsc(fmt(r.amount_tiyin))} сум — ${masterEsc(({pending:'Ожидает проверки',approved:'Подтверждено',rejected:'Отклонено'})[r.status]||r.status)} ${r.review_note?'('+masterEsc(r.review_note)+')':''}</p>`).join('');
+    masterShell('Мой депозит', `<article class="card"><h2>Баланс: ${masterEsc(fmt(d.balance_tiyin))} сум</h2><p>Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% за выданный акт.</p><p class="subtitle">Пополнение зачисляется только после проверки платежа администратором.</p></article>
+      <article class="card"><h2>Отправить чек пополнения</h2><p>Сначала оплатите через Paynet Xolis по реквизитам, предоставленным администратором. Затем загрузите чек.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" min="1000" max="100000000" step="1" required><label>Чек JPG или PNG, до 4 МБ</label><input id="financeReceipt" type="file" accept="image/jpeg,image/png" required><button type="submit">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
+      <article class="card"><h2>Заявки на пополнение</h2>${receipts||'<p>Заявок пока нет.</p>'}</article>
+      <article class="card"><h2>Последние операции</h2>${operations||'<p>Операций пока нет.</p>'}</article>`);
+  }catch(e){masterShell('Мой депозит',`<article class="card"><p class="error">${masterEsc(e.message)}</p><p>Финансовый раздел пока не активирован администратором. Остальные функции мастера работают как раньше.</p></article>`)}
+}
+async function submitMasterFinanceReceipt(){
+  const status=document.getElementById('financeUploadStatus');
+  const file=document.getElementById('financeReceipt')?.files?.[0];
+  const amount=document.getElementById('financeAmount')?.value;
+  if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size>4*1024*1024){if(status)status.textContent='Нужен JPG или PNG до 4 МБ.';return;}
+  if(status)status.textContent='Отправляем чек…';
+  try{
+    const image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Ошибка чтения чека'));reader.readAsDataURL(file)});
+    await masterApi('/api/master/finance/receipt','POST',{amount,image});
+    await showMasterFinance();masterToast('Чек отправлен на проверку.');
+  }catch(e){if(status)status.textContent=e.message;}
 }

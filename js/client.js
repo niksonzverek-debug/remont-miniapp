@@ -57,9 +57,9 @@ function btClientRecentOrder(d){
 function btRenderReferralPanel(box,r){
   if(!box)return;
   const url=String(r?.link||'');
-  if(!r?.enabled||!url){box.hidden=true;box.replaceChildren();return;}
+  if(!r?.enabled){box.hidden=true;box.replaceChildren();return;}
   box.hidden=false;
-  box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Приглашено: ${Number(r.invited_count)||0}.</p><input id="btReferralLink" readonly value="${escapeClient(url)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`;
+  box.innerHTML=`<b>🎁 Пригласить друга</b><p>Друг получит скидку ${Number(r.new_client_discount_percent)||0}%, а вам начислится ${Number(r.referrer_reward_percent)||0}% после его первого завершённого ремонта.</p><p>Накопленных скидок: ${Number(r.discount_credits)||0}. Зарегистрировано по вашей ссылке: ${Number(r.invited_count)||0}. Осталось приглашений: ${Number(r.invites_remaining)||0}.</p>${url?`<input id="btReferralLink" readonly value="${escapeClient(url)}"><button type="button" onclick="btCopyReferralLink()">Копировать ссылку</button><button type="button" class="secondary" onclick="btShareReferralLink()">Поделиться</button>`:`<p class="subtitle">${escapeClient(r.message||'Новые приглашения пока недоступны.')}</p>`}`;
 }
 function btRefreshClientReviewsEntry(){
  const el=document.getElementById('btClientReviewsEntry');if(!el)return;
@@ -91,7 +91,7 @@ function showClientReferral(){
  setPage('🎁 Пригласить друга','<article class="card" id="btReferralPanel"><p class="subtitle">Проверяем доступность приглашений…</p></article>');
  clientApi('/api/client/referral').then(r=>{
    const box=document.getElementById('btReferralPanel');if(!box)return;
-   if(!r.enabled||!r.link){box.innerHTML='<p class="subtitle">Реферальная программа у вашего мастера сейчас недоступна.</p>';return;}
+   if(!r.enabled){box.innerHTML='<p class="subtitle">Реферальная программа у вашего мастера сейчас недоступна.</p>';return;}
    btRenderReferralPanel(box,r);
  }).catch(()=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent='Не удалось проверить программу. Повторите позже.'});
 }
@@ -752,7 +752,7 @@ async function btLoadChatMedia(container, mediaId, kind){
     }catch(e){if(container.isConnected)container.textContent=e.message;}
 }
 function btChatBubble(m){
-    const mine=String(m.from_id)===String(tg?.initDataUnsafe?.user?.id||currentClientTelegramId);
+    const mine=m.sender_role==='client' || (m.sender_role!=='master' && String(m.from_id)===String(tg?.initDataUnsafe?.user?.id||currentClientTelegramId));
     const media=String(m.media_id||'');const kind=m.type==='video'?'video':m.type==='photo'?'photo':'';
     return `<div class="bt-chat-bubble ${mine?'mine':'theirs'}"><div class="bt-chat-sender">${mine?'Вы':'Мастер'}</div>`+
         (m.text?`<p>${escapeClient(m.text)}</p>`:'')+
