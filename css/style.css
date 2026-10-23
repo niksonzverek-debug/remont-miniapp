@@ -910,3 +910,39 @@ body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !importa
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto !important; }
 }
+
+/* Targeted client/master action styling: no changes to other buttons. */
+.bt-client-home .bt-main-action.bt-red-action,.master-app .bt-master-primary.bt-red-action{
+ background:linear-gradient(110deg,#7b122a,#e12e4e 55%,#9a1733)!important;
+ border:1px solid #ff6079!important;color:#fff!important;
+ box-shadow:0 0 13px #ff375c,0 0 27px #f2295866,inset 0 1px #ffbac6!important;
+ animation:btRedActionPulse 2.2s ease-in-out infinite;
+}
+@keyframes btRedActionPulse{50%{box-shadow:0 0 20px #ff375c,0 0 42px #f2295899,inset 0 1px #ffbac6}}
+@media(prefers-reduced-motion:reduce){.bt-client-home .bt-main-action.bt-red-action,.master-app .bt-master-primary.bt-red-action{animation:none}}
+
+/* TehServic: live neon validity feedback, scoped to order and act forms. */
+.bt-order-page .bt-required-neon.bt-field-empty,
+.bt-master-act-form .bt-required-neon.bt-field-empty {
+  border-color:#ff465c!important;
+  box-shadow:0 0 0 2px rgba(255,56,85,.30),0 0 13px rgba(255,35,65,.67)!important;
+  transition:border-color .15s,box-shadow .15s;
+}
+.bt-order-page .bt-required-neon.bt-field-ready,
+.bt-master-act-form .bt-required-neon.bt-field-ready {
+  border-color:#39e89c!important;
+  box-shadow:0 0 0 2px rgba(45,235,149,.25),0 0 13px rgba(22,218,119,.54)!important;
+  transition:border-color .15s,box-shadow .15s;
+}
+
+/* Patch 15: align fixed language switcher with Telegram's content safe area.
+   Reuse variables already populated by mobile-shell.js; no changes to navigation. */
+.bt-lang-widget {
+  top: calc(13px + var(--rb-safe-top, env(safe-area-inset-top, 0px))) !important;
+  right: max(13px, calc((100vw - 460px) / 2 + 12px), calc(12px + var(--rb-safe-right, 0px))) !important;
+}
+@media (max-width: 600px) {
+  .bt-lang-widget {
+    right: calc(12px + var(--rb-safe-right, 0px)) !important;
+  }
+}

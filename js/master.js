@@ -276,18 +276,16 @@ async function renderMasterMenu() {
   const s=masterCache.stats||{};
   masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
-  <button class="bt-master-primary" onclick="showCreateAct()">＋ Создать акт</button>
-  <div class="stack-list" style="margin:12px 0">
-    <button type="button" class="bt-master-primary" onclick="showMasterInviteLink()">🔗 Моя ссылка для клиентов</button>
-    <button type="button" class="secondary" onclick="showMasterPaymentQr()">💳 Мой QR для оплаты</button>
-    <button type="button" class="secondary" onclick="showMasterFinance()">💰 Мой депозит</button>
-  </div>
+  <button class="bt-master-primary bt-red-action" onclick="showCreateAct()">＋ Создать акт</button>
   <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
     <button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><b>Заявки</b><small>Все обращения</small></button>
     <button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><b>Акты</b><small>Документы</small></button>
     <button class="menu-btn" onclick="showMasterClients()"><span class="emoji">♙</span><b>Клиенты</b><small>Контакты</small></button>
-    <button class="menu-btn" onclick="showMasterMessages()"><span class="emoji">✉</span><b>Чаты</b><small>Переписка</small></button>
     <button class="menu-btn" onclick="showMasterPromos()"><span class="emoji">◇</span><b>Промокоды</b><small>Скидки</small></button>
+    <button class="menu-btn" onclick="showMasterFinanceReport()"><span class="emoji">▥</span><b>Финансы</b><small>Отчёт</small></button>
+    <button class="menu-btn" onclick="showMasterInviteLink()"><span class="emoji">↗</span><b>Моя ссылка</b><small>Для клиентов</small></button>
+    <button class="menu-btn" onclick="showMasterPaymentQr()"><span class="emoji">▦</span><b>Мой QR</b><small>Для оплаты</small></button>
+    <button class="menu-btn" onclick="showMasterFinance()"><span class="emoji">₽</span><b>Мой депозит</b><small>Баланс</small></button>
     <button class="menu-btn" onclick="showMasterFAQ()"><span class="emoji">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
     <button class="menu-btn" onclick="showMasterSupport()"><span class="emoji">✉</span><b>Поддержка</b><small>Написать администратору</small></button>
   </div>
@@ -826,24 +824,96 @@ async function showMasterFinance(){
   try {
     const d = await masterApi('/api/master/finance');
     const fmt = t => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(t||0)/100);
+    const effectiveBalance = Number.isFinite(Number(d.available_tiyin)) ? Number(d.available_tiyin) : Number(d.balance_tiyin||0);
     const labels={admin_credit:'Пополнение администратором',receipt_credit:'Подтверждённый чек',act_commission:'Комиссия за акт',correction:'Корректировка'};
     const operations=(d.operations||[]).map(o=>`<div class="card"><b>${masterEsc(labels[o.kind]||o.kind)}</b><p>${masterEsc(fmt(o.amount_tiyin))} сум ${o.act_number?'· акт '+masterEsc(o.act_number):''}</p><small>${masterEsc(o.created_at||'')}</small></div>`).join('');
     const receipts=(d.receipts||[]).map(r=>`<p>${masterEsc(fmt(r.amount_tiyin))} сум — ${masterEsc(({pending:'Ожидает проверки',approved:'Подтверждено',rejected:'Отклонено'})[r.status]||r.status)} ${r.review_note?'('+masterEsc(r.review_note)+')':''}</p>`).join('');
-    masterShell('Мой депозит', `<article class="card"><h2>Баланс: ${masterEsc(fmt(d.balance_tiyin))} сум</h2><p>Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% за выданный акт.</p><p class="subtitle">Пополнение зачисляется только после проверки платежа администратором.</p></article>
-      <article class="card"><h2>Отправить чек пополнения</h2><p>Сначала оплатите через Paynet Xolis по реквизитам, предоставленным администратором. Затем загрузите чек.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" min="1000" max="100000000" step="1" required><label>Чек JPG или PNG, до 4 МБ</label><input id="financeReceipt" type="file" accept="image/jpeg,image/png" required><button type="submit">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
+    const paymentUrl = typeof d.payment_url==='string' && /^https:\/\/[^\s]+$/i.test(d.payment_url) ? d.payment_url : '';
+    const paymentLink = paymentUrl ? `<a class="btn" href="${masterEsc(paymentUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin:12px 0">Перейти к пополнению</a>` : '<p class="subtitle">Ссылка для оплаты пока не настроена администратором.</p>';
+    masterShell('Мой депозит', `<article class="card"><h2>Баланс: ${masterEsc(fmt(effectiveBalance))} сум</h2>${paymentLink}<p>Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% от суммы выданного акта.</p><p class="subtitle">Пополнение зачисляется только после проверки платежа администратором.</p></article>
+      <article class="card"><h2>Отправить чек пополнения</h2><p>Оплатите пополнение по ссылке выше, затем укажите сумму и прикрепите чек. Средства зачисляются только после подтверждения администратора.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" min="1000" max="100000000" step="1" required><label>Чек JPG или PNG, до 4 МБ</label><input id="financeReceipt" type="file" accept="image/jpeg,image/png" required><button type="submit">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
       <article class="card"><h2>Заявки на пополнение</h2>${receipts||'<p>Заявок пока нет.</p>'}</article>
       <article class="card"><h2>Последние операции</h2>${operations||'<p>Операций пока нет.</p>'}</article>`);
   }catch(e){masterShell('Мой депозит',`<article class="card"><p class="error">${masterEsc(e.message)}</p><p>Финансовый раздел пока не активирован администратором. Остальные функции мастера работают как раньше.</p></article>`)}
 }
+let masterFinanceReceiptSending = false;
+let masterFinanceSubmissionId = null;
 async function submitMasterFinanceReceipt(){
+  if(masterFinanceReceiptSending)return;
   const status=document.getElementById('financeUploadStatus');
   const file=document.getElementById('financeReceipt')?.files?.[0];
   const amount=document.getElementById('financeAmount')?.value;
+  const amountNumber=Number(amount);
+  if(!Number.isSafeInteger(amountNumber)||amountNumber<1000||amountNumber>100000000){if(status)status.textContent='Укажите сумму от 1 000 до 100 000 000 сум.';return;}
   if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size>4*1024*1024){if(status)status.textContent='Нужен JPG или PNG до 4 МБ.';return;}
+  masterFinanceSubmissionId ||= crypto.randomUUID();
+  masterFinanceReceiptSending=true;
+  const submitButton=document.querySelector('#financeReceipt')?.closest('form')?.querySelector('button[type=submit]');
+  if(submitButton)submitButton.disabled=true;
   if(status)status.textContent='Отправляем чек…';
   try{
     const image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Ошибка чтения чека'));reader.readAsDataURL(file)});
-    await masterApi('/api/master/finance/receipt','POST',{amount,image});
+    await masterApi('/api/master/finance/receipt','POST',{amount,image,submission_id:masterFinanceSubmissionId});
+    masterFinanceSubmissionId=null;
     await showMasterFinance();masterToast('Чек отправлен на проверку.');
   }catch(e){if(status)status.textContent=e.message;}
+  finally{masterFinanceReceiptSending=false;if(submitButton)submitButton.disabled=false;}
 }
+
+/* Read-only master earnings report; sourced from PostgreSQL issued acts. */
+async function showMasterFinanceReport(){
+  masterShell('Финансы','<article class="card">Загружаем отчёт…</article>');
+  try {
+    const d=await masterApi('/api/master/finance');
+    const r=d.report;
+    if(!r)throw new Error('Финансовая аналитика пока не подключена на сервере.');
+    const fmt=n=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(n||0)/100);
+    const periods=[['today','Сегодня'],['days7','Последние 7 дней'],['days30','Последние 30 дней'],['all','За всё время']];
+    const blocks=periods.map(([key,title])=>{const p=r[key]||{};return `<article class="card"><h2>${title}</h2><p>Выдано актов: <b>${masterEsc(p.acts||0)}</b></p><p>Сумма ремонтов: <b>${masterEsc(fmt(p.gross_tiyin))} сум</b></p><p>Комиссия: <b>${masterEsc(fmt(p.commission_tiyin))} сум</b></p><p>После комиссии: <b>${masterEsc(fmt(p.net_tiyin))} сум</b></p></article>`}).join('');
+    masterShell('Финансы',`${Number(r.missing_commissions)>0?'<article class="card"><p class="error">Некоторые акты ещё не имеют подтверждённого расчёта комиссии. Итог предварительный.</p></article>':''}${blocks}<article class="card"><h2>Произвольный период</h2><label>С даты</label><input type="date" id="masterReportFrom"><label>По дату включительно</label><input type="date" id="masterReportTo"><button type="button" id="masterReportApply">Показать</button><div id="masterReportCustom" role="status"></div></article><article class="card"><p class="subtitle">Отчёт по выданным актам. Сумма после комиссии не учитывает стоимость запчастей и другие расходы.</p></article>`);
+    const apply=document.getElementById('masterReportApply');
+    if(apply)apply.addEventListener('click',()=>{
+      const from=document.getElementById('masterReportFrom').value;
+      const to=document.getElementById('masterReportTo').value;
+      const target=document.getElementById('masterReportCustom');
+      if(!from||!to||from>to){target.textContent='Выберите корректный период: дата начала не позже даты окончания.';return;}
+      const result={acts:0,gross_tiyin:0,commission_tiyin:0,net_tiyin:0};
+      for(const [day,record] of Object.entries(r.daily||{})){
+        if(day<from||day>to)continue;
+        for(const key of Object.keys(result))result[key]+=Number(record[key]||0);
+      }
+      target.innerHTML=`<p>Выдано актов: <b>${masterEsc(result.acts)}</b></p><p>Сумма ремонтов: <b>${masterEsc(fmt(result.gross_tiyin))} сум</b></p><p>Комиссия: <b>${masterEsc(fmt(result.commission_tiyin))} сум</b></p><p>После комиссии: <b>${masterEsc(fmt(result.net_tiyin))} сум</b></p>`;
+    });
+  } catch(e) {masterShell('Финансы',`<article class="card error">${masterEsc(e.message)}</article>`);}
+}
+
+/* Live mandatory-field feedback. Event delegation supports dynamically rendered Mini App pages. */
+(function(){
+  function applicable(el){
+    return el && el.matches && el.matches('input,select,textarea') &&
+      (el.closest('.bt-master-act-form') || el.closest('.bt-order-page'));
+  }
+  function required(el){
+    if(el.required) return true;
+    if(!el.closest('.bt-order-page')) return false;
+    return ['device','brand','problem','address','device_custom','brand_custom'].includes(el.id) &&
+      el.offsetParent !== null;
+  }
+  function refresh(el){
+    if(!applicable(el)) return;
+    const isRequired=required(el);
+    el.classList.toggle('bt-required-neon',isRequired);
+    el.classList.remove('bt-field-empty','bt-field-ready');
+    if(!isRequired || el.disabled || el.type==='hidden') return;
+    const hasValue=String(el.value||'').trim().length>0;
+    const valid=hasValue && (typeof el.checkValidity!=='function' || el.checkValidity());
+    el.classList.add(valid?'bt-field-ready':'bt-field-empty');
+  }
+  document.addEventListener('input',function(e){refresh(e.target);},true);
+  document.addEventListener('change',function(e){refresh(e.target);},true);
+  const observer=new MutationObserver(function(){
+    document.querySelectorAll('.bt-master-act-form input,.bt-master-act-form select,.bt-master-act-form textarea,.bt-order-page input,.bt-order-page select,.bt-order-page textarea').forEach(refresh);
+  });
+  function start(){observer.observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();

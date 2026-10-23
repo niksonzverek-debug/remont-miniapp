@@ -63,16 +63,14 @@ function btRenderReferralPanel(box,r){
 }
 function btRefreshClientReviewsEntry(){
  const el=document.getElementById('btClientReviewsEntry');if(!el)return;
- el.hidden=true;
- clientApi('/api/client/master-reviews').then(data=>{
-   if(el.isConnected)el.hidden=!data.enabled;
- }).catch(()=>{if(el.isConnected)el.hidden=true});
+ el.hidden=false; // Раздел отзывов виден даже без опубликованных отзывов.
+
 }
 function showClientMasterReviews(){
  setPage('⭐ Отзывы о мастере','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
  clientApi('/api/client/master-reviews').then(data=>{
    const el=document.getElementById('btMasterReviewsPanel');if(!el)return;
-   if(!data.enabled){el.innerHTML='<p class="subtitle">Мастер пока не включил показ отзывов.</p>';return;}
+   if(!data.enabled){el.innerHTML='<h2>Отзывы о мастере</h2><p class="subtitle">У мастера пока нет доступных отзывов. Вы сможете оценить работу после завершённого ремонта.</p>';return;}
    const reviews=Array.isArray(data.reviews)?data.reviews:[];
    const title='<h2>Отзывы о '+escapeClient(data.master_name||'мастере')+'</h2>';
    const summary=reviews.length?'<p class="subtitle">Оценка '+escapeClient(data.average_rating)+' из 5 · отзывов: '+escapeClient(data.count)+'</p>':'<p class="subtitle">Показ отзывов включён, но опубликованных отзывов ещё нет.</p>';
@@ -1512,3 +1510,34 @@ async function startRemontApp(){
 migrateLegacyMasterApplicationQueue();
 startRemontApp();
 startMasterApplicationAutoSync();
+
+/* Live mandatory-field feedback. Event delegation supports dynamically rendered Mini App pages. */
+(function(){
+  function applicable(el){
+    return el && el.matches && el.matches('input,select,textarea') &&
+      (el.closest('.bt-master-act-form') || el.closest('.bt-order-page'));
+  }
+  function required(el){
+    if(el.required) return true;
+    if(!el.closest('.bt-order-page')) return false;
+    return ['device','brand','problem','address','device_custom','brand_custom'].includes(el.id) &&
+      el.offsetParent !== null;
+  }
+  function refresh(el){
+    if(!applicable(el)) return;
+    const isRequired=required(el);
+    el.classList.toggle('bt-required-neon',isRequired);
+    el.classList.remove('bt-field-empty','bt-field-ready');
+    if(!isRequired || el.disabled || el.type==='hidden') return;
+    const hasValue=String(el.value||'').trim().length>0;
+    const valid=hasValue && (typeof el.checkValidity!=='function' || el.checkValidity());
+    el.classList.add(valid?'bt-field-ready':'bt-field-empty');
+  }
+  document.addEventListener('input',function(e){refresh(e.target);},true);
+  document.addEventListener('change',function(e){refresh(e.target);},true);
+  const observer=new MutationObserver(function(){
+    document.querySelectorAll('.bt-master-act-form input,.bt-master-act-form select,.bt-master-act-form textarea,.bt-order-page input,.bt-order-page select,.bt-order-page textarea').forEach(refresh);
+  });
+  function start(){observer.observe(document.body,{childList:true,subtree:true});}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
+})();
