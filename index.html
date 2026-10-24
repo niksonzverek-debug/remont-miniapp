@@ -34,18 +34,19 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
 <script src="js/advertiser-config.js?v=20261021-p15-reviews-referral"></script>
 <script src="js/common.js?v=20261021-fullscreen-v1"></script>
 <script src="js/mobile-shell.js?v=20261021-fullscreen-v1"></script>
-<script src="js/ui-language.js?v=20261021-compact-i18n-v1"></script>
+<script src="js/ui-language.js?v=20261024-ruuz-fix1"></script>
 <script>
 (async function bootRemontBT(){
   const area = document.getElementById('btEntry');
   try { tg.ready(); tg.expand(); } catch (_) {}
+  const translate = value => window.btTranslateText ? window.btTranslateText(value) : String(value);
   const esc = value => String(value ?? '').replace(/[&<>"']/g,c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const show = (heading, text, buttons = []) => {
     area.innerHTML = '<section class="bt-entry-card"><img class="bt-entry-icon" src="img/remont-bt-icon.png" alt="ТехСервис">'
-      +'<h1>'+esc(heading)+'</h1><p>'+esc(text)+'</p><div class="bt-entry-actions" id="btEntryActions"></div></section>';
+      +'<h1>'+esc(translate(heading))+'</h1><p>'+esc(translate(text))+'</p><div class="bt-entry-actions" id="btEntryActions"></div></section>';
     const actions = document.getElementById('btEntryActions');
     for (const b of buttons) {
-      const el = document.createElement('button'); el.type='button';el.textContent=b.text;
+      const el = document.createElement('button'); el.type='button';el.textContent=translate(b.text);
       if (b.secondary) el.className='secondary';
       el.addEventListener('click', b.run); actions.appendChild(el);
     }

@@ -11,7 +11,7 @@
  function downloadPayoutJournal(){
    if(!dashboard)return;
    const rows=filteredPayouts();
-   if(!rows.length)return setStatus('Нет записей для выгрузки.');
+   if(!rows.length)return setStatus((lang==='uz'?'Yuklab olish uchun yozuvlar yoʻq.':lang==='en'?'No records to export.':'Нет записей для выгрузки.'));
    const csvValue=value=>{
      let text=String(value??'').replace(/\r|\n/g,' ');
      if(/^[=+@\-]/.test(text))text="'"+text; // defend against spreadsheet formula injection
@@ -33,7 +33,7 @@
  const t = key => (text[lang] && text[lang][key]) || text.ru[key] || key;
  const money = n => new Intl.NumberFormat(lang === 'ru' ? 'ru-RU' : lang === 'en' ? 'en-US' : 'uz-UZ').format(Number(n || 0)) + ' сум';
  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
- function setLang(next) { lang=next; $('langBtn').textContent=lang==='ru'?'Oʻzbekcha':'Русский'; $('pageTitle').textContent=t('title'); $('pageSubtitle').textContent=t('subtitle'); $('refreshBtn').textContent=t('refresh'); $('mRegistrations').textContent=t('regs'); $('mActivations').textContent=t('activationsLabel'); $('mRepairs').textContent=t('repairs'); $('mAccrued').textContent=t('accrued'); $('mPaid').textContent=t('paid'); $('mBalance').textContent=t('balance'); $('mPending').textContent=t('pending'); $('mWeeklyRepairs').textContent=t('weeklyRepairs'); $('mWeeklyAccrued').textContent=t('weeklyAccrued'); $('promoTitle').textContent=t('promos'); $('payoutTitle').textContent=t('payouts'); $('cardTitle').textContent=t('card'); $('cardHelp').textContent=t('cardHelp'); $('newCard').placeholder=t('cardPlaceholder'); $('requestCardBtn').textContent=t('request'); if(dashboard) render(dashboard); }
+ function setLang(next) { lang=next; $('langBtn').textContent=lang==='ru'?'Oʻzbekcha':lang==='uz'?'English':'Русский'; $('pageTitle').textContent=t('title'); $('pageSubtitle').textContent=t('subtitle'); $('refreshBtn').textContent=t('refresh'); $('mRegistrations').textContent=t('regs'); $('mActivations').textContent=t('activationsLabel'); $('mRepairs').textContent=t('repairs'); $('mAccrued').textContent=t('accrued'); $('mPaid').textContent=t('paid'); $('mBalance').textContent=t('balance'); $('mPending').textContent=t('pending'); $('mWeeklyRepairs').textContent=t('weeklyRepairs'); $('mWeeklyAccrued').textContent=t('weeklyAccrued'); $('promoTitle').textContent=t('promos'); $('payoutTitle').textContent=t('payouts'); $('cardTitle').textContent=t('card'); $('cardHelp').textContent=t('cardHelp'); $('newCard').placeholder=t('cardPlaceholder'); $('requestCardBtn').textContent=t('request'); if(dashboard) render(dashboard); }
  function setStatus(message, isError=false) { $('status').className=isError?'error':'notice'; $('status').textContent=message; $('status').classList.remove('hidden'); }
  async function api(path, method='GET', body=null) {
   const base=String(window.REMONT_ADVERTISER_API_BASE||'').replace(/\/$/,'');
@@ -61,15 +61,16 @@
   for(const [id,key] of [['registrations','registrations'],['activations','activations'],['repairs','repairs']]) $(id).textContent=money(s[key]).replace(' сум','');
   ['accrued','paid','balance','pending','weeklyAccrued'].forEach(k=>$(k).textContent=money(k==='weeklyAccrued'?s.weekly_accrued:s[k])); $('weeklyRepairs').textContent=String(s.weekly_repairs||0);
   const promos=data.promocodes||[];
-  $('promos').innerHTML=promos.length?promos.map(p=>`<div class="list-item"><div class="row"><b>${esc(p.code)}</b><span class="pill">${p.active?t('active'):t('inactive')}</span></div><div class="muted">${esc(p.discount_percent)}% скидка · ${esc(p.reward_percent)}% ${t('reward')} · лимит на клиента: ${esc(p.uses_per_client||'—')}</div><div>${p.registrations} ${t('registrations')} · ${p.activations||0} ${t('activations')} · ${p.repairs} ${t('repairs2')}</div><div class="muted">${esc(p.expires_at||'')}</div><div><b>${money(p.accrued)}</b></div></div>`).join(''):`<p class="muted">${t('noPromos')}</p>`;
+  $('promos').innerHTML=promos.length?promos.map(p=>`<div class="list-item"><div class="row"><b>${esc(p.code)}</b><span class="pill">${p.active?t('active'):t('inactive')}</span></div><div class="muted">${esc(p.discount_percent)}% ${lang==='uz'?'chegirma':lang==='en'?'discount':'скидка'} · ${esc(p.reward_percent)}% ${t('reward')} · ${lang==='uz'?'Mijoz uchun limit':lang==='en'?'Per-customer limit':'Лимит на клиента'}: ${esc(p.uses_per_client||'—')}</div><div>${p.registrations} ${t('registrations')} · ${p.activations||0} ${t('activations')} · ${p.repairs} ${t('repairs2')}</div><div class="muted">${esc(p.expires_at||'')}</div><div><b>${money(p.accrued)}</b></div></div>`).join(''):`<p class="muted">${t('noPromos')}</p>`;
   const payouts=filteredPayouts();
   const total=payouts.reduce((sum,p)=>sum+Number(p.amount||0),0);
-  if($('btPayoutSummary'))$('btPayoutSummary').textContent=`Записей: ${payouts.length} · сумма: ${money(total)}. Статусы и чеки соответствуют данным сервера.`;
+  if($('btPayoutSummary'))$('btPayoutSummary').textContent=`${lang==='uz'?'Yozuvlar':lang==='en'?'Records':'Записей'}: ${payouts.length} · ${lang==='uz'?'summa':lang==='en'?'total':'сумма'}: ${money(total)}.`;
   $('payouts').innerHTML=payouts.length?payouts.map(p=>{const status=p.status==='confirmed'?t('confirmed'):p.status==='disputed'?t('disputed'):p.status==='sent'?t('sent'):t('pendingReview');return `<div class="list-item"><div class="row"><b>${money(p.amount)}</b><span class="pill">${esc(status)}</span></div><div class="muted">${esc(p.code||'')} · ${esc(p.created_at||'')} · ID ${esc(p.id||'')}</div>${p.has_receipt?'<div class="muted">Чек сохранён в системе</div>':''}${p.status==='sent'?`<div class="row" style="margin-top:8px"><button class="btn" data-decision="confirmed" data-id="${esc(p.id)}">${t('confirm')}</button><button class="btn warn" data-decision="disputed" data-id="${esc(p.id)}">${t('dispute')}</button></div>`:''}</div>`}).join(''):`<p class="muted">${t('noPayouts')}</p>`;
   $('status').classList.add('hidden'); $('app').classList.remove('hidden');
  }
  async function load() { try { setStatus(t('loading')); const data=await api('/api/advertiser/dashboard'); render(data); } catch(e) { if(String(window.REMONT_ADVERTISER_API_BASE||'').trim()==='') { $('setup').classList.remove('hidden'); setStatus(t('setup'),true); } else setStatus(t('error')+': '+e.message,true); } }
- $('langBtn').addEventListener('click',()=>setLang(lang==='ru'?'uz':'ru'));
+ $('langBtn').addEventListener('click',()=>window.setMiniLanguage?.(lang==='ru'?'uz':lang==='uz'?'en':'ru'));
+ document.addEventListener('bt:languagechange',event=>setLang(event.detail.language));
  $('refreshBtn').addEventListener('click',load);
  $('btPayoutFilter')?.addEventListener('change',()=>{if(dashboard)render(dashboard);});
  $('btPayoutMonth')?.addEventListener('change',()=>{if(dashboard)render(dashboard);});
@@ -77,5 +78,5 @@
  $('requestCardBtn').addEventListener('click',async()=>{const card=$('newCard').value.replace(/\D/g,'');try{const r=await api('/api/advertiser/card-request','POST',{card_number:card});setStatus(r.message||t('cardSent'));$('newCard').value='';}catch(e){setStatus(t('error')+': '+e.message,true);}});
  $('payouts').addEventListener('click',async e=>{const b=e.target.closest('[data-decision]');if(!b)return;let note='';if(b.dataset.decision==='disputed'){note=prompt(t('disputePrompt'))||'';if(!note)return;}try{const r=await api(`/api/advertiser/payouts/${encodeURIComponent(b.dataset.id)}/decision`,'POST',{decision:b.dataset.decision,note});setStatus(r.message||t('connected'));await load();}catch(err){setStatus(t('error')+': '+err.message,true);}});
  try { if(tg){tg.ready();tg.expand();} } catch(_) {}
- setLang(lang); load();
+ setLang(window.currentMiniLang?.()||lang); load();
 })();
