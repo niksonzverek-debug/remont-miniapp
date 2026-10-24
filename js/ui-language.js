@@ -39,8 +39,24 @@
   // Do not alter customer names, message bodies, uploaded file details or user inputs.
   const EXCLUDE='script,style,code,pre,textarea,.tablewrap,.detaildialog,.dialog,#dataTable,#recordFields,#jsonEditor,#historyResults,[contenteditable],.bt-chat-history,.chat-history,.bt-inbox-thread,.bt-recent-chat,.message-bubble,.bt-chat-bubble,.bt-user-content,[data-no-translate],#clientWelcomeName,.bt-header-name,#hello,#cardInfo';
   let processing=false;
+  // Preserve original Russian template strings per DOM node, not form state.
+  const originalText=new WeakMap(), lastText=new WeakMap();
+  const originalAttributes=new WeakMap(), lastAttributes=new WeakMap();
+  function sourceText(node){
+    const current=node.nodeValue;
+    if(lastText.has(node)&&lastText.get(node)===current)return originalText.get(node);
+    originalText.set(node,current);return current;
+  }
+  function sourceAttribute(el,key){
+    const current=el.getAttribute(key);
+    let originals=originalAttributes.get(el),last=lastAttributes.get(el);
+    if(!originals){originals={};originalAttributes.set(el,originals);}
+    if(!last){last={};lastAttributes.set(el,last);}
+    if(Object.prototype.hasOwnProperty.call(last,key)&&last[key]===current)return originals[key];
+    originals[key]=current;return current;
+  }
   function translateTree(root){
-    if(language()==='ru'||!root||processing)return;
+    if(!root||processing)return;
     processing=true;
     try{
       const scan=root.nodeType===1?root:document.body;
@@ -53,12 +69,18 @@
         }
       });
       const nodes=[];while(walker.nextNode())nodes.push(walker.currentNode);
-      for(const node of nodes){const value=t(node.nodeValue);if(value!==node.nodeValue)node.nodeValue=value;}
+      for(const node of nodes){const source=sourceText(node);
+        const value=t(source);
+        lastText.set(node,value);
+        if(value!==node.nodeValue)node.nodeValue=value;}
       scan.querySelectorAll?.('input[placeholder],textarea[placeholder],select[aria-label],button[aria-label],[title]').forEach(el=>{
         if(el.closest(EXCLUDE))return;
         for(const key of ['placeholder','aria-label','title']){
           if(!el.hasAttribute(key))continue;
-          const value=t(el.getAttribute(key));if(value!==el.getAttribute(key))el.setAttribute(key,value);
+          const source=sourceAttribute(el,key);
+          const value=t(source);
+          lastAttributes.get(el)[key]=value;
+          if(value!==el.getAttribute(key))el.setAttribute(key,value);
         }
       });
     } finally {processing=false;}
@@ -67,8 +89,19 @@
   function changeLang(next){
     if(!flags[next]||next===language())return;
     try{localStorage.setItem(LANG_KEY,next)}catch(_){ }
-    // Reload from original Russian templates. Never translate a previously translated sentence again.
-    location.reload();
+    document.documentElement.lang=next;
+    const widget=document.getElementById('remontLangToggle');
+    if(widget){
+      const current=widget.querySelector('.bt-lang-current');
+      if(current)current.textContent=flags[next];
+      widget.querySelectorAll('.bt-lang-menu button').forEach(button=>{
+        button.classList.toggle('selected',button.lang===next);
+      });
+      const menu=widget.querySelector('.bt-lang-menu');if(menu)menu.hidden=true;
+      if(current)current.setAttribute('aria-expanded','false');
+    }
+    translateTree(document.body);
+    document.dispatchEvent(new CustomEvent('bt:languagechange',{detail:{language:next}}));
   }
   window.setMiniLanguage=changeLang;
   function ensureSwitch(){

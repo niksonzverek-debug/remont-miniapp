@@ -911,15 +911,20 @@ body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !importa
   html { scroll-behavior: auto !important; }
 }
 
-/* Targeted client/master action styling: no changes to other buttons. */
+/* Keep the original blue fill. Only the outer edge glows like a new notification. */
 .bt-client-home .bt-main-action.bt-red-action,.master-app .bt-master-primary.bt-red-action{
- background:linear-gradient(110deg,#7b122a,#e12e4e 55%,#9a1733)!important;
- border:1px solid #ff6079!important;color:#fff!important;
- box-shadow:0 0 13px #ff375c,0 0 27px #f2295866,inset 0 1px #ffbac6!important;
+ background:linear-gradient(110deg,#0848a5,#168bff 56%,#0961c9)!important;
+ color:#fff!important;
+ border:1px solid #ff5676!important;
+ box-shadow:0 0 0 1px #ff5676aa,0 0 12px #ff375caa,0 0 24px #f2295855,inset 0 1px #a8edff80!important;
  animation:btRedActionPulse 2.2s ease-in-out infinite;
 }
-@keyframes btRedActionPulse{50%{box-shadow:0 0 20px #ff375c,0 0 42px #f2295899,inset 0 1px #ffbac6}}
+@keyframes btRedActionPulse{50%{box-shadow:0 0 0 2px #ff5676,0 0 19px #ff375c,0 0 35px #f2295888,inset 0 1px #a8edff80}}
 @media(prefers-reduced-motion:reduce){.bt-client-home .bt-main-action.bt-red-action,.master-app .bt-master-primary.bt-red-action{animation:none}}
+/* Deposit is a compact, clickable line directly below the master's profile header. */
+.master-app .bt-master-deposit-link{display:flex;align-items:center;gap:10px;width:100%;margin:4px 0 12px;padding:11px 14px;border:1px solid #2876bf;border-radius:12px;background:linear-gradient(110deg,#0b2549,#123e6c);color:#d6ecff;text-align:left;cursor:pointer}
+.master-app .bt-master-deposit-link strong{margin-left:auto;color:#fff;font-size:15px}
+.master-app .bt-master-deposit-link:focus-visible{outline:2px solid #70d9ff;outline-offset:2px}
 
 /* TehServic: live neon validity feedback, scoped to order and act forms. */
 .bt-order-page .bt-required-neon.bt-field-empty,
@@ -946,3 +951,10 @@ body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !importa
     right: calc(12px + var(--rb-safe-right, 0px)) !important;
   }
 }
+
+/* Deposit receipt selection — patch 02; scoped to the master deposit form. */
+.master-deposit-pay-link { display:inline-flex; justify-content:center; align-items:center; margin:12px 0; text-align:center; max-width:100%; }
+.master-deposit-file-input { position:absolute!important; width:1px!important; height:1px!important; opacity:0!important; overflow:hidden!important; clip-path:inset(50%); }
+.master-deposit-file-picker { display:flex; align-items:center; gap:10px; width:100%; box-sizing:border-box; min-height:52px; padding:12px 16px; margin:8px 0 16px; border:1px solid rgba(74,169,255,.7); border-radius:14px; background:rgba(18,54,99,.45); color:inherit; cursor:pointer; box-shadow:0 0 10px rgba(0,132,255,.18),inset 0 0 9px rgba(0,132,255,.07); overflow-wrap:anywhere; }
+.master-deposit-file-picker:focus-visible { outline:2px solid #67b8ff; outline-offset:2px; }
+.master-deposit-file-icon { font-size:22px; flex:none; }

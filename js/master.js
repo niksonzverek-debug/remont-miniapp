@@ -211,6 +211,47 @@ async function loadMasterData() {
   btStartMasterAttention();
   return masterCache;
 }
+// Dashboard deposit is informational; issuance is also checked immediately before opening the form.
+let btMasterFinanceSnapshot = null;
+function btMasterDepositValue(d){
+  if (!d || typeof d !== 'object') return null;
+  const v = d.available_tiyin ?? d.balance_tiyin;
+  return v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v);
+}
+function btMasterMoney(tiyin){
+  return new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(tiyin)/100);
+}
+function btMasterDepositShortage(tiyin){
+  return 'Депозит исчерпан. Пополните баланс для продолжения выдачи актов. Не хватает '+btMasterMoney(Math.abs(tiyin))+' сум.';
+}
+async function btMasterRefreshDeposit(){
+  try{
+    const d=await masterApi('/api/master/finance');
+    btMasterFinanceSnapshot=btMasterDepositValue(d);
+  }catch(_){ btMasterFinanceSnapshot=null; }
+  const balance=document.getElementById('btMasterHomeDepositValue');
+  if(balance) balance.textContent=btMasterFinanceSnapshot===null?'Баланс недоступен':btMasterMoney(btMasterFinanceSnapshot)+' сум';
+  const button=document.getElementById('btMasterHomeCreateAct');
+  if(button){
+    const locked=btMasterFinanceSnapshot!==null&&btMasterFinanceSnapshot<0;
+    button.textContent=locked?'🔒 Создать акт':'＋ Создать акт';
+    button.setAttribute('aria-label',locked?btMasterDepositShortage(btMasterFinanceSnapshot):'Создать акт');
+  }
+}
+async function btMasterCanOpenAct(){
+  // Always refresh the value: the balance may have changed since the dashboard rendered.
+  try{
+    const d=await masterApi('/api/master/finance');
+    btMasterFinanceSnapshot=btMasterDepositValue(d);
+  }catch(_){btMasterFinanceSnapshot=null; /* Existing server-side issuance policy remains authoritative. */}
+  if(btMasterFinanceSnapshot!==null&&btMasterFinanceSnapshot<0){
+    const message=btMasterDepositShortage(btMasterFinanceSnapshot);
+    masterToast(message,true);
+    if(typeof showAlert==='function')showAlert(message);
+    return false;
+  }
+  return true;
+}
 let btMasterCurrentScreen='';
 let btMasterAttentionTimer=null;
 let btMasterAttentionInFlight=false;
@@ -275,8 +316,9 @@ async function renderMasterMenu() {
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
   const s=masterCache.stats||{};
   masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
+  <button type="button" class="bt-master-deposit-link" onclick="showMasterFinance()" aria-label="Открыть мой депозит"><span>Мой депозит</span><strong id="btMasterHomeDepositValue">Загружаем…</strong><span aria-hidden="true">›</span></button>
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
-  <button class="bt-master-primary bt-red-action" onclick="showCreateAct()">＋ Создать акт</button>
+  <button id="btMasterHomeCreateAct" class="bt-master-primary bt-red-action" onclick="showCreateAct()">＋ Создать акт</button>
   <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
     <button class="menu-btn" onclick="showMasterOrders()"><span class="emoji">▤</span><b>Заявки</b><small>Все обращения</small></button>
     <button class="menu-btn" onclick="showMasterActs()"><span class="emoji">▧</span><b>Акты</b><small>Документы</small></button>
@@ -285,7 +327,7 @@ async function renderMasterMenu() {
     <button class="menu-btn" onclick="showMasterFinanceReport()"><span class="emoji">▥</span><b>Финансы</b><small>Отчёт</small></button>
     <button class="menu-btn" onclick="showMasterInviteLink()"><span class="emoji">↗</span><b>Моя ссылка</b><small>Для клиентов</small></button>
     <button class="menu-btn" onclick="showMasterPaymentQr()"><span class="emoji">▦</span><b>Мой QR</b><small>Для оплаты</small></button>
-    <button class="menu-btn" onclick="showMasterFinance()"><span class="emoji">₽</span><b>Мой депозит</b><small>Баланс</small></button>
+
     <button class="menu-btn" onclick="showMasterFAQ()"><span class="emoji">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
     <button class="menu-btn" onclick="showMasterSupport()"><span class="emoji">✉</span><b>Поддержка</b><small>Написать администратору</small></button>
   </div>
@@ -293,6 +335,7 @@ async function renderMasterMenu() {
     <div class="bt-recent-head"><button type="button" class="bt-recent-all" onclick="showMasterMessages()"><b>✉ Последние сообщения</b><small>Все чаты →</small></button><span class="count-bubble">${s.unread_messages||0}</span></div>
     <div id="btMasterRecentThreads" class="bt-recent-list">${btMasterRecentThreadsMarkup()}</div>
   </section>`);
+  void btMasterRefreshDeposit();
 }
 function showMasterFAQ(){
   const items=[
@@ -432,7 +475,7 @@ async function showMasterActs(){
  const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button>${['pending','sending','pending_client','pending_delivery','sending_failed'].includes(a.status)?`<button type="button" onclick="retryMasterActDelivery('${masterEsc(a.number)}')">↻ Повторить доставку</button>`:''}</div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
  masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);
 }
-async function showMasterCreateAct(orderId){try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
+async function showMasterCreateAct(orderId){if(!(await btMasterCanOpenAct()))return;try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
 /* Каждый список содержит 5 стандартных вариантов и шестой «Другое». */
 const masterAppliances=[
  {value:'Стиральная машина',icon:'♻'},
@@ -532,7 +575,8 @@ function btMasterOldOrders(){
         .filter(x=>Number.isFinite(x.age)&&x.age>=2*3600*1000)
         .sort((a,b)=>b.age-a.age).slice(0,5);
 }
-function renderMasterActForm(o=null){
+async function renderMasterActForm(o=null){
+ if(!(await btMasterCanOpenAct()))return;
  btMasterActOrder=o;
  actGeoLocation=null;
  const manual=!o, id=o?String(o.id):'', safeId=id.replace(/'/g,"\\'");
@@ -679,7 +723,7 @@ async function activateMasterPromo(code){
 }
 function showCreateMasterPromo(){masterShell('Новый промокод',`<button class="back-btn" onclick="showMasterPromos()">← Назад</button><form class="card" onsubmit="event.preventDefault();submitMasterPromo()"><label>Код</label><input id="pCode" required maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" placeholder="PARTNER10"><label>Имя партнёра</label><input id="pName" required maxlength="150"><label>Telegram партнёра</label><input id="pContact" required maxlength="150" placeholder="@username"><label>Телефон рекламодателя</label><input id="pPartnerPhone" required type="tel" placeholder="+998901234567"><label>Номер карты</label><input id="pCard" required inputmode="numeric" maxlength="23" placeholder="16–19 цифр"><label>Скидка клиенту, %</label><input id="pDiscount" required type="number" min="1" max="50" value="5"><label>Вознаграждение партнёру, %</label><input id="pReward" required type="number" min="0" max="30" value="5"><label>Использований на клиента</label><input id="pLimit" required type="number" min="1" max="100" value="1"><label>Действует до</label><input id="pExpiry" required type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}"><button type="submit" id="promoSubmit">Создать промокод</button><p id="promoStatus" class="subtitle"></p></form>`);}
 async function submitMasterPromo(){const btn=document.getElementById('promoSubmit'),st=document.getElementById('promoStatus');btn.disabled=true;try{const r=await masterApi('/api/master/promo','POST',{code:document.getElementById('pCode').value.trim().toUpperCase(),partner_name:document.getElementById('pName').value.trim(),partner_contact:document.getElementById('pContact').value.trim(),partner_phone:document.getElementById('pPartnerPhone').value.trim(),partner_card:document.getElementById('pCard').value.replace(/\D/g,''),discount_percent:Number(document.getElementById('pDiscount').value),reward_percent:Number(document.getElementById('pReward').value),max_act:Number(document.getElementById('pLimit').value),expires_at:document.getElementById('pExpiry').value+'T23:59:59'});st.textContent=r.message;await showMasterPromos();}catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}}
-function showCreateAct(){const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}
+async function showCreateAct(){if(!(await btMasterCanOpenAct()))return;const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}
 function showCreatePromoForm(){showCreateMasterPromo();}
 function sendEvent(){showAlert('Это действие теперь выполняется в мастерской панели. Выберите раздел в меню.');return false;}
 bootMasterApp();
@@ -829,12 +873,21 @@ async function showMasterFinance(){
     const operations=(d.operations||[]).map(o=>`<div class="card"><b>${masterEsc(labels[o.kind]||o.kind)}</b><p>${masterEsc(fmt(o.amount_tiyin))} сум ${o.act_number?'· акт '+masterEsc(o.act_number):''}</p><small>${masterEsc(o.created_at||'')}</small></div>`).join('');
     const receipts=(d.receipts||[]).map(r=>`<p>${masterEsc(fmt(r.amount_tiyin))} сум — ${masterEsc(({pending:'Ожидает проверки',approved:'Подтверждено',rejected:'Отклонено'})[r.status]||r.status)} ${r.review_note?'('+masterEsc(r.review_note)+')':''}</p>`).join('');
     const paymentUrl = typeof d.payment_url==='string' && /^https:\/\/[^\s]+$/i.test(d.payment_url) ? d.payment_url : '';
-    const paymentLink = paymentUrl ? `<a class="btn" href="${masterEsc(paymentUrl)}" target="_blank" rel="noopener noreferrer" style="display:inline-block;margin:12px 0">Перейти к пополнению</a>` : '<p class="subtitle">Ссылка для оплаты пока не настроена администратором.</p>';
+    const paymentLink = paymentUrl ? `<a class="btn master-deposit-pay-link" href="${masterEsc(paymentUrl)}" target="_blank" rel="noopener noreferrer">Перейти к пополнению</a>` : '<p class="subtitle">Ссылка для оплаты пока не настроена администратором.</p>';
     masterShell('Мой депозит', `<article class="card"><h2>Баланс: ${masterEsc(fmt(effectiveBalance))} сум</h2>${paymentLink}<p>Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% от суммы выданного акта.</p><p class="subtitle">Пополнение зачисляется только после проверки платежа администратором.</p></article>
-      <article class="card"><h2>Отправить чек пополнения</h2><p>Оплатите пополнение по ссылке выше, затем укажите сумму и прикрепите чек. Средства зачисляются только после подтверждения администратора.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" min="1000" max="100000000" step="1" required><label>Чек JPG или PNG, до 4 МБ</label><input id="financeReceipt" type="file" accept="image/jpeg,image/png" required><button type="submit">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
+      <article class="card"><h2>Отправить чек пополнения</h2><p>Оплатите пополнение по ссылке выше, затем укажите сумму и прикрепите чек. Средства зачисляются только после подтверждения администратора.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" oninput="masterFinanceSubmissionId=null" min="1000" max="100000000" step="1" required><label for="financeReceipt">Чек JPG или PNG, до 4 МБ</label><label class="master-deposit-file-picker" for="financeReceipt"><span class="master-deposit-file-icon" aria-hidden="true">📎</span><span id="financeReceiptLabel">Выбрать чек</span></label><input id="financeReceipt" class="master-deposit-file-input" type="file" accept="image/jpeg,image/png" required onchange="masterFinanceReceiptSelected(this)"><button type="submit" id="masterFinanceSubmitReceipt">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
       <article class="card"><h2>Заявки на пополнение</h2>${receipts||'<p>Заявок пока нет.</p>'}</article>
       <article class="card"><h2>Последние операции</h2>${operations||'<p>Операций пока нет.</p>'}</article>`);
   }catch(e){masterShell('Мой депозит',`<article class="card"><p class="error">${masterEsc(e.message)}</p><p>Финансовый раздел пока не активирован администратором. Остальные функции мастера работают как раньше.</p></article>`)}
+}
+function masterFinanceReceiptSelected(input){
+  const file=input?.files?.[0];
+  const label=document.getElementById('financeReceiptLabel');
+  const status=document.getElementById('financeUploadStatus');
+  if(label)label.textContent=file ? file.name : 'Выбрать чек';
+  if(status)status.textContent='';
+  // A different receipt or amount must not reuse the previous request identifier.
+  masterFinanceSubmissionId=null;
 }
 let masterFinanceReceiptSending = false;
 let masterFinanceSubmissionId = null;
@@ -845,8 +898,8 @@ async function submitMasterFinanceReceipt(){
   const amount=document.getElementById('financeAmount')?.value;
   const amountNumber=Number(amount);
   if(!Number.isSafeInteger(amountNumber)||amountNumber<1000||amountNumber>100000000){if(status)status.textContent='Укажите сумму от 1 000 до 100 000 000 сум.';return;}
-  if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size>4*1024*1024){if(status)status.textContent='Нужен JPG или PNG до 4 МБ.';return;}
-  masterFinanceSubmissionId ||= crypto.randomUUID();
+  if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size===0||file.size>4*1024*1024){if(status)status.textContent='Нужен JPG или PNG до 4 МБ.';return;}
+  masterFinanceSubmissionId ||= (globalThis.crypto?.randomUUID?.() || 'receipt-'+Date.now()+'-'+Math.random().toString(36).slice(2));
   masterFinanceReceiptSending=true;
   const submitButton=document.querySelector('#financeReceipt')?.closest('form')?.querySelector('button[type=submit]');
   if(submitButton)submitButton.disabled=true;

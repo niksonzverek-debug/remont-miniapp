@@ -3,6 +3,43 @@
 // ============ СОСТОЯНИЕ ============
 let btOrderOperationId = null;
 let btHomeTimer = null;
+let btClientPromoTimer = null;
+let btClientHomeGeneration = 0;
+function btStopClientPromoCarousel(){
+    if(btClientPromoTimer){clearInterval(btClientPromoTimer);btClientPromoTimer=null;}
+}
+function btStartClientPromoCarousel(generation){
+    const banner=document.getElementById('btClientPromoBanner');
+    if(!banner)return;
+    // Promo-code entry is always available; referral is advertised only when enabled.
+    const slides=[{icon:'🎁',title:'У вас есть промокод?',detail:'Получите скидку на ремонт',open:showEnterPromo}];
+    let current=0;
+    const render=()=>{
+        if(generation!==btClientHomeGeneration||!banner.isConnected)return;
+        const slide=slides[current];
+        const icon=banner.querySelector('[data-promo-icon]');
+        const title=banner.querySelector('[data-promo-title]');
+        const detail=banner.querySelector('[data-promo-detail]');
+        if(icon)icon.textContent=slide.icon;
+        if(title)title.textContent=slide.title;
+        if(detail)detail.textContent=slide.detail;
+        banner.onclick=()=>slide.open();
+        banner.setAttribute('aria-label',slide.title+' '+slide.detail);
+    };
+    render();
+    clientApi('/api/client/referral').then(r=>{
+        if(generation!==btClientHomeGeneration||!banner.isConnected)return;
+        if(r?.enabled&&r?.link){
+            slides.push({icon:'🎁',title:'Пригласи друга — получи скидку 5%!',detail:'Приглашайте друзей и получайте скидки',open:showClientReferral});
+            btClientPromoTimer=setInterval(()=>{
+                if(generation!==btClientHomeGeneration||!banner.isConnected){btStopClientPromoCarousel();return;}
+                current=(current+1)%slides.length;
+                render();
+            },3000);
+        }
+    }).catch(()=>{});
+}
+
 let btOrderProgressTimer = null;
 function btStopOrderProgressRefresh() {
     if (btOrderProgressTimer) { clearInterval(btOrderProgressTimer); btOrderProgressTimer = null; }
@@ -98,13 +135,15 @@ function renderClientMenu() {
     btStopOrderProgressRefresh();
     btStopChatRefresh();
     if(btHomeTimer){clearInterval(btHomeTimer);btHomeTimer=null;}
+    btStopClientPromoCarousel();
+    const btPromoGeneration=++btClientHomeGeneration;
     document.body.classList.remove('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <main class="bt-client-home">
           <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header>
-          <button class="bt-client-promo-banner" type="button" onclick="showEnterPromo()"><span>🎁</span><span><b>У вас есть промокод?</b><small>Получите скидку на ремонт</small></span><span aria-hidden="true">›</span></button>
+          <button class="bt-client-promo-banner" id="btClientPromoBanner" type="button" onclick="showEnterPromo()"><span data-promo-icon>🎁</span><span><b data-promo-title>У вас есть промокод?</b><small data-promo-detail>Получите скидку на ремонт</small></span><span aria-hidden="true">›</span></button>
+          <button class="bt-main-action bt-client-new-order-action bt-red-action" type="button" onclick="showNewOrder()">＋ Создать заявку</button>
           <div class="client-home-grid bt-home-tiles">
-            <button class="menu-btn" onclick="showNewOrder()"><span class="emoji bt-line-icon">⊕</span><b>Создать заявку</b><small>Новый ремонт</small></button>
             <button class="menu-btn" onclick="showMyOrders()"><span class="emoji bt-line-icon">▤</span><b>Мои заявки</b><small>История</small></button>
             <button class="menu-btn" onclick="showMyActs()"><span class="emoji bt-line-icon">◫</span><b>Мои акты</b><small>Гарантия</small></button>
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><b>Промокоды</b><small>Скидки</small></button>
@@ -128,6 +167,7 @@ function renderClientMenu() {
         </main>`;
     btRefreshClientReferralEntry();
     btRefreshClientReviewsEntry();
+    btStartClientPromoCarousel(btPromoGeneration);
     clientApi('/api/advertiser/dashboard').then(d => {
         if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
         const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
@@ -1073,11 +1113,6 @@ function showNewOrder() {
 
         <div class="card">
             <div class="bt-client-address-row"><div><label for="house">Дом *</label><input id="house" maxlength="80" placeholder="15А" autocomplete="off"></div><div><label for="apartment">Квартира</label><input id="apartment" maxlength="80" placeholder="42" autocomplete="off"></div></div>
-            <div class="bt-saved-address-box"><label for="btSavedAddressPicker">Сохранённый адрес</label>
-                <select id="btSavedAddressPicker" class="bt-client-select" onchange="btUseSavedAddress()"><option value="">— Выбрать адрес —</option>${btAddressOptions()}</select>
-                <div class="bt-saved-address-actions"><button type="button" class="secondary" onclick="btSaveCurrentAddress('home')">⌂ Запомнить как дом</button><button type="button" class="secondary" onclick="btSaveCurrentAddress('work')">⌂ Запомнить как работу</button></div>
-                <p id="btAddressSaveStatus" class="subtitle" role="status">Адреса сохраняются только на этом устройстве.</p>
-            </div>
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
             </button>
