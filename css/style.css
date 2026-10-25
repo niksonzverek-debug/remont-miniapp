@@ -958,3 +958,27 @@ body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !importa
 .master-deposit-file-picker { display:flex; align-items:center; gap:10px; width:100%; box-sizing:border-box; min-height:52px; padding:12px 16px; margin:8px 0 16px; border:1px solid rgba(74,169,255,.7); border-radius:14px; background:rgba(18,54,99,.45); color:inherit; cursor:pointer; box-shadow:0 0 10px rgba(0,132,255,.18),inset 0 0 9px rgba(0,132,255,.07); overflow-wrap:anywhere; }
 .master-deposit-file-picker:focus-visible { outline:2px solid #67b8ff; outline-offset:2px; }
 .master-deposit-file-icon { font-size:22px; flex:none; }
+
+/* 25.10.2026 — mobile identity form and safe Telegram header */
+.master-app{padding-top:max(14px,env(safe-area-inset-top,0px))!important;box-sizing:border-box}
+.master-app .bt-master-header{height:auto!important;min-height:98px!important;align-items:center!important;overflow:visible!important;padding-top:16px!important;padding-bottom:16px!important}
+.master-app .bt-master-header .bt-header-copy{min-width:0!important;flex:1 1 auto!important;overflow:visible!important}
+.master-app .bt-master-header .bt-header-name{display:-webkit-box!important;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;white-space:normal!important;overflow:hidden!important;overflow-wrap:anywhere!important;line-height:1.18!important;max-height:2.45em!important;font-size:clamp(16px,4.6vw,23px)!important}
+.master-app .bt-master-header .bt-header-role{flex-shrink:0!important}
+.master-app #masterContent{padding-bottom:calc(98px + env(safe-area-inset-bottom,0px))!important;scroll-margin-top:24px}
+.master-app .bt-identity-card{margin-top:12px!important;scroll-margin-top:calc(80px + env(safe-area-inset-top,0px))!important}
+.master-app .bt-identity-card,.master-app .bt-identity-card *{box-sizing:border-box}
+.master-app .bt-identity-form{display:flex;flex-direction:column;gap:10px;min-width:0}
+.master-app .bt-identity-form>label:not(.bt-identity-consent),.master-app .bt-identity-field>label:first-child{font-weight:700;color:#cce5ff}
+.master-app .bt-identity-field{min-width:0;display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.master-app .bt-identity-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important;pointer-events:none!important}
+.master-app .bt-identity-file-button{display:flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:12px 16px;border:1px solid #5caefb;border-radius:13px;background:linear-gradient(120deg,#113a69,#175c9c);color:white!important;font-weight:700;cursor:pointer;overflow-wrap:anywhere}
+.master-app .bt-identity-file-input:focus-visible+.bt-identity-preview{outline:2px solid #74caff}
+.master-app .bt-identity-preview:empty{display:none}
+.master-app .bt-identity-preview img{display:block;width:100%;max-height:220px;object-fit:contain;border:1px solid #3874a8;border-radius:12px;background:#081727}
+.master-app .bt-identity-field small{color:#a9c9e5}
+.master-app .bt-identity-consent{display:flex!important;align-items:flex-start!important;gap:12px!important;line-height:1.5!important;margin:14px 0!important;cursor:pointer}
+.master-app .bt-identity-consent input{appearance:auto!important;-webkit-appearance:checkbox!important;display:block!important;flex:0 0 23px!important;width:23px!important;height:23px!important;min-height:23px!important;margin:2px 0 0!important;opacity:1!important;accent-color:#3189f6}
+.master-app .bt-identity-submit{width:100%!important;min-height:56px!important;background:linear-gradient(100deg,#1468d7,#318af6)!important;color:white!important;border-radius:14px!important}
+.master-app .bt-identity-back{width:100%;min-height:48px;margin:12px 0}
+@media(max-width:380px){.master-app .bt-master-header .bt-header-name{font-size:16px!important}.master-app .bt-identity-card{padding:14px!important}}
