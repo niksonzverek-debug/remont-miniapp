@@ -661,7 +661,7 @@ async function showMyActs() {
     setPage('📄 Акты и документы', '<p class="subtitle">Загружаем документы…</p>');
     try {
         const d = await clientApi('/api/client/dashboard');
-        btClientActsCache = d.acts || [];
+        btClientActsCache = (d.acts || []).filter(a=>a.status!=='cancelled');
         const statuses={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',cancelled:'Отменён',draft:'Черновик'};
         const masterHeader=`<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div>`;
         const content=btClientActsCache.length?btClientActsCache.map(a=>`<article class="card">

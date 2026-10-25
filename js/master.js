@@ -474,7 +474,7 @@ async function retryMasterActDelivery(number){
 async function showMasterActs(){
  try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
  clearMasterPdfUrl();
- const rows=masterCache.acts.map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button>${['pending','sending','pending_client','pending_delivery','sending_failed'].includes(a.status)?`<button type="button" onclick="retryMasterActDelivery('${masterEsc(a.number)}')">↻ Повторить доставку</button>`:''}</div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
+ const rows=masterCache.acts.filter(a=>a.status!=='cancelled').map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button>${['pending','sending','pending_client','pending_delivery','sending_failed'].includes(a.status)?`<button type="button" onclick="retryMasterActDelivery('${masterEsc(a.number)}')">↻ Повторить доставку</button>`:''}</div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
  masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);
 }
 async function showMasterCreateAct(orderId){if(!(await btMasterCanOpenAct()))return;try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
@@ -501,7 +501,7 @@ const masterGuarantees=[{value:'0',label:'Без гарантии',icon:'⊘'},{
 function masterChoiceMarkup(id,label,items,selected=''){
  const current=items.find(i=>i.value===selected);
  const options=items.map(i=>`<button type="button" class="bt-master-choice" role="option" data-value="${masterEsc(i.value)}" onclick="chooseMasterActItem(this,'${id}')"><span class="bt-master-choice-icon">${masterEsc(i.icon)}</span><span>${masterEsc(i.label||i.value)}</span><span class="bt-master-check">✓</span></button>`).join('');
- return `<label id="${id}Label">${masterEsc(label)}</label><details class="bt-master-picker" id="${id}Picker"><summary role="button"><span id="${id}Summary">${current?masterEsc((current.icon||'')+' '+(current.label||current.value)):'Выберите вариант'}</span><span aria-hidden="true">⌄</span></summary><div class="bt-master-picker-options" role="listbox" aria-labelledby="${id}Label">${options}</div></details><input id="${id}" type="hidden" value="${masterEsc(selected)}">`;
+ return `<label id="${id}Label">${masterEsc(label)}</label><details class="bt-master-picker ${['actDevice','actBrand'].includes(id)?(selected?'bt-act-complete':'bt-act-required'):''}" id="${id}Picker"><summary role="button"><span id="${id}Summary">${current?masterEsc((current.icon||'')+' '+(current.label||current.value)):'Выберите вариант'}</span><span aria-hidden="true">⌄</span></summary><div class="bt-master-picker-options" role="listbox" aria-labelledby="${id}Label">${options}</div></details><input id="${id}" type="hidden" value="${masterEsc(selected)}">`;
 }
 function chooseMasterActItem(button,id){
  const value=button.dataset.value||'';document.getElementById(id).value=value;
@@ -510,10 +510,24 @@ function chooseMasterActItem(button,id){
  for(const other of document.querySelectorAll(`#${id}Picker .bt-master-choice`))other.classList.toggle('selected',other===button);
  if(id==='actGuarantee')toggleMasterCustomGuarantee();else toggleActCustom(id,id+'CustomWrap');
  if(id==='actDevice')renderMasterActWorks();
+ if(id==='actDevice'||id==='actBrand')btActUpdateChoiceGlow(id);
+}
+function btActUpdateChoiceGlow(id){
+ const picker=document.getElementById(id+'Picker');if(!picker)return;
+ const selected=document.getElementById(id)?.value||'';
+ const custom=selected==='__other__'?(document.getElementById(id+'Custom')?.value.trim()||''):selected;
+ picker.classList.toggle('bt-act-complete',!!custom);
+ picker.classList.toggle('bt-act-required',!custom);
+}
+function btActUpdateLocationGlow(){
+ const button=document.getElementById('actLocationButton');if(!button)return;
+ button.classList.toggle('bt-act-complete',!!actGeoLocation);
+ button.classList.toggle('bt-act-required',!actGeoLocation);
 }
 function toggleActCustom(selectId,wrapId){
  const el=document.getElementById(selectId),wrap=document.getElementById(wrapId);
  if(wrap)wrap.style.display=el?.value==='__other__'?'block':'none';
+ if(selectId==='actDevice'||selectId==='actBrand')btActUpdateChoiceGlow(selectId);
 }
 function renderMasterActWorks(){
  const panel=document.getElementById('actWorksList');if(!panel)return;
@@ -588,22 +602,21 @@ async function renderMasterActForm(o=null){
  const initialBrand=masterBrands.some(i=>i.value===brand)?brand:(brand?'__other__':'');
  masterShell('Создать акт',`<button class="back-btn" onclick="${manual?'renderMasterMenu()':'showMasterOrders()'}">← Назад</button>${o?`<article class="card"><h2>Заявка ${masterEsc(o.id)}</h2><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'')}</p><p><b>Техника:</b> ${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' '))}</p><p>${masterEsc(o.problem||'')}</p><button class="secondary" type="button" onclick="renderMasterActForm(null)">Создать акт без заявки</button></article>`:`<article class="card"><h2>Акт без заявки</h2><p>Для клиента, обратившегося лично или по телефону. Регистрация в Telegram не обязательна.</p></article>`}<form class="stack-list" onsubmit="event.preventDefault();submitMasterAct(event,'${safeId}');return false;"><article class="card bt-master-act-form">${manual?`<label>ФИО клиента</label><input id="actClientName" maxlength="150" required placeholder="Имя и фамилия"><label>Телефон клиента</label><input id="actClientPhone" required type="tel" inputmode="tel" maxlength="60" placeholder="+998 …">`:''}
  ${masterChoiceMarkup('actDevice','Вид техники',masterAppliances,initialDevice)}
- <div id="actDeviceCustomWrap" style="display:none"><label>Укажите вид техники</label><input id="actDeviceCustom" maxlength="120" value="${masterEsc(initialDevice==='__other__'?device:'')}" placeholder="Введите технику"></div>
+ <div id="actDeviceCustomWrap" style="display:none"><label>Укажите вид техники</label><input oninput="btActUpdateChoiceGlow('actDevice')" id="actDeviceCustom" maxlength="120" value="${masterEsc(initialDevice==='__other__'?device:'')}" placeholder="Введите технику"></div>
  ${masterChoiceMarkup('actBrand','Бренд',masterBrands,initialBrand)}
- <div id="actBrandCustomWrap" style="display:none"><label>Укажите бренд</label><input id="actBrandCustom" maxlength="120" value="${masterEsc(initialBrand==='__other__'?brand:'')}" placeholder="Введите бренд"></div>
+ <div id="actBrandCustomWrap" style="display:none"><label>Укажите бренд</label><input oninput="btActUpdateChoiceGlow('actBrand')" id="actBrandCustom" maxlength="120" value="${masterEsc(initialBrand==='__other__'?brand:'')}" placeholder="Введите бренд"></div>
  <label>Модель (если есть)</label><input id="actModel" maxlength="120" value="${masterEsc(o?.model||'')}" placeholder="Модель техники">
  <label>Выполненные работы <small class="subtitle">Можно выбрать несколько</small></label><div id="actWorksList" class="bt-master-works"></div>
- <div class="bt-work-templates"><button type="button" class="secondary" onclick="masterApplyWorkTemplate('maintenance')">✧ Профилактика</button><button type="button" class="secondary" onclick="masterApplyWorkTemplate('basic')">⚙ Типовая работа</button><button type="button" class="secondary" onclick="masterApplyWorkTemplate('clear')">× Снять выбор</button></div><p id="actTemplateStatus" class="subtitle"></p>
+
  <div id="actWorksCustomWrap" style="display:none"><label>Свои работы (каждая с новой строки)</label><textarea id="actWorksCustom" maxlength="3000" rows="4" placeholder="Дополнительная работа 1&#10;Дополнительная работа 2"></textarea></div>
  <label>Стоимость, сум</label><input id="actPrice" inputmode="numeric" autocomplete="off" required placeholder="Например, 500 000" oninput="formatActPrice(this)">
  ${masterChoiceMarkup('actGuarantee','Гарантия',masterGuarantees,'30')}
  <div id="actGuaranteeCustomWrap" style="display:none"><label>Свой срок гарантии, месяцев</label><input id="actGuaranteeMonths" inputmode="numeric" type="number" min="1" max="120" step="1" placeholder="Например, 12"></div>
  <div class="bt-master-address-row"><div><label>Дом *</label><input id="actHouse" required maxlength="80" value="${masterEsc(o?.house||'')}" placeholder="15А"></div><div><label>Квартира</label><input id="actApartment" maxlength="80" value="${masterEsc(o?.apartment||'')}" placeholder="42"></div></div>
- <button type="button" class="secondary" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
- <button type="button" class="secondary" onclick="masterPreviewDraftAct()">◫ Посмотреть черновик акта</button>
- <div id="btMasterActDraftPreview" class="bt-act-draft-preview" hidden></div>
+ <button id="actLocationButton" type="button" class="secondary bt-act-required" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
+
  <button id="actSubmit" type="submit">▣ Создать акт</button><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
- toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();
+ toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();btActUpdateLocationGlow();
 }
 function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';}
 // Keep the same operation ID on retries, including ambiguous network failures.
@@ -616,7 +629,7 @@ function masterNewActRequestId(){
  return masterActRequestId;
 }
 let actGeoLocation=null;
-function captureActLocation(){const status=document.getElementById('actLocationStatus');if(!navigator.geolocation){if(status)status.textContent='Браузер не поддерживает определение локации.';return;}if(status)status.textContent='Определяем локацию…';navigator.geolocation.getCurrentPosition(pos=>{actGeoLocation={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy};if(status)status.textContent=`📍 Локация сохранена (точность около ${Math.round(pos.coords.accuracy)} м)`;},err=>{if(status)status.textContent=err.code===1?'Разрешите доступ к локации в браузере.':'Не удалось определить локацию. Повторите попытку — без GPS акт сохранить нельзя.';},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});}
+function captureActLocation(){const status=document.getElementById('actLocationStatus');if(!navigator.geolocation){if(status)status.textContent='Браузер не поддерживает определение локации.';return;}if(status)status.textContent='Определяем локацию…';navigator.geolocation.getCurrentPosition(pos=>{actGeoLocation={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy};if(status)status.textContent=`📍 Локация сохранена (точность около ${Math.round(pos.coords.accuracy)} м)`;btActUpdateLocationGlow();},err=>{if(status)status.textContent=err.code===1?'Разрешите доступ к локации в браузере.':'Не удалось определить локацию. Повторите попытку — без GPS акт сохранить нельзя.';btActUpdateLocationGlow();},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});}
 async function submitMasterAct(event,orderId){
  if(event){event.preventDefault();event.stopPropagation();}
  const btn=document.getElementById('actSubmit'),st=document.getElementById('actStatus');
@@ -995,3 +1008,6 @@ async function showMasterFinanceReport(){
   function start(){observer.observe(document.body,{childList:true,subtree:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
+/* Required act choices: red neon until selected, green after completion. */
+(function(){const style=document.createElement('style');style.textContent=`.bt-master-picker.bt-act-required,.bt-act-required#actLocationButton{border:1px solid #ff4058!important;box-shadow:0 0 7px rgba(255,45,75,.65),0 0 16px rgba(255,45,75,.25)!important}.bt-master-picker.bt-act-complete,.bt-act-complete#actLocationButton{border:1px solid #29d986!important;box-shadow:0 0 7px rgba(41,217,134,.65),0 0 16px rgba(41,217,134,.22)!important}`;document.head.appendChild(style)})();
