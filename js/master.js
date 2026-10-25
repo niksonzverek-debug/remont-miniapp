@@ -457,7 +457,8 @@ async function sendMasterReply(){
         let response;
         if(file){const data=await btMasterFileBase64(file);response=await masterApi('/api/master/message-media','POST',{client_id:activeChatClientId,text,media_type:file.type,file_name:file.name,data});}
         else response=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});
-        window.RemontMobile?.clearDirty();status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
+        masterActRequestId=null;
+  window.RemontMobile?.clearDirty();status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
         await btMasterRefreshOpenChat();
     }catch(e){status.textContent=e.message;status.className='error';}
     finally{if(btn?.isConnected)btn.disabled=false;}
@@ -604,6 +605,15 @@ async function renderMasterActForm(o=null){
  toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();
 }
 function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';}
+// Keep the same operation ID on retries, including ambiguous network failures.
+let masterActRequestId=null;
+function masterNewActRequestId(){
+ if(!masterActRequestId){
+  if(!globalThis.crypto?.randomUUID)throw new Error('Обновите Telegram/WebView: требуется безопасный идентификатор операции.');
+  masterActRequestId=crypto.randomUUID();
+ }
+ return masterActRequestId;
+}
 let actGeoLocation=null;
 function captureActLocation(){const status=document.getElementById('actLocationStatus');if(!navigator.geolocation){if(status)status.textContent='Браузер не поддерживает определение локации.';return;}if(status)status.textContent='Определяем локацию…';navigator.geolocation.getCurrentPosition(pos=>{actGeoLocation={latitude:pos.coords.latitude,longitude:pos.coords.longitude,accuracy:pos.coords.accuracy};if(status)status.textContent=`📍 Локация сохранена (точность около ${Math.round(pos.coords.accuracy)} м)`;},err=>{if(status)status.textContent=err.code===1?'Разрешите доступ к локации в браузере.':'Не удалось определить локацию. Повторите попытку — без GPS акт сохранить нельзя.';},{enableHighAccuracy:true,timeout:12000,maximumAge:60000});}
 async function submitMasterAct(event,orderId){
@@ -627,6 +637,7 @@ async function submitMasterAct(event,orderId){
   if(!payload.device||!payload.brand||!payload.works.length||!payload.price||payload.price<=0)throw new Error('Заполните технику, бренд, работы и стоимость.');
   if(!payload.house)throw new Error('Укажите дом.');
   if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number')throw new Error('Укажите GPS-локацию нажатием соответствующей кнопки.');
+  payload.request_id=masterNewActRequestId();
   const r=await masterApi('/api/master/act','POST',payload);
   window.RemontMobile?.clearDirty();
   st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);
@@ -635,7 +646,7 @@ async function submitMasterAct(event,orderId){
  }catch(e){
    const networkFailure=(typeof navigator!=='undefined'&&navigator.onLine===false)||/failed to fetch|networkerror|load failed|fetch failed/i.test(String(e.message||''));
    if(networkFailure&&payload&&typeof queueOperation==='function'){
-     const offline={event:'offline_create_act',client_name:payload.client_name||'',client_phone:payload.client_phone||'',device:payload.device,brand:payload.brand,model:payload.model||'—',works:payload.works,price:payload.price,guarantee_days:payload.guarantee_days,guarantee_months:payload.guarantee_months,house:payload.house,apartment:payload.apartment,location:{lat:payload.location.latitude,lon:payload.location.longitude},order_id:payload.order_id||'',local_registration_id:(typeof getLocalRegistrationId==='function'?getLocalRegistrationId():'')};
+     const offline={event:'offline_create_act',client_name:payload.client_name||'',client_phone:payload.client_phone||'',device:payload.device,brand:payload.brand,model:payload.model||'—',works:payload.works,price:payload.price,guarantee_days:payload.guarantee_days,guarantee_months:payload.guarantee_months,house:payload.house,apartment:payload.apartment,location:{lat:payload.location.latitude,lon:payload.location.longitude},order_id:payload.order_id||'',request_id:payload.request_id,local_registration_id:(typeof getLocalRegistrationId==='function'?getLocalRegistrationId():'')};
      queueOperation(offline);st.textContent='Сервер недоступен. Акт помещён в очередь и пока НЕ создан на сервере.';st.className='notice';btn.textContent='▣ Акт ожидает отправки';btn.disabled=true;
    }else{st.textContent=e.message||'Не удалось создать акт.';st.className='error';btn.textContent='▣ Повторить создание акта';btn.disabled=false;}
  }
@@ -735,6 +746,7 @@ async function showMasterProfile(){
   const localEnabled=r.master_enabled!==undefined?!!r.master_enabled:(r.enabled!==false);
   const adminEnabled=r.admin_enabled!==false;
   masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Переключатели сохраняются сразу после нажатия. Остальные поля сохраняются кнопкой ниже.</p></article>
+  <article class="card"><h2>🪪 Идентификация личности</h2><p id="identityStatus">Загрузка статуса…</p><button type="button" onclick="showMasterIdentity()">Пройти идентификацию</button></article>
   <form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()">
   <article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"></article>
   <article class="card"><h2>Отзывы</h2><p class="subtitle">Показывать отзывы в публичном профиле мастера.</p><label class="toggle-row bt-setting-toggle"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${reviews?'checked':''} onchange="btSaveMasterToggle(this,'reviews')"></label><p id="masterReviewsToggleState" class="subtitle" role="status">${reviews?'Отзывы включены':'Отзывы скрыты'}</p></article>
@@ -745,8 +757,13 @@ async function showMasterProfile(){
   <label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}">
   <label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}">
   </article><article class="card"><button id="masterSettingsSave" type="submit">Сохранить остальные настройки</button><p id="masterSettingsStatus" class="subtitle" role="status"></p></article></form>
-  <button class="bt-master-support-entry" type="button" onclick="showMasterSupport()">💬 Написать в поддержку</button>`);
+  <button class="bt-master-support-entry" type="button" onclick="showMasterSupport()">💬 Написать в поддержку</button>`);masterIdentityStatus();
 }
+async function showMasterIdentity(){
+  masterShell('Идентификация',`<button class="back-btn" onclick="showMasterProfile()">← Назад</button><article class="card"><h2>Добровольная идентификация</h2><p>Проверка документов администратором. После одобрения — разовый бонус 20 000 сум на депозит.</p><form onsubmit="event.preventDefault();submitMasterIdentity()"><label>ФИО как в паспорте</label><input id="identityName" required maxlength="180"><label>Лицевая сторона паспорта / ID</label><input id="identityFront" type="file" accept="image/jpeg,image/png" required><label>Обратная сторона (если есть)</label><input id="identityBack" type="file" accept="image/jpeg,image/png"><label>Селфи</label><input id="identitySelfie" type="file" accept="image/jpeg,image/png" required><label><input id="identityConsent" type="checkbox" required> Согласен на обработку персональных данных для проверки личности</label><button type="submit" id="identitySend">Отправить документы</button><p id="identityMessage" role="status"></p></form></article>`);
+}
+async function submitMasterIdentity(){const btn=document.getElementById('identitySend'),msg=document.getElementById('identityMessage');btn.disabled=true;try{const image=async id=>{const f=document.getElementById(id).files[0];if(!f)return null;if(!['image/jpeg','image/png'].includes(f.type)||f.size>4*1024*1024)throw Error('JPG/PNG до 4 МБ');return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Ошибка файла'));reader.readAsDataURL(f)})};const payload={full_name:document.getElementById('identityName').value,consent:document.getElementById('identityConsent').checked,front:await image('identityFront'),back:await image('identityBack'),selfie:await image('identitySelfie')};const r=await masterApi('/api/master/identity','POST',payload);msg.textContent=r.message;setTimeout(showMasterProfile,900)}catch(e){msg.textContent=e.message;btn.disabled=false}}
+async function masterIdentityStatus(){try{const r=await masterApi('/api/master/identity');const el=document.getElementById('identityStatus');if(el)el.textContent=({unverified:'Не проверен',pending:'На проверке',approved:'✅ Личность проверена',rejected:'Отклонено — '+(r.review_note||'')})[r.status]||r.status}catch(e){const el=document.getElementById('identityStatus');if(el)el.textContent='Статус недоступен: '+e.message}}
 async function btSaveMasterToggle(el,kind){
   const old=!el.checked,desired=!!el.checked;
   const status=document.getElementById(kind==='reviews'?'masterReviewsToggleState':'masterReferralToggleState');

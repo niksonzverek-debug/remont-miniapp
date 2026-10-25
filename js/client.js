@@ -103,15 +103,24 @@ function btRefreshClientReviewsEntry(){
  el.hidden=false; // Раздел отзывов виден даже без опубликованных отзывов.
 
 }
+// Badge always comes from the authenticated client's assigned master's server status.
+function btMasterVerifiedBadge(master){
+    return master?.identity_verified===true ? '<span class="bt-identity-verified" style="display:inline-flex;align-items:center;gap:5px;color:#20bc95;font-weight:700;font-size:.86rem;margin:5px 0">✔ '+escapeClient((window.btUiLang==='uz'||document.documentElement.lang==='uz')?'Shaxsi tekshirilgan':'Личность проверена')+'</span>' : '';
+}
+function btUpdateMasterBadge(d){
+    const el=document.getElementById('btHomeMasterIdentity');
+    if(el)el.innerHTML=btMasterVerifiedBadge(d?.master);
+}
 function showClientMasterReviews(){
  setPage('⭐ Отзывы о мастере','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
  clientApi('/api/client/master-reviews').then(data=>{
    const el=document.getElementById('btMasterReviewsPanel');if(!el)return;
-   if(!data.enabled){el.innerHTML='<h2>Отзывы о мастере</h2><p class="subtitle">У мастера пока нет доступных отзывов. Вы сможете оценить работу после завершённого ремонта.</p>';return;}
+   const verified=data.identity_verified===true?'<p class="subtitle" style="color:#19a77a">✔ Личность проверена</p>':'';
+   if(!data.enabled){el.innerHTML='<h2>Отзывы о мастере</h2>'+verified+'<p class="subtitle">У мастера пока нет доступных отзывов. Вы сможете оценить работу после завершённого ремонта.</p>';return;}
    const reviews=Array.isArray(data.reviews)?data.reviews:[];
    const title='<h2>Отзывы о '+escapeClient(data.master_name||'мастере')+'</h2>';
    const summary=reviews.length?'<p class="subtitle">Оценка '+escapeClient(data.average_rating)+' из 5 · отзывов: '+escapeClient(data.count)+'</p>':'<p class="subtitle">Показ отзывов включён, но опубликованных отзывов ещё нет.</p>';
-   el.innerHTML=title+summary+reviews.map(r=>'<div class="bt-public-review"><b>'+('⭐'.repeat(Math.min(5,Math.max(1,Number(r.rating)||1))))+'</b><small>'+escapeClient([r.device,r.brand].filter(Boolean).join(' · '))+' · '+escapeClient(String(r.created_at||'').slice(0,10))+'</small><p>'+escapeClient(r.text||'Без комментария')+'</p></div>').join('');
+   el.innerHTML=title+verified+summary+reviews.map(r=>'<div class="bt-public-review"><b>'+('⭐'.repeat(Math.min(5,Math.max(1,Number(r.rating)||1))))+'</b><small>'+escapeClient([r.device,r.brand].filter(Boolean).join(' · '))+' · '+escapeClient(String(r.created_at||'').slice(0,10))+'</small><p>'+escapeClient(r.text||'Без комментария')+'</p></div>').join('');
  }).catch(()=>{const el=document.getElementById('btMasterReviewsPanel');if(el)el.textContent='Не удалось загрузить отзывы. Повторите позже.'});
 }
 function btRefreshClientReferralEntry(){
@@ -140,7 +149,7 @@ function renderClientMenu() {
     document.body.classList.remove('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <main class="bt-client-home">
-          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header>
+          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header><div id="btHomeMasterIdentity" class="bt-master-identity-home" aria-live="polite"></div>
           <button class="bt-client-promo-banner" id="btClientPromoBanner" type="button" onclick="showEnterPromo()"><span data-promo-icon>🎁</span><span><b data-promo-title>У вас есть промокод?</b><small data-promo-detail>Получите скидку на ремонт</small></span><span aria-hidden="true">›</span></button>
           <button class="bt-main-action bt-client-new-order-action bt-red-action" type="button" onclick="showNewOrder()">＋ Создать заявку</button>
           <div class="client-home-grid bt-home-tiles">
@@ -177,6 +186,7 @@ function renderClientMenu() {
     clientApi('/api/client/dashboard').then(d => {
         const name=String(d.profile?.name||'').trim().replace(/\s+([.,!?])/g,'$1'); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
         btClientRecentOrder(d);
+        btUpdateMasterBadge(d);
     }).catch(()=>{});
     // Home chat is functional, not a separate navigation screen.
     btRefreshClientChat(true);
@@ -612,7 +622,7 @@ async function showMyOrders() {
     setPage('📋 Мои заявки', '<p class="subtitle">Загружаем ваши заявки…</p>');
     try {
         const d = await clientApi('/api/client/dashboard');
-        setPage('📋 Мои заявки', `<p class="subtitle">Статусы обновляются автоматически каждые 20 секунд.</p><div id="btOrdersList">${btOrderCards(d.orders||[])}</div>`);
+        setPage('📋 Мои заявки', `<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div><p class="subtitle">Статусы обновляются автоматически каждые 20 секунд.</p><div id="btOrdersList">${btOrderCards(d.orders||[])}</div>`);
         btOrderProgressTimer=setInterval(btRefreshOrderCards,20000);
     } catch (e) { setPage('📋 Мои заявки', `<div class="card error">${escapeClient(e.message)}</div>`); }
 }
@@ -653,6 +663,7 @@ async function showMyActs() {
         const d = await clientApi('/api/client/dashboard');
         btClientActsCache = d.acts || [];
         const statuses={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',cancelled:'Отменён',draft:'Черновик'};
+        const masterHeader=`<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div>`;
         const content=btClientActsCache.length?btClientActsCache.map(a=>`<article class="card">
           <div class="card-row"><b>Акт № ${escapeClient(a.number||'—')}</b><span class="status-pill">${escapeClient(statuses[a.status]||a.status||'—')}</span></div>
           <p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p>
@@ -1491,7 +1502,7 @@ async function showCallMaster() {
     try {
         const d = await clientApi('/api/client/dashboard');
         const phone = String(d.master?.phone || '').trim();
-        setPage('📞 Контакты мастера', phone ? `<div class="card"><p>${escapeClient(d.master?.name || 'Ваш мастер')}</p><a class="menu-btn" href="tel:${escapeClient(phone)}">Позвонить: ${escapeClient(phone)}</a></div>` : '<div class="card">Номер мастера пока не указан. Напишите мастеру через раздел сообщений.</div>');
+        setPage('📞 Контакты мастера', phone ? `<div class="card"><p>${escapeClient(d.master?.name || 'Ваш мастер')} ${btMasterVerifiedBadge(d.master)}</p><a class="menu-btn" href="tel:${escapeClient(phone)}">Позвонить: ${escapeClient(phone)}</a></div>` : '<div class="card">Номер мастера пока не указан. Напишите мастеру через раздел сообщений.</div>');
     } catch (e) { setPage('📞 Контакты мастера', `<div class="card error">${escapeClient(e.message)}</div>`); }
 }
 
