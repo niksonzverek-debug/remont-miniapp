@@ -763,14 +763,12 @@ bootMasterApp();
 async function showMasterProfile(){
   try{await loadMasterData()}catch(e){return masterShell('Настройки профиля',`<article class="card error">${masterEsc(e.message)}</article>`)}
   const p=masterCache.profile||{},r=p.referral_settings||{};
-  const reviews=!!p.show_reviews;
   const localEnabled=r.master_enabled!==undefined?!!r.master_enabled:(r.enabled!==false);
   const adminEnabled=r.admin_enabled!==false;
   masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Переключатели сохраняются сразу после нажатия. Остальные поля сохраняются кнопкой ниже.</p></article>
   <article class="card"><h2>🪪 Идентификация личности</h2><p id="identityStatus">Загрузка статуса…</p><button type="button" onclick="showMasterIdentity()">Пройти идентификацию</button></article>
   <form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()">
-  <article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"></article>
-  <article class="card"><h2>Отзывы</h2><p class="subtitle">Показывать отзывы в публичном профиле мастера.</p><label class="toggle-row bt-setting-toggle"><span>Показывать отзывы</span><input id="masterShowReviews" type="checkbox" ${reviews?'checked':''} onchange="btSaveMasterToggle(this,'reviews')"></label><p id="masterReviewsToggleState" class="subtitle" role="status">${reviews?'Отзывы включены':'Отзывы скрыты'}</p></article>
+  <article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"><label for="masterAbout">О мастере (видно клиентам)</label><textarea id="masterAbout" maxlength="700" rows="4" placeholder="Опыт работы, специализация, подход к ремонту">${masterEsc(p.about||'')}</textarea><label for="masterAvatar">Фото профиля (видно клиентам)</label><div id="masterAvatarPreview">${p.avatar?`<img src="${masterEsc(p.avatar)}" alt="Фото мастера" style="width:96px;height:96px;border-radius:50%;object-fit:cover">`:''}</div><input id="masterAvatar" type="file" accept="image/jpeg,image/png,image/webp" onchange="btPreviewMasterAvatar(this)"><button type="button" class="secondary" onclick="btClearMasterAvatar()">Удалить фото</button></article>
   <article class="card"><h2>Реферальная программа</h2><p class="subtitle">Рефералы работают отдельно от промокодов. Настройка мастера и разрешение администратора проверяются сервером.</p>
   <label class="toggle-row bt-setting-toggle"><span>Разрешить рефералы моим клиентам</span><input id="masterReferralEnabled" type="checkbox" ${localEnabled?'checked':''} onchange="btSaveMasterToggle(this,'referrals')"></label>
   <p id="masterReferralToggleState" class="subtitle" role="status">${!adminEnabled?'⛔ Администратор отключил программу для всех. Ваша галочка сохраняется, но клиенты не увидят ссылку, пока администратор не включит программу.':localEnabled?'✅ Программа доступна клиентам, привязанным к вам.':'Рефералы выключены — клиенты не увидят кнопку приглашения.'}</p>
@@ -794,31 +792,45 @@ async function submitMasterIdentity(){const btn=document.getElementById('identit
 async function masterIdentityStatus(){try{const r=await masterApi('/api/master/identity');const el=document.getElementById('identityStatus');if(el)el.textContent=({unverified:'Не проверен',pending:'На проверке',approved:'✅ Личность проверена',rejected:'Отклонено — '+(r.review_note||'')})[r.status]||r.status}catch(e){const el=document.getElementById('identityStatus');if(el)el.textContent='Статус временно недоступен. Проверьте подключение сервера и установку cryptography. ('+e.message+')'}}
 async function btSaveMasterToggle(el,kind){
   const old=!el.checked,desired=!!el.checked;
-  const status=document.getElementById(kind==='reviews'?'masterReviewsToggleState':'masterReferralToggleState');
+  const status=document.getElementById('masterReferralToggleState');
   el.disabled=true;
   if(status){status.textContent='Сохраняем…';status.className='subtitle'}
   try{
-    const body=kind==='reviews'?{show_reviews:desired}:{referral_settings:{enabled:desired}};
+    const body={referral_settings:{enabled:desired}};
     const result=await masterApi('/api/master/settings','POST',body);
     if(!masterCache.profile)masterCache.profile={};
     window.RemontMobile?.clearDirty();
-    if(kind==='reviews')masterCache.profile.show_reviews=desired;
-    else masterCache.profile.referral_settings={...(masterCache.profile.referral_settings||{}),master_enabled:desired,enabled:desired};
-    if(status){status.textContent=kind==='reviews'?(desired?'Отзывы включены и сохранены':'Отзывы скрыты и сохранены'):(desired?(masterCache.profile?.referral_settings?.admin_enabled===false?'Галочка сохранена, но администратор отключил программу. Клиентской кнопки пока не будет.':'Рефералы включены. Клиенты с привязкой к вам увидят ссылку.'):'Рефералы отключены: клиентская кнопка приглашения скрыта');status.className='notice'}
+    masterCache.profile.referral_settings={...(masterCache.profile.referral_settings||{}),master_enabled:desired,enabled:desired};
+    if(status){status.textContent=(desired?(masterCache.profile?.referral_settings?.admin_enabled===false?'Галочка сохранена, но администратор отключил программу. Клиентской кнопки пока не будет.':'Рефералы включены. Клиенты с привязкой к вам увидят ссылку.'):'Рефералы отключены: клиентская кнопка приглашения скрыта');status.className='notice'}
   }catch(e){
     el.checked=old;
     if(status){status.textContent='Не удалось сохранить: '+e.message;status.className='error'}
   }finally{el.disabled=false}
 }
+function btClearMasterAvatar(){window.btMasterAvatarDraft='';document.getElementById('masterAvatarPreview').replaceChildren();const inp=document.getElementById('masterAvatar');if(inp)inp.value='';}
+async function btPreviewMasterAvatar(input){
+ const file=input.files?.[0];if(!file)return;
+ if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>4*1024*1024){masterToast('Фото: JPG, PNG или WebP до 4 МБ',true);return;}
+ try{
+  const bitmap=await createImageBitmap(file),c=document.createElement('canvas');c.width=256;c.height=256;
+  const ctx=c.getContext('2d'),scale=Math.max(256/bitmap.width,256/bitmap.height);
+  ctx.drawImage(bitmap,(256-bitmap.width*scale)/2,(256-bitmap.height*scale)/2,bitmap.width*scale,bitmap.height*scale);
+  bitmap.close?.();const url=c.toDataURL('image/jpeg',0.75);
+  if(url.length>180000)throw Error('Фото слишком большое. Выберите другое.');
+  window.btMasterAvatarDraft=url;
+  const box=document.getElementById('masterAvatarPreview');box.replaceChildren();const img=document.createElement('img');img.src=url;img.alt='Новое фото';img.style.cssText='width:96px;height:96px;border-radius:50%;object-fit:cover';box.appendChild(img);
+ }catch(e){masterToast(e.message||'Не удалось обработать фото',true)}
+}
 async function saveMasterSettings(){
   const btn=document.getElementById('masterSettingsSave'),st=document.getElementById('masterSettingsStatus');
   if(!btn||!st)return;
   btn.disabled=true;st.textContent='Сохраняем…';st.className='subtitle';
-  const data={name:document.getElementById('masterProfileName').value.trim(),phone:document.getElementById('masterProfilePhone').value.trim(),referral_settings:{new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)}};
+  const data={name:document.getElementById('masterProfileName').value.trim(),phone:document.getElementById('masterProfilePhone').value.trim(),about:document.getElementById('masterAbout').value.trim(),referral_settings:{new_client_discount_percent:Number(document.getElementById('masterReferralDiscount').value),referrer_reward_percent:Number(document.getElementById('masterReferralReward').value),invites_per_batch:Number(document.getElementById('masterReferralInvites').value)}};
   try{
+    if(window.btMasterAvatarDraft!==undefined)data.avatar=window.btMasterAvatarDraft;
     const r=await masterApi('/api/master/settings','POST',data);
     if(!masterCache.profile)masterCache.profile={};
-    masterCache.profile.name=data.name;masterCache.profile.phone=data.phone;
+    masterCache.profile.name=data.name;masterCache.profile.phone=data.phone;masterCache.profile.about=data.about;if(data.avatar!==undefined){masterCache.profile.avatar=data.avatar;window.btMasterAvatarDraft=undefined;}
     masterCache.profile.referral_settings={...(masterCache.profile.referral_settings||{}),...data.referral_settings};
     window.RemontMobile?.clearDirty();
     st.textContent=r.message||'Настройки сохранены';st.className='notice';

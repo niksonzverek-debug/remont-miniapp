@@ -115,12 +115,14 @@ function showClientMasterReviews(){
  setPage('⭐ Отзывы о мастере','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
  clientApi('/api/client/master-reviews').then(data=>{
    const el=document.getElementById('btMasterReviewsPanel');if(!el)return;
-   const verified=data.identity_verified===true?'<p class="subtitle" style="color:#19a77a">✔ Личность проверена</p>':'';
-   if(!data.enabled){el.innerHTML='<h2>Отзывы о мастере</h2>'+verified+'<p class="subtitle">У мастера пока нет доступных отзывов. Вы сможете оценить работу после завершённого ремонта.</p>';return;}
+   const avatar=(typeof data.master_avatar==='string'&&data.master_avatar.startsWith('data:image/jpeg;base64,')&&data.master_avatar.length<=180000)?`<img src="${escapeClient(data.master_avatar)}" alt="Фото мастера" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #3a8fff">`:'<div style="width:80px;height:80px;border-radius:50%;display:grid;place-items:center;background:#193956;font-size:32px">👨‍🔧</div>';
+   const passport=data.verification?.passport_selfie===true?'✅ Паспорт и селфи проверены':'◯ Паспорт и селфи не проверены';
+   const profile=`<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">${avatar}<div><h2 style="margin:0">${escapeClient(data.master_name||'Мастер')}</h2><p class="subtitle">${escapeClient(data.master_phone||'Телефон не указан')}</p></div></div><p class="subtitle">${escapeClient(passport)}</p><p class="subtitle">Самозанятость · скоро</p><p class="subtitle">QR-чек · скоро</p><h3>О мастере</h3><p>${escapeClient(data.master_about||'Мастер пока не добавил информацию о себе.')}</p><hr>`;
+   if(!data.enabled){el.innerHTML=profile+'<h3>Отзывы</h3><p class="subtitle">У мастера пока нет отзывов.</p>';return;}
    const reviews=Array.isArray(data.reviews)?data.reviews:[];
-   const title='<h2>Отзывы о '+escapeClient(data.master_name||'мастере')+'</h2>';
+   const title=profile+'<h3>Отзывы о мастере</h3>';
    const summary=reviews.length?'<p class="subtitle">Оценка '+escapeClient(data.average_rating)+' из 5 · отзывов: '+escapeClient(data.count)+'</p>':'<p class="subtitle">Показ отзывов включён, но опубликованных отзывов ещё нет.</p>';
-   el.innerHTML=title+verified+summary+reviews.map(r=>'<div class="bt-public-review"><b>'+('⭐'.repeat(Math.min(5,Math.max(1,Number(r.rating)||1))))+'</b><small>'+escapeClient([r.device,r.brand].filter(Boolean).join(' · '))+' · '+escapeClient(String(r.created_at||'').slice(0,10))+'</small><p>'+escapeClient(r.text||'Без комментария')+'</p></div>').join('');
+   el.innerHTML=title+summary+reviews.map(r=>'<div class="bt-public-review"><b>'+('⭐'.repeat(Math.min(5,Math.max(1,Number(r.rating)||1))))+'</b><small>'+escapeClient([r.device,r.brand].filter(Boolean).join(' · '))+' · '+escapeClient(String(r.created_at||'').slice(0,10))+'</small><p>'+escapeClient(r.text||'Без комментария')+'</p></div>').join('');
  }).catch(()=>{const el=document.getElementById('btMasterReviewsPanel');if(el)el.textContent='Не удалось загрузить отзывы. Повторите позже.'});
 }
 function btRefreshClientReferralEntry(){
@@ -149,7 +151,7 @@ function renderClientMenu() {
     document.body.classList.remove('bt-inner-page', 'bt-order-page');
     document.body.innerHTML = `
         <main class="bt-client-home">
-          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header><div id="btHomeMasterIdentity" class="bt-master-identity-home" aria-live="polite"></div>
+          <header class="bt-brand-head bt-compact-header bt-client-header"><img class="bt-brand-logo bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис"><div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name" id="clientWelcomeName">${escapeClient(tg.initDataUnsafe?.user?.first_name || localStorage.getItem('remont_bt_name') || 'клиент')}</strong></div><span class="bt-header-role">👤 <span>Клиент</span></span></header>
           <button class="bt-client-promo-banner" id="btClientPromoBanner" type="button" onclick="showEnterPromo()"><span data-promo-icon>🎁</span><span><b data-promo-title>У вас есть промокод?</b><small data-promo-detail>Получите скидку на ремонт</small></span><span aria-hidden="true">›</span></button>
           <button class="bt-main-action bt-client-new-order-action bt-red-action" type="button" onclick="showNewOrder()">＋ Создать заявку</button>
           <div class="client-home-grid bt-home-tiles">
