@@ -213,7 +213,12 @@ async function loadMasterData() {
   const telegramId=String(tg?.initDataUnsafe?.user?.id||'');
   const signedId=String(new URLSearchParams(location.search).get('master_uid')||'');
   const expectedId=String((tg?.initData && telegramId) ? telegramId : (signedId || masterCurrentUserId));
-  if (expectedId && String(dash.authenticated_master_id||'') !== expectedId) {
+  // The super-admin (450540408) is authorized server-side to use the
+  // existing master profile (8159262843). The API still authenticates the
+  // actual Telegram session; this only avoids rejecting its canonical owner ID.
+  const returnedMasterId=String(dash.authenticated_master_id||'');
+  const isAuthorizedOwnerAlias=(expectedId==='450540408' && returnedMasterId==='8159262843');
+  if (expectedId && returnedMasterId !== expectedId && !isAuthorizedOwnerAlias) {
     localStorage.removeItem('remontBT.master.session.v1');
     throw new Error('Кабинет открыт под другим Telegram ID. Откройте новую кнопку кабинета из чата с ботом.');
   }
