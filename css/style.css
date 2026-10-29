@@ -982,3 +982,69 @@ body.bt-order-page #submit { bottom: calc(76px + var(--rb-safe-bottom)) !importa
 .master-app .bt-identity-submit{width:100%!important;min-height:56px!important;background:linear-gradient(100deg,#1468d7,#318af6)!important;color:white!important;border-radius:14px!important}
 .master-app .bt-identity-back{width:100%;min-height:48px;margin:12px 0}
 @media(max-width:380px){.master-app .bt-master-header .bt-header-name{font-size:16px!important}.master-app .bt-identity-card{padding:14px!important}}
+
+
+/* Electric Lightning V2: dashboard ONLY, no JS, routing or chat changes. */
+body:has(.bt-client-home),body:has(.master-app){
+ background-color:#041023!important;
+ background-image:linear-gradient(180deg,rgba(4,14,32,.48),rgba(1,8,22,.72)),url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22420%22%20height%3D%22900%22%20viewBox%3D%220%200%20420%20900%22%3E%3Cdefs%3E%3Cfilter%20id%3D%22g%22%3E%3CfeGaussianBlur%20stdDeviation%3D%224%22%2F%3E%3C%2Ffilter%3E%3C%2Fdefs%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%230e7bfa%22%20stroke-width%3D%222%22%20opacity%3D%22.42%22%20filter%3D%22url%28%23g%29%22%3E%3Cpath%20d%3D%22M230%200L201%2076%20250%20122%20192%20205%20230%20253%20183%20328%20212%20390%20158%20469%22%2F%3E%3Cpath%20d%3D%22M420%20515L360%20551%20380%20608%20318%20660%20340%20709%20272%20769%20295%20842%20255%20900%22%2F%3E%3C%2Fg%3E%3Cg%20fill%3D%22none%22%20stroke%3D%22%2353caff%22%20stroke-width%3D%22.8%22%20opacity%3D%22.58%22%3E%3Cpath%20d%3D%22M230%200L201%2076%20250%20122%20192%20205%20230%20253%20183%20328%20212%20390%20158%20469%22%2F%3E%3Cpath%20d%3D%22M420%20515L360%20551%20380%20608%20318%20660%20340%20709%20272%20769%20295%20842%20255%20900%22%2F%3E%3Cpath%20d%3D%22M250%20122L290%20150%20272%20202M212%20390L255%20425%20239%20458M360%20551L321%20530%20300%20552M340%20709L385%20745%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E"),radial-gradient(ellipse at 52% 8%,#0b3d75 0%,#061a37 42%,#030b1c 100%)!important;
+ background-size:100% 100%,100% auto,100% 100%!important;
+ background-position:center top!important;
+ background-attachment:fixed!important;
+}
+/* Electric etched profile header: do not hide/change any real controls. */
+.bt-client-home .bt-client-header,.master-app .bt-master-header{
+ position:relative!important;isolation:isolate;
+ border:1px solid #35bdff!important;border-radius:22px!important;
+ background:linear-gradient(136deg,transparent 49%,rgba(37,168,255,.23) 49.5%,transparent 50.3%) 0 0/230px 160px,linear-gradient(170deg,#0b335e,#06182e 75%)!important;
+ box-shadow:0 0 0 2px #0c72c766,0 0 19px #068fff90,inset 0 2px 0 #9eefff7a,inset 0 -4px 18px #087ad950!important;
+}
+.bt-client-home .bt-client-header::after,.master-app .bt-master-header::after{
+ content:"";position:absolute;inset:5px;border-radius:17px;pointer-events:none;
+ border:1px solid #5ce2ff35;box-shadow:inset 0 0 14px #1c9dff30;
+}
+.bt-client-home .bt-client-header .bt-header-logo,.master-app .bt-master-header .bt-header-logo{
+ border:2px solid #57d6ff!important;border-radius:18px!important;
+ box-shadow:0 0 0 3px #0b63b455,0 0 17px #1bb7ffb8,inset 0 0 8px #2d99ff66!important;
+}
+/* The existing tile elements are recolored, not replaced. */
+.master-app .bt-six-tiles,.bt-client-home .bt-home-tiles{
+ display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;
+ gap:10px!important;margin:16px 0!important;padding:0!important;
+}
+.master-app .bt-six-tiles .menu-btn,.bt-client-home .bt-home-tiles .menu-btn{
+ --tile-rgb:22,166,255;position:relative!important;isolation:isolate;overflow:hidden!important;
+ box-sizing:border-box!important;min-width:0!important;min-height:112px!important;
+ display:flex!important;flex-direction:column!important;align-items:center!important;justify-content:center!important;
+ gap:6px!important;padding:11px 5px!important;text-align:center!important;
+ border:2px solid rgb(var(--tile-rgb))!important;border-radius:19px!important;
+ background:radial-gradient(ellipse at 50% -20%,rgba(var(--tile-rgb),.66),transparent 62%),linear-gradient(155deg,rgba(var(--tile-rgb),.27) 0%,#0b2543 39%,#07172e 85%,rgba(var(--tile-rgb),.22) 100%)!important;
+ box-shadow:inset 0 2px 0 #e4faff8c,inset 0 -4px 0 rgba(var(--tile-rgb),.7),inset 0 0 18px rgba(var(--tile-rgb),.27),0 0 0 2px rgba(var(--tile-rgb),.2),0 0 14px rgba(var(--tile-rgb),.65),0 7px 16px #0009!important;
+ text-shadow:0 1px 3px #000d;transition:transform .14s ease,filter .14s ease!important;
+}
+.master-app .bt-six-tiles .menu-btn::before,.bt-client-home .bt-home-tiles .menu-btn::before{
+ content:"";position:absolute;inset:4px 5px auto;height:35%;border-radius:14px 14px 45% 45%;
+ background:linear-gradient(180deg,#ffffff48,#ffffff04);pointer-events:none;z-index:-1;
+}
+.master-app .bt-six-tiles .menu-btn .emoji,.bt-client-home .bt-home-tiles .menu-btn .emoji{
+ color:rgb(var(--tile-rgb))!important;font-size:31px!important;line-height:1.1!important;
+ text-shadow:0 0 9px rgba(var(--tile-rgb),.95),0 0 17px rgba(var(--tile-rgb),.5)!important;
+ filter:drop-shadow(0 3px 2px #000b);
+}
+.master-app .bt-six-tiles .menu-btn b,.bt-client-home .bt-home-tiles .menu-btn b{
+ font-size:clamp(11px,3.2vw,14px)!important;line-height:1.17!important;color:#fff!important;
+}
+.master-app .bt-six-tiles .menu-btn small,.bt-client-home .bt-home-tiles .menu-btn small{
+ font-size:clamp(10px,2.9vw,12px)!important;line-height:1.16!important;color:#bcd8f5!important;
+}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+2),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+2){--tile-rgb:255,163,43}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+3),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+3){--tile-rgb:30,235,159}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+4),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+4){--tile-rgb:190,95,255}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+5),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+5){--tile-rgb:31,222,239}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+6),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+6){--tile-rgb:255,71,168}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+7),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+7){--tile-rgb:138,99,255}
+.master-app .bt-six-tiles .menu-btn:nth-child(8n+8),.bt-client-home .bt-home-tiles .menu-btn:nth-child(8n+8){--tile-rgb:97,197,255}
+.master-app .bt-six-tiles .menu-btn:active,.bt-client-home .bt-home-tiles .menu-btn:active{transform:translateY(2px) scale(.98)!important}
+.master-app .bt-six-tiles .menu-btn:focus-visible,.bt-client-home .bt-home-tiles .menu-btn:focus-visible{outline:2px solid white!important;outline-offset:3px!important}
+@media(max-width:330px){.master-app .bt-six-tiles,.bt-client-home .bt-home-tiles{gap:6px!important}.master-app .bt-six-tiles .menu-btn,.bt-client-home .bt-home-tiles .menu-btn{padding:8px 2px!important}}
+@media(prefers-reduced-motion:reduce){.master-app .bt-six-tiles .menu-btn,.bt-client-home .bt-home-tiles .menu-btn{transition:none!important}}

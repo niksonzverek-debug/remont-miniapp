@@ -90,14 +90,25 @@ async function previewMasterAct(number){
 async function copyMasterActLink(number){
  try{
   const url=await masterActPublicUrl(number);
-  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);masterToast('Ссылка скопирована. Действует 24 часа.');}
-  else window.prompt('Скопируйте ссылку на акт (действует 24 часа):',url);
+  const marketing=await masterApi('/api/master/marketing-link');
+  const registrationUrl=String(marketing.url||'');
+  if(!/^https:\/\/t\.me\/[A-Za-z0-9_]+\?start=m_[0-9]+$/.test(registrationUrl))throw new Error('Не удалось получить ссылку регистрации мастера.');
+  const text=`🧾 Акт № ${number} — ТехСервис\n\n📄 Нажмите, чтобы открыть акт (24 часа):\n${url}\n\n📱 Нажмите, чтобы открыть ТехСервис и пройти регистрацию у мастера:\n${registrationUrl}`;
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);masterToast('Текст акта и ссылка регистрации скопированы.');}
+  else window.prompt('Скопируйте сообщение с актом и регистрацией:',text);
  }catch(e){masterToast(e.message,true)}
 }
 async function shareMasterAct(number){
  try{
   const url=await masterActPublicUrl(number);
-  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(url)+'&text='+encodeURIComponent(`Акт выполненных работ № ${number} — ТехСервис. Ссылка действительна 24 часа.`);
+  // Share the act AND the permanent master registration link in one message.
+  // The referral link comes from the authenticated master API (canonical master
+  // profile, including the administrator's linked Telegram account).
+  const marketing=await masterApi('/api/master/marketing-link');
+  const registrationUrl=String(marketing.url||'');
+  if(!/^https:\/\/t\.me\/[A-Za-z0-9_]+\?start=m_[0-9]+$/.test(registrationUrl))throw new Error('Не удалось получить ссылку регистрации мастера.');
+  const message=`🧾 Акт выполненных работ № ${number} — ТехСервис.\n\n📄 Нажмите, чтобы открыть акт (ссылка действует 24 часа):\n${url}\n\n📱 Нажмите, чтобы открыть ТехСервис и пройти регистрацию у вашего мастера:\n${registrationUrl}`;
+  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(registrationUrl)+'&text='+encodeURIComponent(`🧾 Акт выполненных работ № ${number} — ТехСервис.\n\n📄 Нажмите, чтобы открыть акт (ссылка действует 24 часа):\n${url}\n\n📱 Нажмите на ссылку ниже, чтобы открыть ТехСервис и пройти регистрацию у вашего мастера.`);
   const app=window.Telegram?.WebApp;
   if(app&&typeof app.openTelegramLink==='function')app.openTelegramLink(shareUrl);
   else window.open(shareUrl,'_blank','noopener,noreferrer');
