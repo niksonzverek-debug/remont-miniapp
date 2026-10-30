@@ -481,7 +481,6 @@ async function sendMasterReply(){
         let response;
         if(file){const data=await btMasterFileBase64(file);response=await masterApi('/api/master/message-media','POST',{client_id:activeChatClientId,text,media_type:file.type,file_name:file.name,data});}
         else response=await masterApi('/api/master/message','POST',{client_id:activeChatClientId,text});
-        masterActRequestId=null;
   window.RemontMobile?.clearDirty();status.textContent=response.message||'Сообщение отправлено.';status.className='notice';field.value='';const input=document.getElementById('masterChatFile');if(input)input.value='';btMasterDescribeFile();
         await btMasterRefreshOpenChat();
     }catch(e){status.textContent=e.message;status.className='error';}
@@ -616,6 +615,8 @@ function btMasterOldOrders(){
 }
 async function renderMasterActForm(o=null){
  if(!(await btMasterCanOpenAct()))return;
+ // A new form is a new issuance; retries within this form keep the same ID.
+ masterActRequestId=null;
  btMasterActOrder=o;
  actGeoLocation=null;
  const manual=!o, id=o?String(o.id):'', safeId=id.replace(/'/g,"\\'");
@@ -676,6 +677,9 @@ async function submitMasterAct(event,orderId){
   if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number')throw new Error('Укажите GPS-локацию нажатием соответствующей кнопки.');
   payload.request_id=masterNewActRequestId();
   const r=await masterApi('/api/master/act','POST',payload);
+  // Reset only after the server confirms success (including idempotent replay).
+  // A failed/ambiguous network request must retain its ID for safe retry.
+  masterActRequestId=null;
   window.RemontMobile?.clearDirty();
   st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);
   // Не скачиваем PDF автоматически: мастер открывает его в разделе «Акты».
