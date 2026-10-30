@@ -206,12 +206,20 @@ function renderClientMenu() {
 
 function showClientFAQ(){
     const items=[
-      ['Как создать заявку?','На главной нажмите «Создать заявку», выберите технику и опишите неисправность. После отправки заявка появится в «Мои заявки».'],
-      ['Как связаться с мастером?','Переписка расположена прямо на главной странице. Введите сообщение или прикрепите фото и видео.'],
-      ['Где посмотреть статус ремонта?','Откройте «Мои заявки»: там отображается ход выполнения и актуальный статус.'],
-      ['Где найти акт и гарантию?','В разделе «Мои акты» доступны документы, сумма ремонта и срок гарантии.'],
-      ['Как применить промокод?','Перейдите в «Промокоды» и введите код. Условия скидки зависят от промокода.'],
-      ['Можно ли повторить прошлую заявку?','Откройте прошлую заявку и выберите повторное обращение. Проверьте данные перед отправкой.']
+      ['Что такое ТехСервис?','Это сервис для оформления заявок на ремонт бытовой техники, связи с мастером и хранения электронных актов и гарантий.'],
+      ['Как зарегистрироваться?','Откройте приложение клиента из Telegram, укажите имя и телефон и сохраните данные. Повторная регистрация не требуется.'],
+      ['Как создать заявку?','На главной нажмите «Создать заявку», выберите технику, опишите неисправность, укажите удобное время и место ремонта, затем отправьте заявку.'],
+      ['Как указать место ремонта?','Выберите один способ: введите адрес вручную либо отправьте геолокацию. Если Вы сейчас не дома, укажите домашний адрес текстом — GPS телефона не обязателен.'],
+      ['Можно ли отправить геолокацию в чат бота?','Да. После отправки местоположения бот предложит «Создать заявку» или «Отменить». При создании заявки координаты будут использованы как место ремонта; отправка GPS сама по себе заказ не создаёт.'],
+      ['Как узнать, принял ли мастер заявку?','Откройте «Мои заявки». Там отображается текущий статус обращения. Если мастер ещё не принял заявку, дождитесь изменения статуса.'],
+      ['Как связаться с мастером?','Используйте чат в кабинете клиента. Можно отправить текст и, если доступно в интерфейсе, фото или видео неисправности.'],
+      ['Где посмотреть выполненный ремонт?','Откройте «Мои акты». В электронном акте указаны выполненные работы, стоимость и условия гарантии.'],
+      ['Что означает гарантия?','Срок и условия гарантии указаны в конкретном акте. Сохраняйте акт и обращайтесь к мастеру при вопросах по выполненному ремонту.'],
+      ['Как работают промокоды?','В разделе «Промокоды» введите полученный код. Размер скидки, срок действия и ограничения зависят от условий промокода.'],
+      ['Как пригласить друга?','Поделитесь своей реферальной ссылкой, если она доступна в кабинете. Условия скидки зависят от завершения ремонта приглашённого клиента и действующих правил программы.'],
+      ['Можно ли изменить мастера?','В настройках доступен запрос на смену мастера. Укажите причину; заявку рассмотрит администратор. До подтверждения текущий мастер не меняется.'],
+      ['Что делать, если заявка отменена администратором?','Откройте историю заявок и посмотрите статус и причину. При необходимости создайте новую заявку или свяжитесь с поддержкой.'],
+      ['Что делать, если приложение не обновилось?','Полностью закройте Mini App и откройте его снова из актуальной кнопки в Telegram. При повторной ошибке обратитесь в поддержку.']
     ];
     setPage('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Частые вопросы о пользовании ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${escapeClient(q)}</summary><p>${escapeClient(a)}</p></details>`).join('')}<button type="button" onclick="renderClientMenu()">← Главная</button></article>`);
 }
@@ -582,14 +590,14 @@ function btClientBottomNav() {
 const btOrderStatusLabels = {
     new: 'Ожидает мастера', accepted: 'Принята мастером', in_progress: 'Выполняется ремонт',
     act_issued: 'Ожидает подтверждения акта', act_pending_delivery:'Акт готов — ожидает уведомления', rejected: 'Отклонена мастером',
-    closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена', archived_admin: 'Удалена администратором'
+    closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена'
 };
 function btOrderTimeline(o) {
     const status = String(o.status || 'new');
     const steps = [{label:'Заявка',done:true},{label:'Принято',done:['accepted','in_progress','act_issued','closed','completed'].includes(status)},
         {label:'Ремонт',done:['act_issued','closed','completed'].includes(status)},
         {label:'Акт',done:['act_issued','closed','completed'].includes(status)}];
-    if (status === 'rejected' || status === 'cancelled' || status === 'archived_admin') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
+    if (status === 'rejected' || status === 'cancelled') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
     return `<div class="bt-status-timeline" aria-label="Этапы заявки">${steps.map(s=>`<span class="${s.done?'done':''}"><i>${s.done?'✓':'·'}</i>${s.label}</span>`).join('')}</div>`;
 }
 function btOrderCards(rows) {
@@ -602,7 +610,7 @@ function btOrderCards(rows) {
         const remaining=Number(o.act_confirmation_deadline||0)*1000-Date.now();
         if(confirmationReady && remaining>0)deadline=`<p class="subtitle">Если не подтвердить акт, он может автоматически закрыться после ${Math.ceil(remaining/60000)} мин. Ознакомьтесь с документом заранее.</p>`;
         return `<article class="card bt-order-progress-card">
-            <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>${o.status==='archived_admin'?`<p class="subtitle"><b>Причина удаления:</b> ${escapeClient(o.admin_archive_reason||'Не указана')}</p>`:''}
+            <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>
             <h3>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3>
             <p>${escapeClient(o.problem||'')}</p>${btOrderTimeline(o)}
             <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
@@ -617,7 +625,7 @@ async function btRefreshOrderCards() {
     try {
         const result=await clientApi('/api/client/dashboard');
         const list=document.getElementById('btOrdersList');
-        if(list){const markup=btOrderCards(result.orders||[]);if(list.innerHTML!==markup)list.innerHTML=markup;}
+        if(list)list.innerHTML=btOrderCards(result.orders||[]);
     } catch(_) { /* Keep last known status; users may retry manually. */ }
 }
 async function showMyOrders() {
@@ -1125,13 +1133,17 @@ function showNewOrder() {
         </div>
 
         <div class="card">
-            <div class="bt-client-address-row"><div><label for="house">Дом *</label><input id="house" maxlength="80" placeholder="15А" autocomplete="off"></div><div><label for="apartment">Квартира</label><input id="apartment" maxlength="80" placeholder="42" autocomplete="off"></div></div>
+            <label for="house">Адрес выезда (или геолокация)</label>
+            <input id="house" maxlength="80" placeholder="Например: Ташкент, ул. Навои, дом 15" autocomplete="street-address" oninput="btClientManualAddressChanged()">
+            <label for="apartment" style="margin-top:12px">Квартира / ориентир (необязательно)</label>
+            <input id="apartment" maxlength="80" placeholder="Квартира 42, подъезд 2" autocomplete="off">
+            <p class="subtitle">Выберите один способ: укажите адрес вручную или отправьте точку GPS. Можно заказать ремонт домой, находясь в другом месте.</p>
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
             </button>
 
             <p id="location_status" style="color:#888;font-size:13px;margin-top:8px;">
-                Локация не отправлена
+                GPS не выбран. Можно просто указать адрес выше.
             </p>
         </div>
 
@@ -1263,6 +1275,22 @@ function onBrandChange() {
     wrap.style.display = val === '__other__' ? 'block' : 'none';
 }
 
+// Ручной адрес имеет приоритет: GPS телефона не должен указывать на работу,
+// если клиент вручную вводит адрес дома.
+function btClientManualAddressChanged(){
+    orderData.location=null;
+    const status=document.getElementById('location_status');
+    if(status)status.textContent='Используется адрес, введённый вручную (без GPS).';
+}
+function btClientLocationSelected(lat,lon){
+    orderData.location={lat:Number(lat),lon:Number(lon)};
+    // Не смешиваем адрес предыдущей заявки с новой точкой GPS.
+    const house=document.getElementById('house');
+    const apartment=document.getElementById('apartment');
+    if(house)house.value='';
+    if(apartment)apartment.value='';
+}
+
 // ============ ЛОКАЦИЯ ============
 
 function sendLocation() {
@@ -1277,10 +1305,7 @@ function sendLocation() {
             tg.LocationManager.init(() => {
                 tg.LocationManager.getLocation((loc) => {
                     if (loc && loc.latitude != null && loc.longitude != null) {
-                        orderData.location = {
-                            lat: loc.latitude,
-                            lon: loc.longitude,
-                        };
+                        btClientLocationSelected(loc.latitude,loc.longitude);
 
                         status.textContent =
                             `✅ ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`;
@@ -1311,10 +1336,7 @@ function getBrowserLocation() {
 
     navigator.geolocation.getCurrentPosition(
         (pos) => {
-            orderData.location = {
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude,
-            };
+            btClientLocationSelected(pos.coords.latitude,pos.coords.longitude);
 
             status.textContent =
                 `✅ ${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
@@ -1412,7 +1434,7 @@ async function submitOrder() {
 
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
-    if (!house) return showAlert('Укажите дом');
+    if (!house && !orderData.location) return showAlert('Укажите адрес выезда или отправьте геолокацию');
 
     try {
         localStorage.setItem('remont_bt_house', house);
@@ -1445,7 +1467,7 @@ async function submitOrder() {
         apartment: apartment,
         comment: comment,
         promo_code: order_promo_code,
-        location: orderData.location || null,
+        location: house ? null : (orderData.location || null),
     };
 
     // Даже если клиент не нажал «Проверить», сервер проверит и привяжет активный код
@@ -1542,6 +1564,18 @@ async function startRemontApp(){
         localStorage.setItem('remont_bt_identity_saved', '1');
         if (currentClientTelegramId) localStorage.setItem('remont_bt_profile_uid', currentClientTelegramId);
       } catch (_) {}
+      if (clientUrlParams.get('new_order') === 'location') {
+        const lat = Number(clientUrlParams.get('draft_lat'));
+        const lon = Number(clientUrlParams.get('draft_lon'));
+        if (Number.isFinite(lat) && Number.isFinite(lon) &&
+            Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
+          showNewOrder();
+          btClientLocationSelected(lat, lon);
+          const status = document.getElementById('location_status');
+          if (status) status.textContent = '📍 Геолокация из Telegram добавлена к заявке.';
+          return;
+        }
+      }
       renderClientMenu();
       return;
     }
