@@ -582,14 +582,14 @@ function btClientBottomNav() {
 const btOrderStatusLabels = {
     new: 'Ожидает мастера', accepted: 'Принята мастером', in_progress: 'Выполняется ремонт',
     act_issued: 'Ожидает подтверждения акта', act_pending_delivery:'Акт готов — ожидает уведомления', rejected: 'Отклонена мастером',
-    closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена'
+    closed: 'Завершена', completed: 'Завершена', cancelled: 'Отменена', archived_admin: 'Удалена администратором'
 };
 function btOrderTimeline(o) {
     const status = String(o.status || 'new');
     const steps = [{label:'Заявка',done:true},{label:'Принято',done:['accepted','in_progress','act_issued','closed','completed'].includes(status)},
         {label:'Ремонт',done:['act_issued','closed','completed'].includes(status)},
         {label:'Акт',done:['act_issued','closed','completed'].includes(status)}];
-    if (status === 'rejected' || status === 'cancelled') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
+    if (status === 'rejected' || status === 'cancelled' || status === 'archived_admin') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
     return `<div class="bt-status-timeline" aria-label="Этапы заявки">${steps.map(s=>`<span class="${s.done?'done':''}"><i>${s.done?'✓':'·'}</i>${s.label}</span>`).join('')}</div>`;
 }
 function btOrderCards(rows) {
@@ -602,7 +602,7 @@ function btOrderCards(rows) {
         const remaining=Number(o.act_confirmation_deadline||0)*1000-Date.now();
         if(confirmationReady && remaining>0)deadline=`<p class="subtitle">Если не подтвердить акт, он может автоматически закрыться после ${Math.ceil(remaining/60000)} мин. Ознакомьтесь с документом заранее.</p>`;
         return `<article class="card bt-order-progress-card">
-            <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>
+            <div class="card-row"><b>${escapeClient(o.id||'Заявка')}</b><span class="status-pill">${escapeClient(label)}</span></div>${o.status==='archived_admin'?`<p class="subtitle"><b>Причина удаления:</b> ${escapeClient(o.admin_archive_reason||'Не указана')}</p>`:''}
             <h3>${escapeClient([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3>
             <p>${escapeClient(o.problem||'')}</p>${btOrderTimeline(o)}
             <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
@@ -617,7 +617,7 @@ async function btRefreshOrderCards() {
     try {
         const result=await clientApi('/api/client/dashboard');
         const list=document.getElementById('btOrdersList');
-        if(list)list.innerHTML=btOrderCards(result.orders||[]);
+        if(list){const markup=btOrderCards(result.orders||[]);if(list.innerHTML!==markup)list.innerHTML=markup;}
     } catch(_) { /* Keep last known status; users may retry manually. */ }
 }
 async function showMyOrders() {
