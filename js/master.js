@@ -104,6 +104,12 @@ async function shareMasterAct(number){
   // message with two real text links; forwarding preserves their formatting.
   const result=await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/share-message`,'POST',{public_base:masterApiBase});
   masterToast(result.message||'Сообщение отправлено в чат с ботом. Перешлите его клиенту.');
+  // Open the bot chat where the formatted, forwardable message was delivered.
+  if(result.chat_url && /^https:\/\/t\.me\/[A-Za-z0-9_]+$/.test(result.chat_url)){
+   const app=window.Telegram?.WebApp;
+   if(app && typeof app.openTelegramLink==='function') app.openTelegramLink(result.chat_url);
+   else window.open(result.chat_url,'_blank','noopener,noreferrer');
+  }
  }catch(e){masterToast(e.message,true)}
 }
 function showMasterActCorrection(number){
