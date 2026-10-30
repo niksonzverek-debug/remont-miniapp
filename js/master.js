@@ -100,19 +100,10 @@ async function copyMasterActLink(number){
 }
 async function shareMasterAct(number){
  try{
-  const url=await masterActPublicUrl(number);
-  // Share the act AND the permanent master registration link in one message.
-  // The referral link comes from the authenticated master API (canonical master
-  // profile, including the administrator's linked Telegram account).
-  const marketing=await masterApi('/api/master/marketing-link');
-  const registrationUrl=String(marketing.url||'');
-  if(!/^https:\/\/t\.me\/[A-Za-z0-9_]+\?start=m_[0-9]+$/.test(registrationUrl))throw new Error('Не удалось получить ссылку регистрации мастера.');
-  const message=`🧾 Акт выполненных работ № ${number} — ТехСервис.\n\n📄 Нажмите, чтобы открыть акт (ссылка действует 24 часа):\n${url}\n\n📱 Нажмите, чтобы открыть ТехСервис и пройти регистрацию у вашего мастера:\n${registrationUrl}`;
-  const shareUrl='https://t.me/share/url?url='+encodeURIComponent(registrationUrl)+'&text='+encodeURIComponent(`🧾 Акт выполненных работ № ${number} — ТехСервис.\n\n📄 Нажмите, чтобы открыть акт (ссылка действует 24 часа):\n${url}\n\n📱 Нажмите на ссылку ниже, чтобы открыть ТехСервис и пройти регистрацию у вашего мастера.`);
-  const app=window.Telegram?.WebApp;
-  if(app&&typeof app.openTelegramLink==='function')app.openTelegramLink(shareUrl);
-  else window.open(shareUrl,'_blank','noopener,noreferrer');
-  masterToast('Выберите получателя в Telegram. Передаётся защищённая ссылка на PDF, а не открытый доступ к базе.');
+  // Telegram share/url cannot encode hidden hyperlinks. The bot sends an HTML
+  // message with two real text links; forwarding preserves their formatting.
+  const result=await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/share-message`,'POST',{public_base:masterApiBase});
+  masterToast(result.message||'Сообщение отправлено в чат с ботом. Перешлите его клиенту.');
  }catch(e){masterToast(e.message,true)}
 }
 function showMasterActCorrection(number){
