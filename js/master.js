@@ -364,15 +364,14 @@ function showMasterFAQ(){
   masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
 function masterOrderMapUrl(order){
- const l=order?.location;
- if(!l||typeof l!=='object')return '';
- const lat=Number(l.lat??l.latitude),lon=Number(l.lon??l.longitude);
+ const l=order?.location||order?.geo||order?.geolocation||{};
+ const lat=Number(l.lat??l.latitude??order?.latitude??order?.lat),lon=Number(l.lon??l.lng??l.longitude??order?.longitude??order?.lon);
  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return '';
  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat+','+lon)}`;
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена',archived_admin:'Удалена администратором'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
- const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p>${o.status==='archived_admin'?`<p class="subtitle"><b>Причина удаления:</b> ${masterEsc(o.admin_archive_reason||'Не указана')}</p>`:''}${o.status==='new'&&Date.now()-Date.parse(o.created_at||'')>2*3600*1000?'<p class="bt-overdue-note">⚠ Ожидает ответа более двух часов</p>':''}<div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}${o.client_id?`<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button>`:''}${masterOrderMapUrl(o)?`<a class="secondary menu-btn" target="_blank" rel="noopener noreferrer" href="${masterEsc(masterOrderMapUrl(o))}">📍 Маршрут</a>`:''}</div></article>`).join('');
+ const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p>${o.status==='archived_admin'?`<p class="subtitle"><b>Причина удаления:</b> ${masterEsc(o.admin_archive_reason||'Не указана')}</p>`:''}${o.status==='new'&&Date.now()-Date.parse(o.created_at||'')>2*3600*1000?'<p class="bt-overdue-note">⚠ Ожидает ответа более двух часов</p>':''}<div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}${o.client_id?`<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button>`:''}${o.status==='accepted'&&masterOrderMapUrl(o)?`<a class="secondary menu-btn" target="_blank" rel="noopener noreferrer" href="${masterEsc(masterOrderMapUrl(o))}">📍 Открыть маршрут</a>`:''}</div></article>`).join('');
  masterShell('Заявки',`<div class="section-heading"><p>Сначала показываются последние заявки. Действия доступны только по заявкам вашего кабинета.</p><select id="orderFilter" onchange="filterMasterOrders()"><option value="all">Все статусы</option><option value="new">Новые</option><option value="accepted">Принятые</option><option value="act_issued">Акт отправлен</option><option value="closed">Закрытые</option><option value="archived_admin">Архив (удалены администратором)</option></select></div><div id="masterOrderList" class="stack-list">${rows||'<article class="card">Заявок пока нет.</article>'}</div>`);}
 function filterMasterOrders(){const f=document.getElementById('orderFilter')?.value||'all';document.querySelectorAll('#masterOrderList .order-card').forEach((el,i)=>{const o=masterCache.orders[i];el.style.display=f==='all'||o?.status===f?'':'none';});}
 async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/master/orders/${encodeURIComponent(id)}/decision`,'POST',{decision});masterToast(r.message);await showMasterOrders();}catch(e){masterToast(e.message,true);}}
@@ -490,11 +489,33 @@ async function retryMasterActDelivery(number){
    await showMasterActs();
  }catch(e){masterToast(e.message||'Не удалось отправить уведомление',true)}
 }
+let btActsObserver=null;
 async function showMasterActs(){
  try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
  clearMasterPdfUrl();
  const rows=masterCache.acts.filter(a=>a.status!=='cancelled').map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button>${['pending','sending','pending_client','pending_delivery','sending_failed'].includes(a.status)?`<button type="button" onclick="retryMasterActDelivery('${masterEsc(a.number)}')">↻ Повторить доставку</button>`:''}</div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`).join('');
- masterShell('Акты',`<div class="stack-list">${rows||'<article class="card">Актов пока нет.</article>'}</div>`);
+ if(btActsObserver){btActsObserver.disconnect();btActsObserver=null;}
+ // Render only three act cards initially; add the next three when scrolling near the end.
+ const listId='btMasterActPagedList', markerId='btMasterActsSentinel';
+ masterShell('Акты',`<div id="${listId}" class="stack-list">${rows.slice(0,3).join('')||'<article class="card">Актов пока нет.</article>'}</div>${rows.length>3?`<div id="${markerId}" class="bt-acts-more-sentinel" aria-label="Загрузка следующих актов">Прокрутите вниз для следующих актов</div>`:''}`);
+ if(rows.length<=3)return;
+ const list=document.getElementById(listId),marker=document.getElementById(markerId);
+ if(!list||!marker)return;
+ let next=3;
+ const appendNext=()=>{
+   if(!document.getElementById(listId)||document.getElementById(listId)!==list){btActsObserver?.disconnect();return;}
+   const chunk=rows.slice(next,next+3);if(!chunk.length){marker.remove();btActsObserver?.disconnect();return;}
+   list.insertAdjacentHTML('beforeend',chunk.join(''));next+=chunk.length;
+   if(next>=rows.length){marker.remove();btActsObserver?.disconnect();}
+ };
+ if('IntersectionObserver' in window){
+   btActsObserver=new IntersectionObserver(entries=>{if(entries.some(e=>e.isIntersecting))appendNext();},{rootMargin:'220px 0px'});
+   btActsObserver.observe(marker);
+ }else{
+   // Legacy WebView fallback: load all remaining cards to avoid inaccessible history.
+   while(next<rows.length)appendNext();
+ }
+
 }
 async function showMasterCreateAct(orderId){if(!(await btMasterCanOpenAct()))return;try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
 /* Каждый список содержит 5 стандартных вариантов и шестой «Другое». */

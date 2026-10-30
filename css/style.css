@@ -1049,18 +1049,15 @@ body:has(.bt-client-home),body:has(.master-app){
 @media(max-width:330px){.master-app .bt-six-tiles,.bt-client-home .bt-home-tiles{gap:6px!important}.master-app .bt-six-tiles .menu-btn,.bt-client-home .bt-home-tiles .menu-btn{padding:8px 2px!important}}
 @media(prefers-reduced-motion:reduce){.master-app .bt-six-tiles .menu-btn,.bt-client-home .bt-home-tiles .menu-btn{transition:none!important}}
 
-/* Mobile rendering: avoid viewport-fixed gradient repaint and expensive nav blur
-   during touch scrolling. Desktop Electric Steel Blue appearance is unchanged. */
+/* Smooth mobile scrolling without disabling neon or electric animations.
+   The original fixed SVG background is costly in Telegram Android WebView. */
 @media (hover:none) and (pointer:coarse) {
   html { -webkit-overflow-scrolling:touch; }
-  body { background-attachment:scroll !important; }
+  body:has(.bt-client-home),body:has(.master-app) { background-attachment:scroll!important; }
   .master-app .master-bottom-nav, .bt-client-bottom-nav {
-    -webkit-backdrop-filter:none !important;
-    backdrop-filter:none !important;
-    background:#081427 !important;
-  }
-  .menu-btn::before, .bt-client-home .bt-main-action::after,
-  .bt-client-home .bt-live-panel::before, .bt-circuit::after {
-    animation-play-state:paused !important;
+    -webkit-backdrop-filter:none!important;
+    backdrop-filter:none!important;
+    background:linear-gradient(180deg,#101a36,#081427)!important;
   }
 }
+.bt-acts-more-sentinel {text-align:center;padding:18px 10px;color:#a5c5ec;font-size:13px;}
