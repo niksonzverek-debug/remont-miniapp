@@ -111,13 +111,18 @@ function btUpdateMasterBadge(d){
     const el=document.getElementById('btHomeMasterIdentity');
     if(el)el.innerHTML=btMasterVerifiedBadge(d?.master);
 }
+function btFormatPublicPhone(value){
+ const raw=String(value||'').trim();const digits=raw.replace(/\D/g,'');
+ if(digits.length===12&&digits.startsWith('998'))return '+998 '+digits.slice(3,5)+' '+digits.slice(5,8)+' '+digits.slice(8,10)+' '+digits.slice(10,12);
+ return raw;
+}
 function showClientMasterReviews(){
- setPage('⭐ Отзывы о мастере','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
+ setPage('👨‍🔧 Мой мастер','<article class="card" id="btMasterReviewsPanel"><p class="subtitle">Загружаем отзывы…</p></article>');
  clientApi('/api/client/master-reviews').then(data=>{
    const el=document.getElementById('btMasterReviewsPanel');if(!el)return;
    const avatar=(typeof data.master_avatar==='string'&&data.master_avatar.startsWith('data:image/jpeg;base64,')&&data.master_avatar.length<=180000)?`<img src="${escapeClient(data.master_avatar)}" alt="Фото мастера" style="width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid #3a8fff">`:'<div style="width:80px;height:80px;border-radius:50%;display:grid;place-items:center;background:#193956;font-size:32px">👨‍🔧</div>';
    const passport=data.verification?.passport_selfie===true?'✅ Паспорт и селфи проверены':'◯ Паспорт и селфи не проверены';
-   const profile=`<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">${avatar}<div><h2 style="margin:0">${escapeClient(data.master_name||'Мастер')}</h2><p class="subtitle">${escapeClient(data.master_phone||'Телефон не указан')}</p></div></div><p class="subtitle">${escapeClient(passport)}</p><p class="subtitle">Самозанятость · скоро</p><p class="subtitle">QR-чек · скоро</p><h3>О мастере</h3><p>${escapeClient(data.master_about||'Мастер пока не добавил информацию о себе.')}</p><hr>`;
+   const profile=`<div style="display:flex;gap:14px;align-items:center;margin-bottom:12px">${avatar}<div><h2 style="margin:0">${escapeClient(data.master_name||'Мастер')}</h2><p class="subtitle">${escapeClient(btFormatPublicPhone(data.master_phone||'Телефон не указан'))}</p></div></div><p class="subtitle">${escapeClient(passport)}</p><p class="subtitle">Самозанятость · скоро</p><p class="subtitle">QR-чек · скоро</p><h3>О мастере</h3><p>${escapeClient(data.master_about||'Мастер пока не добавил информацию о себе.')}</p><hr>`;
    if(!data.enabled){el.innerHTML=profile+'<h3>Отзывы</h3><p class="subtitle">У мастера пока нет отзывов.</p>';return;}
    const reviews=Array.isArray(data.reviews)?data.reviews:[];
    const title=profile+'<h3>Отзывы о мастере</h3>';
@@ -158,7 +163,7 @@ function renderClientMenu() {
             <button class="menu-btn" onclick="showMyOrders()"><span class="emoji bt-line-icon">▤</span><b>Мои заявки</b><small>История</small></button>
             <button class="menu-btn" onclick="showMyActs()"><span class="emoji bt-line-icon">◫</span><b>Мои акты</b><small>Гарантия</small></button>
             <button class="menu-btn" onclick="showEnterPromo()"><span class="emoji bt-line-icon">◇</span><b>Промокоды</b><small>Скидки</small></button>
-            <button class="menu-btn bt-reviews-entry" id="btClientReviewsEntry" type="button" onclick="showClientMasterReviews()" hidden><span class="emoji bt-line-icon">☆</span><b>Отзывы о мастере</b><small>Оценки клиентов</small></button>
+            <button class="menu-btn bt-reviews-entry" id="btClientReviewsEntry" type="button" onclick="showClientMasterReviews()" hidden><span class="emoji bt-line-icon">☆</span><b>Мой мастер</b><small>Профиль и отзывы</small></button>
             <button class="menu-btn bt-referral-entry" id="btClientReferralEntry" type="button" onclick="showClientReferral()" hidden><span class="emoji bt-line-icon">↗</span><b>Пригласить друга</b><small>Рефералы</small></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><b>Профиль</b><small>Мои данные</small></button>
             <button class="menu-btn" onclick="showClientFAQ()"><span class="emoji bt-line-icon">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
@@ -177,6 +182,7 @@ function renderClientMenu() {
           <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     btRefreshClientReferralEntry();
+    window.btMountClientLanguage?.();
     btRefreshClientReviewsEntry();
     btStartClientPromoCarousel(btPromoGeneration);
     clientApi('/api/advertiser/dashboard').then(d => {
@@ -557,7 +563,7 @@ async function clientApi(path, method='GET', body=null) {
 let btClientPageBack=()=>renderClientMenu();
 let btClientActPreviewNumber='';
 function btClientRestoreRoute(title){
-    if(title.includes('Отзывы о мастере'))return ()=>showClientMasterReviews();
+    if(title.includes('Мой мастер')||title.includes('Отзывы о мастере'))return ()=>showClientMasterReviews();
     if(title.includes('Пригласить друга'))return ()=>showClientReferral();
     if(title.includes('F.A.Q.'))return ()=>showClientFAQ();
     if(title.includes('Кабинет мастера'))return ()=>showMasterChoice();
@@ -600,8 +606,17 @@ function btOrderTimeline(o) {
     if (status === 'rejected' || status === 'cancelled') return `<div class="bt-order-stage-note">${escapeClient(btOrderStatusLabels[status])}</div>`;
     return `<div class="bt-status-timeline" aria-label="Этапы заявки">${steps.map(s=>`<span class="${s.done?'done':''}"><i>${s.done?'✓':'·'}</i>${s.label}</span>`).join('')}</div>`;
 }
+function btActiveOrders(rows) {
+    // Only unfinished orders belong to the current-orders screen.
+    const inactive = new Set(['closed', 'completed', 'cancelled', 'canceled', 'rejected']);
+    return (Array.isArray(rows) ? rows : []).filter(o => {
+        const status = String(o?.status || '').toLowerCase();
+        const displayStatus = String(o?.display_status || '').toLowerCase();
+        return !inactive.has(status) && !inactive.has(displayStatus);
+    });
+}
 function btOrderCards(rows) {
-    return rows.length ? rows.map(o => {
+    return btActiveOrders(rows).map(o => {
         const confirmationReady=Boolean(o.can_confirm_act === true);
         const displayStatus=String(o.display_status||o.status||'');
         const label=btOrderStatusLabels[displayStatus]||displayStatus||'Обрабатывается';
@@ -616,23 +631,33 @@ function btOrderCards(rows) {
             <p class="subtitle">Обновлено: ${escapeClient(date||'—')}</p>
             ${o.promocode?`<p>🎟️ Промокод: ${escapeClient(o.promocode)}</p>`:''}
             ${confirmationReady?`<button onclick="confirmClientAct('${escapeClient(o.id)}')">✅ Подтвердить выполнение</button>${deadline}`:''}
-            <button type="button" class="secondary" onclick="btRepeatOrder('${escapeClient(o.id)}')">↻ Повторить заявку</button>
         </article>`;
-    }).join('') : '<div class="card">Заявок пока нет. Создайте первую заявку.</div>';
+    }).join('');
 }
 async function btRefreshOrderCards() {
     if (document.hidden || !document.getElementById('btOrdersList')) return;
     try {
         const result=await clientApi('/api/client/dashboard');
         const list=document.getElementById('btOrdersList');
-        if(list)list.innerHTML=btOrderCards(result.orders||[]);
+        if(list){
+            const wasActive=Boolean(list.querySelector('.bt-order-progress-card'));
+            const activeOrders=btActiveOrders(result.orders||[]);
+            if(wasActive !== Boolean(activeOrders.length)){
+                clearInterval(btOrderProgressTimer);
+                btOrderProgressTimer=null;
+                await showMyOrders();
+                return;
+            }
+            list.innerHTML=btOrderCards(activeOrders);
+        }
     } catch(_) { /* Keep last known status; users may retry manually. */ }
 }
 async function showMyOrders() {
     setPage('📋 Мои заявки', '<p class="subtitle">Загружаем ваши заявки…</p>');
     try {
         const d = await clientApi('/api/client/dashboard');
-        setPage('📋 Мои заявки', `<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div><p class="subtitle">Статусы обновляются автоматически каждые 20 секунд.</p><div id="btOrdersList">${btOrderCards(d.orders||[])}</div>`);
+        const activeOrders = btActiveOrders(d.orders||[]);
+        setPage('📋 Мои заявки', `${activeOrders.length ? `<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div><p class="subtitle">Статусы обновляются автоматически каждые 20 секунд.</p>` : ''}<div id="btOrdersList">${btOrderCards(activeOrders)}</div>`);
         btOrderProgressTimer=setInterval(btRefreshOrderCards,20000);
     } catch (e) { setPage('📋 Мои заявки', `<div class="card error">${escapeClient(e.message)}</div>`); }
 }
@@ -659,46 +684,56 @@ async function confirmClientActRequest(orderId) {
 
 let btClientActsCache=[];
 const btActMoney=value=>new Intl.NumberFormat('ru-RU').format(Number(value||0))+' сум';
+function btClientActStatus(status){
+    const statuses={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',confirmed_automatic:'Подтверждён автоматически',confirmed_auto:'Подтверждён автоматически',auto_confirmed:'Подтверждён автоматически',cancelled:'Отменён',draft:'Черновик'};
+    return statuses[String(status||'').toLowerCase()]||'Статус уточняется';
+}
 function btWarrantyIndicator(act){
     const raw=String(act.guarantee_until||'');
     const m=/^(\d{2})\.(\d{2})\.(\d{4})$/.exec(raw);
-    if(!m || Number(act.guarantee_days||0)===0)return '<p class="subtitle">Гарантия: согласно условиям акта.</p>';
+    if(!m || Number(act.guarantee_days||0)===0)return '<span class="bt-act-warranty-muted">Гарантия по условиям акта</span>';
     const end=new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),23,59,59);
     const active=Number.isFinite(end.getTime())&&end>=new Date();
-    return `<p class="bt-warranty-note ${active?'bt-warranty-active':'bt-warranty-expired'}">${active?'✓ Гарантия действует':'Срок гарантии истёк'}</p>`;
+    return `<span class="${active?'bt-warranty-active':'bt-warranty-expired'}">${active?'✓ Гарантия действует':'Гарантия истекла'}</span>`;
+}
+function btClientActTitle(act){
+    return [act.device,act.brand,act.model].filter(Boolean).join(' ')||'Ремонт техники';
 }
 async function showMyActs() {
     setPage('📄 Акты и документы', '<p class="subtitle">Загружаем документы…</p>');
     try {
-        const d = await clientApi('/api/client/dashboard');
-        btClientActsCache = (d.acts || []).filter(a=>a.status!=='cancelled');
-        const statuses={sending:'Отправляется',sent:'Отправлен клиенту',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён',cancelled:'Отменён',draft:'Черновик'};
-        const masterHeader=`<div class="card"><b>Мастер: ${escapeClient(d.master?.name||'Не назначен')}</b> ${btMasterVerifiedBadge(d.master)}</div>`;
-        const content=btClientActsCache.length?btClientActsCache.map(a=>`<article class="card">
-          <div class="card-row"><b>Акт № ${escapeClient(a.number||'—')}</b><span class="status-pill">${escapeClient(statuses[a.status]||a.status||'—')}</span></div>
-          <p>${escapeClient([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p>
-          <p>Стоимость ремонта: ${escapeClient(btActMoney(a.price))}</p>
-          ${Number(a.discount_amount||0)>0?`<p>Скидка: −${escapeClient(btActMoney(a.discount_amount))}</p>`:''}
-          <p><b>Итого: ${escapeClient(btActMoney(a.final_price??a.price))}</b></p>
-          <p>Гарантия: ${escapeClient(a.guarantee_text||'—')} · до ${escapeClient(a.guarantee_until||'—')}</p>
-          ${btWarrantyIndicator(a)}
-          <button type="button" onclick="showClientActPreview('${escapeClient(a.number)}')">📄 Посмотреть акт</button></article>`).join(''):'<div class="card">Актов пока нет.</div>';
-        setPage('📄 Акты и документы',content);
+        const d=await clientApi('/api/client/dashboard');
+        btClientActsCache=(d.acts||[]).filter(a=>a.status!=='cancelled');
+        const content=btClientActsCache.length?btClientActsCache.map((a,index)=>`<button type="button" class="bt-client-act-compact" onclick="showClientActPreviewByIndex(${index})" aria-label="Подробности акта ${escapeClient(a.number||'')}">
+          <span class="bt-client-act-head"><strong>Акт № ${escapeClient(a.number||'—')}</strong><span class="bt-client-act-chevron">›</span></span>
+          <span class="bt-client-act-device">${escapeClient(btClientActTitle(a))}</span>
+          <span class="bt-client-act-meta"><strong>${escapeClient(btActMoney(a.final_price??a.price))}</strong><span>${btWarrantyIndicator(a)}</span></span>
+          <span class="bt-client-act-status">${escapeClient(btClientActStatus(a.status))}</span>
+        </button>`).join(''):'<div class="card">Актов пока нет.</div>';
+        setPage('📄 Акты и документы',`<div class="bt-client-act-list">${content}</div>`);
     } catch(e){setPage('📄 Акты и документы',`<div class="card error">${escapeClient(e.message)}</div>`);}
+}
+function showClientActPreviewByIndex(index){
+    const act=btClientActsCache[index];
+    if(!act){showMyActs();return;}
+    showClientActPreview(act.number);
 }
 function showClientActPreview(number){
     btClientActPreviewNumber=number;
     const act=btClientActsCache.find(a=>String(a.number)===String(number));
     if(!act){showMyActs();return;}
     const works=Array.isArray(act.works)?act.works:[];
-    setPage('📄 Просмотр акта',`<article class="card bt-act-readable"><h2>Акт № ${escapeClient(act.number)}</h2>
-      <p><b>Техника:</b> ${escapeClient([act.device,act.brand,act.model].filter(Boolean).join(' '))}</p>
-      <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${escapeClient(w)}</li>`).join('')||'<li>Не указаны</li>'}</ol>
+    setPage('📄 Подробности ремонта',`<article class="card bt-act-readable bt-client-act-detail">
+      <h2>Акт № ${escapeClient(act.number||'—')}</h2>
+      <p class="bt-client-act-detail-status">${escapeClient(btClientActStatus(act.status))}</p>
+      <p><b>Техника:</b> ${escapeClient(btClientActTitle(act))}</p>
+      <p><b>Выполненные работы:</b></p><ol>${works.map(w=>`<li>${escapeClient(typeof w==='string'?w:(w?.name||w?.title||'Работа'))}</li>`).join('')||'<li>Не указаны</li>'}</ol>
       <p><b>Стоимость ремонта:</b> ${escapeClient(btActMoney(act.price))}</p>
       ${Number(act.discount_amount||0)>0?`<p><b>Скидка:</b> −${escapeClient(btActMoney(act.discount_amount))}</p>`:''}
-      <p><b>Итого к оплате:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
+      <p><b>Итого:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
       <p><b>Гарантия:</b> ${escapeClient(act.guarantee_text||'—')} · до ${escapeClient(act.guarantee_until||'—')}</p>
-      <p>Для просмотра оригинала нажмите «Открыть PDF».</p>
+      <p>${btWarrantyIndicator(act)}</p>
+      ${act.paynet_url && !['paid','confirmed','confirmed_automatic','confirmed_auto','auto_confirmed'].includes(String(act.payment_status==='paid'?'paid':act.status||''))?`<a class="btn" href="${escapeClient(act.paynet_url)}" target="_blank" rel="noopener noreferrer">💳 Оплатить через Paynet</a><p class="subtitle">Оплата откроется в Paynet. После оплаты сообщите мастеру — автоматической проверки пока нет.</p>`:''}
       <button type="button" onclick="openClientActPdf('${escapeClient(number)}')">📄 Открыть PDF</button>
       <button type="button" class="secondary" onclick="downloadClientActPdf('${escapeClient(number)}')">↓ Сохранить PDF</button>
       <button type="button" class="back-btn" onclick="showMyActs()">← Все акты</button></article>`);
@@ -993,28 +1028,6 @@ function btSaveCurrentAddress(which){
         if(status)status.textContent='Адрес сохранён на этом устройстве (без GPS).';
     }catch(_){showAlert('Не удалось сохранить адрес на устройстве.');}
 }
-async function btRepeatOrder(orderId){
-    try{
-        const result=await clientApi('/api/client/dashboard');
-        const previous=(result.orders||[]).find(o=>String(o.id)===String(orderId));
-        if(!previous)throw new Error('Прошлая заявка не найдена.');
-        // Новый идентификатор операции: повторная заявка — самостоятельный заказ.
-        showNewOrder();
-        for(const [field,custom] of [['device','device_custom'],['brand','brand_custom']]){
-            const select=document.getElementById(field),value=String(previous[field]||'');
-            if(!select||!value)continue;
-            const existing=[...select.options].some(option=>option.value===value);
-            select.value=existing?value:'__other__';
-            if(field==='device')onDeviceChange();else onBrandChange();
-            if(!existing){const input=document.getElementById(custom);if(input)input.value=value;}
-        }
-        for(const name of ['problem','house','apartment']){
-            const input=document.getElementById(name);if(input)input.value=String(previous[name]||'');
-        }
-        // Дата и время намеренно новые, прежние промокод и GPS не копируются.
-        showAlert('Данные техники и адрес перенесены. Проверьте дату, время и при необходимости укажите локацию.');
-    }catch(e){showAlert(e.message||'Не удалось повторить заявку.');}
-}
 // ============ НОВАЯ ЗАЯВКА ============
 
 function showNewOrder() {
@@ -1133,11 +1146,10 @@ function showNewOrder() {
         </div>
 
         <div class="card">
-            <label for="house">Адрес выезда (или геолокация)</label>
-            <input id="house" maxlength="80" placeholder="Например: Ташкент, ул. Навои, дом 15" autocomplete="street-address" oninput="btClientManualAddressChanged()">
-            <label for="apartment" style="margin-top:12px">Квартира / ориентир (необязательно)</label>
-            <input id="apartment" maxlength="80" placeholder="Квартира 42, подъезд 2" autocomplete="off">
-            <p class="subtitle">Выберите один способ: укажите адрес вручную или отправьте точку GPS. Можно заказать ремонт домой, находясь в другом месте.</p>
+            <label for="house">Адрес ремонта</label>
+            <div class="bt-client-address-row"><div><label for="house">Дом</label><input id="house" maxlength="40" placeholder="15" autocomplete="off" oninput="btClientManualAddressChanged()"></div><div><label for="apartment">Кв.</label><input id="apartment" maxlength="80" placeholder="42" autocomplete="off"></div></div>
+            <p class="subtitle">Укажите дом и квартиру. Адрес найдите на карте или отправьте текущую локацию.</p>
+            <button type="button" onclick="btOpenAddressMap()" class="bt-map-open">🗺️ Выбрать на карте</button>
             <button onclick="sendLocation()" style="margin-top:14px;padding:14px;font-size:16px;background:#f0f0f0;border:1px solid #ddd;border-radius:10px;width:100%;cursor:pointer;">
                 📍 Отправить мою локацию
             </button>
@@ -1148,15 +1160,18 @@ function showNewOrder() {
         </div>
 
         <div class="card promo-card" id="orderPromoCard">
-            <label>🎟️ Промокод (необязательно)</label>
+            <label>🎟️ Промокод</label>
             <input id="order_promo_code" placeholder="Например, REMONT10" maxlength="64" autocapitalize="characters" autocomplete="off" style="text-transform:uppercase">
             <button type="button" id="orderPromoCheck" onclick="checkOrderPromo()">Проверить промокод</button>
             <p id="orderPromoStatus" class="subtitle">Активный промокод привяжется к вашему аккаунту автоматически при отправке заявки.</p>
         </div>
 
-        <button id="submit" class="bt-client-submit" onclick="submitOrder()">📤 Отправить заявку</button>
+        <button id="submit" class="bt-client-submit bt-client-submit-glow bt-field-empty" onclick="submitOrder()">📤 Отправить заявку</button>
     ` + btClientBottomNav();
+    orderData.location=null;
+    orderData.mapAddress='';
     btEnhanceClientOrderPickers();
+    btClientBindOrderValidation();
 
     try {
         document.getElementById('house').value = isNewClientFlow
@@ -1175,6 +1190,7 @@ function showNewOrder() {
         const identityCard=document.getElementById('clientIdentityCard');
         const firstNameDone=localStorage.getItem('remont_bt_customer_name_confirmed')==='1';
         identityCard.style.display=firstNameDone?'none':'block';
+        btClientUpdateSubmitGlow();
         clientApi('/api/client/profile').then(d=>{
             const profile=d.profile||{};
             if(profile.name)document.getElementById('client_name').value=profile.name;
@@ -1182,7 +1198,7 @@ function showNewOrder() {
                 identityCard.style.display='none';
                 localStorage.setItem('remont_bt_customer_name_confirmed','1');
             }else identityCard.style.display='block';
-        }).catch(()=>{});
+        }).then(()=>btClientUpdateSubmitGlow()).catch(()=>{});
     } catch (e) {
         console.error('Ошибка инициализации формы клиента:', e);
     }
@@ -1252,6 +1268,7 @@ function btRenderStyledClientPicker(selectId){
 function btChooseClientPicker(selectId,button){
     const native=document.getElementById(selectId);if(!native)return;
     native.value=button.dataset.pickerValue;
+    btClientUpdateSubmitGlow();
     document.getElementById(selectId+'StyledPicker').open=false;
     document.getElementById(selectId+'StyledSummary').textContent=button.querySelector('span:nth-child(2)')?.textContent||native.value;
     for(const other of document.querySelectorAll(`#${selectId}StyledPicker .bt-client-picker-option`))other.classList.toggle('selected',other===button);
@@ -1278,17 +1295,50 @@ function onBrandChange() {
 // Ручной адрес имеет приоритет: GPS телефона не должен указывать на работу,
 // если клиент вручную вводит адрес дома.
 function btClientManualAddressChanged(){
-    orderData.location=null;
+    btClientUpdateSubmitGlow();
     const status=document.getElementById('location_status');
-    if(status)status.textContent='Используется адрес, введённый вручную (без GPS).';
+    if(status && !orderData.location)status.textContent='Укажите адрес на карте или отправьте геолокацию.';
 }
 function btClientLocationSelected(lat,lon){
     orderData.location={lat:Number(lat),lon:Number(lon)};
+    orderData.mapAddress='';
+    btClientUpdateSubmitGlow();
     // Не смешиваем адрес предыдущей заявки с новой точкой GPS.
     const house=document.getElementById('house');
     const apartment=document.getElementById('apartment');
-    if(house)house.value='';
-    if(apartment)apartment.value='';
+    // Номер дома и квартира остаются: GPS определяет точку, не квартиру.
+    btClientUpdateSubmitGlow();
+}
+
+// Button glow reflects all required order fields; visual feedback only.
+function btClientUpdateSubmitGlow(){
+    const btn=document.getElementById('submit');if(!btn)return;
+    const value=id=>String(document.getElementById(id)?.value||'').trim();
+    const device=value('device')==='__other__'?value('device_custom'):value('device');
+    const brand=value('brand')==='__other__'?value('brand_custom'):value('brand');
+    const identity=document.getElementById('clientIdentityCard');
+    const nameOk=!identity||identity.style.display==='none'||value('client_name').length>=2;
+    const loc=orderData.location;
+    const gpsOk=loc&&Number.isFinite(Number(loc.lat))&&Number.isFinite(Number(loc.lon));
+    const ready=Boolean(nameOk&&device&&brand&&value('problem').length>=5&&value('when_date')&&value('when_time')&&gpsOk);
+    btn.classList.toggle('bt-field-ready',ready);btn.classList.toggle('bt-field-empty',!ready);
+    for(const id of ['device','brand','when_date','when_time']){
+        const el=document.getElementById(id);if(!el)continue;
+        const chosen=value(id);
+        const ok=Boolean(chosen && (chosen!=='__other__' || value(id+'_custom')));
+        // Styled <details> is a sibling of the hidden native select.
+        const picker=document.getElementById(id+'StyledPicker');
+        if(picker){
+            picker.classList.toggle('bt-field-ready',ok);
+            picker.classList.toggle('bt-field-empty',!ok);
+        }
+    }
+}
+function btClientBindOrderValidation(){
+    const form=document.getElementById('submit')?.parentElement;if(!form)return;
+    form.addEventListener('input',btClientUpdateSubmitGlow);
+    form.addEventListener('change',btClientUpdateSubmitGlow);
+    btClientUpdateSubmitGlow();
 }
 
 // ============ ЛОКАЦИЯ ============
@@ -1434,7 +1484,7 @@ async function submitOrder() {
 
     if (!when_date) return showAlert('Выберите дату');
     if (!when_time) return showAlert('Выберите время');
-    if (!house && !orderData.location) return showAlert('Укажите адрес выезда или отправьте геолокацию');
+    if (!orderData.location) return showAlert('Выберите точку на карте или отправьте геолокацию');
 
     try {
         localStorage.setItem('remont_bt_house', house);
@@ -1463,11 +1513,11 @@ async function submitOrder() {
         problem: problem,
         when_date: when_date,
         when_time: when_time,
-        house: house,
+        house: [orderData.mapAddress,house && ('дом '+house)].filter(Boolean).join(', ') || (house ? 'дом '+house : ''),
         apartment: apartment,
         comment: comment,
         promo_code: order_promo_code,
-        location: house ? null : (orderData.location || null),
+        location: orderData.location || null,
     };
 
     // Даже если клиент не нажал «Проверить», сервер проверит и привяжет активный код
@@ -1623,3 +1673,97 @@ startMasterApplicationAutoSync();
   function start(){observer.observe(document.body,{childList:true,subtree:true});}
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start,{once:true});else start();
 })();
+
+
+// TEST PATCH: embedded address picker. Coordinates are only saved after explicit confirmation.
+// TEST PATCH: center-fixed pin map. No coordinates are saved until confirmation.
+let btAddressMapInstance=null,btAddressMapPoint=null,btAddressMapLabel='';
+let btMapLayers=null,btMapStyle='street';
+function btMapUpdateCenter(){
+    if(!btAddressMapInstance)return;
+    const c=btAddressMapInstance.getCenter();
+    btAddressMapPoint={lat:c.lat,lon:c.lng};
+    const hint=document.getElementById('btMapHint');
+    if(hint)hint.textContent=`Точка: ${c.lat.toFixed(6)}, ${c.lng.toFixed(6)} · Перемещайте карту под меткой`;
+    const btn=document.getElementById('btMapConfirm');if(btn)btn.disabled=false;
+}
+function btMapSetLayer(style){
+    if(!btAddressMapInstance||!btMapLayers)return;
+    const next=style==='satellite'?'satellite':'street';
+    if(btMapLayers[btMapStyle])btAddressMapInstance.removeLayer(btMapLayers[btMapStyle]);
+    btMapStyle=next;
+    btMapLayers[next].addTo(btAddressMapInstance);
+    document.querySelectorAll('#btAddressOverlay [data-map-style]').forEach(b=>{
+        b.classList.toggle('bt-map-style-active',b.dataset.mapStyle===next);
+        b.setAttribute('aria-pressed',String(b.dataset.mapStyle===next));
+    });
+}
+async function btOpenAddressMap(){
+    if(document.getElementById('btAddressOverlay'))return;
+    const overlay=document.createElement('div');overlay.id='btAddressOverlay';overlay.className='bt-address-overlay';
+    overlay.innerHTML=`<div class="bt-address-dialog" role="dialog" aria-modal="true" aria-label="Выбор адреса">
+      <div class="bt-address-top"><strong>🗺️ Адрес ремонта</strong><button type="button" onclick="btCloseAddressMap()" aria-label="Закрыть">✕</button></div>
+      <div class="bt-address-search"><input id="btMapSearch" placeholder="Город, улица, адрес" autocomplete="off"><button type="button" onclick="btSearchAddressMap()">Найти</button></div>
+      <div class="bt-map-style-switch"><button type="button" data-map-style="street" onclick="btMapSetLayer('street')">Схема</button><button type="button" data-map-style="satellite" onclick="btMapSetLayer('satellite')">Спутник</button></div>
+      <div class="bt-map-stage"><div id="btAddressMap"></div><div class="bt-map-center-pin" aria-hidden="true"><span>📍</span></div></div>
+      <p id="btMapHint">Передвигайте карту, чтобы поставить метку на нужный дом.</p>
+      <div class="bt-address-actions"><button type="button" onclick="btCloseAddressMap()">Отмена</button><button type="button" id="btMapConfirm" onclick="btConfirmAddressMap()" disabled>✓ Подтвердить точку</button></div>
+    </div>`;
+    document.body.appendChild(overlay);
+    try{
+        if(!window.L){
+            await new Promise((resolve,reject)=>{
+                const css=document.createElement('link');css.rel='stylesheet';css.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';document.head.appendChild(css);
+                const js=document.createElement('script');js.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';js.onload=resolve;js.onerror=reject;document.head.appendChild(js);
+            });
+        }
+        if(!document.getElementById('btAddressOverlay'))return;
+        const initial=orderData.location||{lat:41.2995,lon:69.2401};
+        btAddressMapInstance=L.map('btAddressMap',{zoomControl:true}).setView([initial.lat,initial.lon],orderData.location?17:12);
+        btMapLayers={
+            street:L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'}),
+            satellite:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'Tiles © Esri and contributors'})
+        };
+        btMapStyle='street';btMapLayers.street.addTo(btAddressMapInstance);
+        btMapSetLayer('street');
+        btAddressMapLabel='';
+        btAddressMapInstance.on('moveend',()=>{btAddressMapLabel='';btMapUpdateCenter();});
+        btMapUpdateCenter();
+        setTimeout(()=>btAddressMapInstance?.invalidateSize(),100);
+    }catch(e){
+        const hint=document.getElementById('btMapHint');
+        if(hint)hint.textContent='Карта недоступна. Проверьте интернет или отправьте геолокацию.';
+        console.warn('Map loading failed',e);
+    }
+}
+async function btSearchAddressMap(){
+    const query=document.getElementById('btMapSearch')?.value.trim();if(!query)return;
+    const hint=document.getElementById('btMapHint');if(hint)hint.textContent='Ищем адрес…';
+    try{
+        const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=uz&q='+encodeURIComponent(query);
+        const response=await fetch(url,{headers:{'Accept':'application/json'}});
+        if(!response.ok)throw Error('search failed');
+        const results=await response.json();
+        if(!results.length){if(hint)hint.textContent='Адрес не найден. Уточните запрос или передвиньте карту.';return;}
+        const place=results[0];
+        btAddressMapLabel=place.display_name||'';
+        btAddressMapInstance?.setView([Number(place.lat),Number(place.lon)],17);
+        // The center pin stays fixed; the user may adjust it by dragging the map.
+        btMapUpdateCenter();
+    }catch(e){if(hint)hint.textContent='Поиск недоступен. Выберите точку перемещением карты.';}
+}
+function btConfirmAddressMap(){
+    if(!btAddressMapInstance)return;
+    const center=btAddressMapInstance.getCenter();
+    if(!Number.isFinite(center.lat)||!Number.isFinite(center.lng))return;
+    orderData.location={lat:center.lat,lon:center.lng};
+    orderData.mapAddress=btAddressMapLabel||document.getElementById('btMapSearch')?.value.trim()||'';
+    const status=document.getElementById('location_status');
+    if(status){status.textContent='✅ Точка на карте подтверждена';status.style.color='#43dba1';}
+    btCloseAddressMap();btClientUpdateSubmitGlow();
+}
+function btCloseAddressMap(){
+    if(btAddressMapInstance){btAddressMapInstance.remove();btAddressMapInstance=null;}
+    btAddressMapPoint=null;btMapLayers=null;
+    document.getElementById('btAddressOverlay')?.remove();
+}

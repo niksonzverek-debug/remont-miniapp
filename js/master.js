@@ -42,7 +42,7 @@ async function downloadMasterAct(number){
     document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
   }catch(e){masterToast(e.message,true);}
 }
-const masterActStatusLabels={sending:'Отправляется',sent:'Отправлен клиенту',pending:'Ожидает привязки',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён клиентом',cancelled:'Отменён',draft:'Черновик'};
+const masterActStatusLabels={sending:'Отправляется',sent:'Отправлен клиенту',pending:'Ожидает привязки',pending_client:'Ожидает регистрации клиента',pending_delivery:'Ожидает доставки',confirmed:'Подтверждён клиентом',confirmed_automatic:'Подтверждён автоматически',cancelled:'Отменён',draft:'Черновик'};
 function masterActStatus(v){return masterActStatusLabels[v]||v||'Без статуса';}
 function masterActSummary(number){
  const act=masterCache.acts.find(a=>String(a.number)===String(number));
@@ -73,12 +73,33 @@ async function openMasterActPdf(number){
  try{const url=await masterActPublicUrl(number,'view-link');openMasterDocumentUrl(url)}
  catch(e){masterToast(e.message,true)}
 }
+function btMasterActPaymentLabel(status){return status==='paid'?'✓ Оплачено':status==='unpaid'?'Не оплачено':'Оплата не указана';}
+let btMasterPaymentSaving=false;
+async function btMasterSaveActPayment(number,status){
+ if(btMasterPaymentSaving)return;
+ btMasterPaymentSaving=true;
+ try{
+  await masterApi(`/api/master/acts/${encodeURIComponent(String(number))}/payment-status`,'POST',{status});
+  const act=masterCache.acts.find(a=>String(a.number)===String(number));
+  if(act)act.payment_status=status;
+  masterToast('Статус оплаты сохранён');
+  previewMasterAct(number);
+ }catch(e){masterToast(e.message||'Не удалось сохранить статус',true)}
+ finally{btMasterPaymentSaving=false;}
+}
+function btMasterAskPayment(number){
+ btMasterLastActNumber=number;
+ masterShell('Оплата по акту',`<article class="card"><h2>Акт № ${masterEsc(number)} создан</h2><p>Клиент оплатил выполненную работу?</p>
+ <div class="button-row"><button type="button" onclick="btMasterSaveActPayment('${masterEsc(number)}','paid')">Да, оплатил</button><button type="button" class="secondary" onclick="btMasterSaveActPayment('${masterEsc(number)}','unpaid')">Нет, ещё не оплатил</button></div>
+ <button type="button" class="back-btn" onclick="showMasterActs()">Ответить позже</button></article>`);
+}
 async function previewMasterAct(number){
  btMasterLastActNumber=number;
  clearMasterPdfUrl();
  masterShell('Просмотр акта',`<article class="card"><h2>Акт № ${masterEsc(number)}</h2>
  <p class="subtitle">Содержимое акта отображается сразу. PDF откроется в просмотрщике телефона или браузере.</p>
- ${masterActSummary(number)}
+ ${masterActSummary(number)}<div class="card"><p><b>Оплата:</b> ${masterEsc(btMasterActPaymentLabel(masterCache.acts.find(a=>String(a.number)===String(number))?.payment_status))}</p>
+ ${!['paid','unpaid'].includes(masterCache.acts.find(a=>String(a.number)===String(number))?.payment_status)?`<div class="button-row"><button type="button" onclick="btMasterSaveActPayment('${masterEsc(number)}','paid')">✓ Оплачено</button><button type="button" class="secondary" onclick="btMasterSaveActPayment('${masterEsc(number)}','unpaid')">Не оплачено</button></div>`:'<p class="subtitle">Ответ мастера зафиксирован и не подлежит изменению.</p>'}</div>
  <div class="button-row"><button type="button" onclick="openMasterActPdf('${masterEsc(number)}')">📄 Открыть PDF</button>
  <button type="button" class="secondary" onclick="downloadMasterAct('${masterEsc(number)}')">↓ Сохранить PDF</button></div>
  <div class="button-row"><button type="button" onclick="shareMasterAct('${masterEsc(number)}')">↗ Поделиться через Telegram</button>
@@ -140,7 +161,7 @@ function btMasterRestoreRoute(title){
    'Написать в поддержку':()=>showMasterSupport(),
    'Рекламная ссылка':()=>showMasterMarketingLink(),
    'Моя ссылка для клиентов':()=>showMasterInviteLink(),
-   'Мой QR для оплаты':()=>showMasterPaymentQr(),
+   'Моя ссылка для оплаты':()=>showMasterPaymentQr(),
    'Мой депозит':()=>showMasterFinance(),
    'Диалог':()=>openMasterChat(clientId),
    'Просмотр акта':()=>previewMasterAct(actNumber),
@@ -163,8 +184,16 @@ function masterShell(title, body) {
      <img class="bt-header-logo" src="img/remont-bt-icon.png" alt="ТехСервис">
      <div class="bt-header-copy"><span class="bt-header-hello">Здравствуйте!</span><strong class="bt-header-name">${masterEsc(name)}</strong></div>
      <span class="bt-header-role">🧰 <span>Мастер</span></span>
+     ${home?`<button type="button" class="bt-master-deposit-link bt-header-deposit" onclick="showMasterFinance()" aria-label="Открыть мой депозит"><span>Мой депозит</span><strong id="btMasterHomeDepositValue">Загружаем…</strong><span aria-hidden="true">›</span></button>`:''}
    </header><section id="masterContent">${home?'':`<h1 class="bt-screen-heading">${masterEsc(title)}</h1>`}${body}</section>
    <nav class="master-bottom-nav"><button onclick="renderMasterMenu()"><span>⌂</span><small>Главная</small></button><button id="btMasterOrdersNav" onclick="showMasterOrders()"><span>▤</span><small>Заказы</small></button><button id="btMasterChatsNav" onclick="showMasterMessages()"><span>✉</span><small>Чаты</small></button><button onclick="showMasterProfile()"><span>◎</span><small>Профиль</small></button></nav><p id="masterToast" class="subtitle" role="status"></p></main>`;
+  // Reuse the existing language control; only move it into the master header.
+  // ui-language.js recreates it after document.body.innerHTML is replaced.
+  setTimeout(() => {
+    const header = document.querySelector('.master-app .bt-master-header');
+    const languageWidget = document.getElementById('remontLangToggle');
+    if (header && languageWidget && !header.contains(languageWidget)) header.appendChild(languageWidget);
+  }, 0);
   btUpdateMasterAttention();
   window.scrollTo({top:0,left:0,behavior:'instant'});
 }
@@ -330,7 +359,6 @@ async function renderMasterMenu() {
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
   const s=masterCache.stats||{};
   masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
-  <button type="button" class="bt-master-deposit-link" onclick="showMasterFinance()" aria-label="Открыть мой депозит"><span>Мой депозит</span><strong id="btMasterHomeDepositValue">Загружаем…</strong><span aria-hidden="true">›</span></button>
   <button class="bt-master-new-orders ${Number(s.new_orders)>0?'bt-attention-urgent':''}" onclick="showMasterOrders()"><span><b>⚡ Новые заявки</b><small>Ожидают принятия</small></span><span class="count-bubble">${s.new_orders||0}</span></button>
   <button id="btMasterHomeCreateAct" class="bt-master-primary bt-red-action" onclick="showCreateAct()">＋ Создать акт</button>
   <div class="master-action-grid bt-master-feature-grid bt-six-tiles">
@@ -340,7 +368,7 @@ async function renderMasterMenu() {
     <button class="menu-btn" onclick="showMasterPromos()"><span class="emoji">◇</span><b>Промокоды</b><small>Скидки</small></button>
     <button class="menu-btn" onclick="showMasterFinanceReport()"><span class="emoji">▥</span><b>Финансы</b><small>Отчёт</small></button>
     <button class="menu-btn" onclick="showMasterInviteLink()"><span class="emoji">↗</span><b>Моя ссылка</b><small>Для клиентов</small></button>
-    <button class="menu-btn" onclick="showMasterPaymentQr()"><span class="emoji">▦</span><b>Мой QR</b><small>Для оплаты</small></button>
+    <button class="menu-btn" onclick="showMasterPaymentQr()"><span class="emoji">▦</span><b>Paynet Xolis</b><small>Ссылка для оплаты</small></button>
 
     <button class="menu-btn" onclick="showMasterFAQ()"><span class="emoji">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
     <button class="menu-btn" onclick="showMasterSupport()"><span class="emoji">✉</span><b>Поддержка</b><small>Написать администратору</small></button>
@@ -367,7 +395,7 @@ function showMasterFAQ(){
       ['Как пополнить депозит?','Откройте баланс и следуйте доступной инструкции по оплате. Если требуется чек, прикрепите его и дождитесь подтверждения администратора.'],
       ['Как работают промокоды?','В разделе «Промокоды» создавайте и отслеживайте доступные предложения для клиентов и партнёров. Условия, сроки и лимиты указываются для каждого кода.'],
       ['Где моя ссылка для клиентов?','На главной странице откройте «Моя ссылка для клиентов». Клиент, зарегистрировавшийся по ней, закрепляется по правилам системы.'],
-      ['Как настроить QR для оплаты?','Откройте «Мой QR для оплаты» и загрузите изображение QR-кода из используемого платёжного приложения.'],
+      ['Как настроить оплату через Paynet?','Откройте «Paynet Xolis» на главной панели и сохраните свою ссылку для оплаты.'],
       ['Что даёт идентификация мастера?','Идентификация добровольная. Отправьте запрошенные документы и селфи на ручную проверку. После одобрения появится отметка «Личность проверена»; работать можно и без неё.'],
       ['Когда начисляется бонус за идентификацию?','Разовый бонус 20 000 сум предусмотрен после первого успешного одобрения администратором. Повторное одобрение не даёт нового бонуса.'],
       ['Что означает удаление принятой заявки администратором?','Такая заявка переносится в архив с причиной. Откройте историю, чтобы увидеть комментарий. Уже выданные акты и финансовые операции не должны удаляться.'],
@@ -375,27 +403,126 @@ function showMasterFAQ(){
     ];
   masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Ответы на частые вопросы о работе в ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
-function masterOrderMapUrl(order){
- const l=order?.location;
- if(l&&typeof l==='object'){
-   const lat=Number(l.lat??l.latitude),lon=Number(l.lon??l.longitude);
-   if(Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180)
-     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(lat+','+lon)}`;
+// Navigation uses confirmed GPS coordinates first; house/apartment remain visible in the order.
+function masterOrderDestination(order){
+ const candidates=[order?.location,order?.geo,order?.coordinates,order?.client_location];
+ for(const l of candidates){
+  if(!l||typeof l!=='object')continue;
+  const lat=Number(l.lat??l.latitude),lon=Number(l.lon??l.lng??l.longitude);
+  if(Number.isFinite(lat)&&Number.isFinite(lon)&&Math.abs(lat)<=90&&Math.abs(lon)<=180&&!(lat===0&&lon===0))
+   return {lat,lon};
  }
- // Google Maps can search an address when the customer did not share GPS.
- const address=String(order?.address||order?.house||'').trim();
- if(address&&address!=='📍 Геолокация клиента')
-   return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(address)}`;
- return '';
+ const address=String(order?.address||'').trim();
+ if(address&&address!=='📍 Геолокация клиента'&&!/^GPS[: ]/i.test(address)){
+  const clean=address.replace(/(?:,|\s)\s*(?:кв\.?|квартира|apt\.?|apartment)\s*[^,;]*/ig,'').trim();
+  if(clean)return {address:clean};
+ }
+ return null;
+}
+function masterOrderMapUrl(order){
+ const dest=masterOrderDestination(order);
+ if(!dest)return '';
+ const target=dest.address||`${dest.lat},${dest.lon}`;
+ return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(target)}`;
+}
+function masterNavLink(dest,provider){
+ const point=dest.address||`${dest.lat},${dest.lon}`;
+ if(provider==='yandex')return dest.address?`https://yandex.com/maps/?text=${encodeURIComponent(dest.address)}`:`https://yandex.com/maps/?rtext=~${dest.lat},${dest.lon}&rtt=auto`;
+ if(provider==='2gis')return dest.address?`https://2gis.ru/search/${encodeURIComponent(dest.address)}`:`https://2gis.ru/routeSearch/rsType/car/to/${dest.lon},${dest.lat}`;
+ return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(point)}`;
+}
+function masterPreferredNavigator(){
+ try{
+  const saved=localStorage.getItem('bt_master_preferred_nav')||'';
+  return ['google','yandex','2gis'].includes(saved)?saved:'';
+ }catch(e){return '';}
+}
+function masterOpenNavigation(dest,provider){
+ const url=masterNavLink(dest,provider);
+ // Called directly in a click handler, so Telegram/Android can open the external link.
+ if(window.Telegram?.WebApp?.openLink){
+  try{window.Telegram.WebApp.openLink(url);return;}catch(e){}
+ }
+ window.open(url,'_blank','noopener,noreferrer');
+}
+function masterSetPreferredNavigator(value){
+ try{
+  if(['google','yandex','2gis'].includes(value))localStorage.setItem('bt_master_preferred_nav',value);
+  else localStorage.removeItem('bt_master_preferred_nav');
+ }catch(e){masterToast('Не удалось сохранить выбор на этом устройстве',true);return;}
+ const status=document.getElementById('masterNavigatorStatus');
+ if(status)status.textContent=value?'Выбор сохранён. Маршрут будет открываться без дополнительного окна.':'При открытии маршрута будет предложен выбор навигатора.';
+}
+function showMasterRoute(orderId){
+ const order=masterCache.orders.find(o=>String(o.id)===String(orderId));
+ const dest=masterOrderDestination(order);
+ if(!dest){masterToast('В заявке нет координат или адреса для маршрута',true);return;}
+ const existing=document.getElementById('btMasterNavChooser');if(existing)existing.remove();
+ const saved=masterPreferredNavigator();
+ if(saved){
+  // A saved preference must actually skip the chooser.
+  masterOpenNavigation(dest,saved);
+  return;
+ }
+ const modal=document.createElement('div');modal.id='btMasterNavChooser';
+ modal.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,6,19,.82);display:flex;align-items:center;justify-content:center;padding:20px';
+ modal.innerHTML=`<div role="dialog" aria-modal="true" aria-label="Выбор навигатора" style="width:min(100%,420px);background:#0b1d33;border:1px solid #3388cf;border-radius:18px;padding:20px;box-shadow:0 0 26px #147dba55;color:#eaf5ff"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b style="font-size:19px">📍 Показать маршрут</b><button type="button" id="btNavClose" class="secondary" style="width:auto">✕</button></div><p style="opacity:.8">Выберите приложение для навигации</p><div style="display:grid;gap:9px"><button type="button" data-nav="google">Google Maps</button><button type="button" data-nav="yandex">Яндекс Карты</button><button type="button" data-nav="2gis">2ГИС</button></div><label style="display:flex;align-items:center;gap:10px;margin-top:16px"><input type="checkbox" id="btNavRemember" ${saved?'checked':''} style="position:absolute;opacity:0;width:1px;height:1px;pointer-events:none"><span id="btNavRememberMark" aria-hidden="true" style="display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;flex:none;border:2px solid ${saved?'#22c55e':'#36b6ee'};border-radius:7px;background:${saved?'#137345':'#09172b'};color:#fff;font-size:19px;font-weight:900;box-shadow:0 0 9px ${saved?'#22c55e77':'#36b6ee44'}">${saved?'✓':''}</span> Запомнить мой выбор</label></div>`;
+ document.body.appendChild(modal);
+ const rememberInput=modal.querySelector('#btNavRemember');
+ const rememberMark=modal.querySelector('#btNavRememberMark');
+ const updateRememberMark=()=>{const on=rememberInput.checked;rememberMark.textContent=on?'✓':'';rememberMark.style.borderColor=on?'#22c55e':'#36b6ee';rememberMark.style.background=on?'#137345':'#09172b';rememberMark.style.boxShadow=on?'0 0 10px #22c55e88':'0 0 9px #36b6ee44';};
+ rememberInput.addEventListener('change',updateRememberMark);
+ const close=()=>modal.remove();modal.querySelector('#btNavClose').onclick=close;
+ modal.addEventListener('click',e=>{if(e.target===modal)close();});
+ modal.querySelectorAll('[data-nav]').forEach(btn=>btn.addEventListener('click',()=>{
+  const provider=btn.dataset.nav;
+  try{if(modal.querySelector('#btNavRemember').checked)localStorage.setItem('bt_master_preferred_nav',provider);else localStorage.removeItem('bt_master_preferred_nav');}catch(e){}
+  close();
+  masterOpenNavigation(dest,provider);
+ }));
 }
 function statusLabel(s){return ({new:'Новая',accepted:'Принята',rejected:'Отклонена',in_progress:'В работе',act_issued:'Акт отправлен',closed:'Закрыта',completed:'Завершена',archived_admin:'Удалена администратором'})[s]||s||'—';}
 async function showMasterOrders(){try{await loadMasterData();}catch(e){return masterShell('Заявки',`<article class="card error">${masterEsc(e.message)}</article>`)}
- const rows=masterCache.orders.map(o=>`<article class="card order-card ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${masterEsc(o.id)}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><h3>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</h3><p><b>Клиент:</b> ${masterEsc(o.client_name||'Клиент')} · ${masterEsc(o.client_phone||'телефон не указан')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p><p class="subtitle">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p>${o.status==='archived_admin'?`<p class="subtitle"><b>Причина удаления:</b> ${masterEsc(o.admin_archive_reason||'Не указана')}</p>`:''}${o.status==='new'&&Date.now()-Date.parse(o.created_at||'')>2*3600*1000?'<p class="bt-overdue-note">⚠ Ожидает ответа более двух часов</p>':''}<div class="button-row">${o.status==='new'?`<button onclick="decideMasterOrder('${masterEsc(o.id)}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${masterEsc(o.id)}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${masterEsc(o.id)}')">📄 Создать акт</button>`:''}${o.client_id?`<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Написать клиенту</button>`:''}${o.status==='accepted'&&masterOrderMapUrl(o)?`<a class="secondary menu-btn" target="_blank" rel="noopener noreferrer" href="${masterEsc(masterOrderMapUrl(o))}">📍 Открыть маршрут</a>`:''}</div></article>`).join('');
- masterShell('Заявки',`<div class="section-heading"><p>Сначала показываются последние заявки. Действия доступны только по заявкам вашего кабинета.</p><select id="orderFilter" onchange="filterMasterOrders()"><option value="all">Все статусы</option><option value="new">Новые</option><option value="accepted">Принятые</option><option value="act_issued">Акт отправлен</option><option value="closed">Закрытые</option><option value="archived_admin">Архив (удалены администратором)</option></select></div><div id="masterOrderList" class="stack-list">${rows||'<article class="card">Заявок пока нет.</article>'}</div>`);}
+ const rows=masterCache.orders.map(o=>{
+   const id=masterEsc(o.id),route=masterOrderDestination(o);
+   const actions=`${o.status==='new'?`<button onclick="decideMasterOrder('${id}','accept')">✓ Принять</button><button class="secondary" onclick="decideMasterOrder('${id}','reject')">Отклонить</button>`:''}${o.status==='accepted'&&!o.act_number?`<button onclick="showMasterCreateAct('${id}')">📄 Создать акт</button>`:''}${o.client_id?`<button class="secondary" onclick="openMasterChat('${masterEsc(o.client_id)}')">💬 Чат</button>`:''}${o.status==='accepted'&&route?`<button type="button" class="secondary" onclick="showMasterRoute('${id}')">📍 Показать маршрут</button>`:''}`;
+   return `<article class="card order-card bt-order-compact ${o.status==='new'?'bt-new-order':''}"><div class="card-row"><b>${id}</b><span class="status-pill ${o.status==='new'?'status-new':''}">${masterEsc(statusLabel(o.status))}</span></div><div class="bt-order-summary"><strong>${masterEsc([o.device,o.brand,o.model].filter(Boolean).join(' ')||'Ремонт техники')}</strong><span>${masterEsc(o.client_name||'Клиент')}</span></div><p class="subtitle bt-order-short">${masterEsc([o.when_date,o.when_time,o.address||o.house].filter(Boolean).join(' · '))}</p><details class="bt-order-details"><summary>Подробнее о заявке</summary><p><b>Телефон:</b> ${masterEsc(o.client_phone||'—')}</p><p>${masterEsc(o.problem||o.comment||'Описание не указано')}</p>${o.status==='archived_admin'?`<p><b>Причина удаления:</b> ${masterEsc(o.admin_archive_reason||'Не указана')}</p>`:''}</details><div class="button-row bt-order-actions">${actions}</div></article>`;
+ }).join('');
+ const initialFilter=masterCache.orders.some(o=>o.status==='new')?'new':masterCache.orders.some(o=>o.status==='accepted')?'accepted':'all';
+ masterShell('Заявки',`<div class="section-heading"><p>Сначала показываются последние заявки. Действия доступны только по заявкам вашего кабинета.</p><select id="orderFilter" onchange="filterMasterOrders()"><option value="all">Все статусы</option><option value="new">Новые</option><option value="accepted">Принятые</option><option value="act_issued">Акт отправлен</option><option value="closed">Закрытые</option><option value="archived_admin">Архив (удалены администратором)</option></select></div><div id="masterOrderList" class="stack-list">${rows||'<article class="card">Заявок пока нет.</article>'}</div>`);
+ const filter=document.getElementById('orderFilter');if(filter){filter.value=initialFilter;filterMasterOrders();}
+}
 function filterMasterOrders(){const f=document.getElementById('orderFilter')?.value||'all';document.querySelectorAll('#masterOrderList .order-card').forEach((el,i)=>{const o=masterCache.orders[i];el.style.display=f==='all'||o?.status===f?'':'none';});}
 async function decideMasterOrder(id,decision){try{const r=await masterApi(`/api/master/orders/${encodeURIComponent(id)}/decision`,'POST',{decision});masterToast(r.message);await showMasterOrders();}catch(e){masterToast(e.message,true);}}
-async function showMasterClients(){try{await loadMasterData();}catch(e){return masterShell('Клиенты',`<article class="card error">${masterEsc(e.message)}</article>`)}const rows=masterCache.clients.map(c=>`<article class="card"><div class="card-row"><b>${masterEsc(c.name||'Клиент')}</b><span class="status-pill">${c.registered?'Зарегистрирован':'Без регистрации'}</span></div><p>${masterEsc(c.phone||'Телефон не указан')}</p><p class="subtitle">${masterEsc(c.public_name||c.registration_no||'')}</p><div class="button-row"><button onclick="openMasterChat('${masterEsc(c.id)}')">💬 Написать</button>${c.phone?`<a class="secondary menu-btn" href="tel:${masterEsc(c.phone)}">📞 Позвонить</a>`:''}</div></article>`).join('');masterShell('Клиенты',`<input id="clientSearch" placeholder="Поиск по имени, телефону" oninput="filterMasterClients()"><div id="masterClientList" class="stack-list">${rows||'<article class="card">Клиентов пока нет.</article>'}</div>`);}
-function filterMasterClients(){const q=(document.getElementById('clientSearch')?.value||'').toLowerCase();document.querySelectorAll('#masterClientList .card').forEach(el=>el.style.display=el.textContent.toLowerCase().includes(q)?'':'none');}
+// Search is intentionally blank until the master supplies a full phone number.
+function btClientPhone(value){let d=String(value||'').replace(/\D/g,'');if(d.length===9)d='998'+d;return d;}
+function btClientWarranty(act){
+ const raw=String(act.guarantee_until||'').trim();
+ if(!raw||raw==='—'||Number(act.guarantee_days)===0)return 'Без гарантии';
+ const m=raw.match(/^(\d{2})\.(\d{2})\.(\d{4})$/);
+ const until=m?new Date(Number(m[3]),Number(m[2])-1,Number(m[1]),23,59,59):new Date(raw);
+ if(Number.isNaN(until.getTime()))return 'Гарантия: '+raw;
+ const days=Math.max(0,Math.ceil((until.getTime()-Date.now())/86400000));
+ return days>0?'Действует · осталось '+days+' дн.':'Гарантия истекла';
+}
+async function showMasterClients(){
+ masterShell('Поиск клиента',`<article class="card bt-client-search"><label for="btClientPhone">Номер телефона клиента</label><input id="btClientPhone" type="tel" inputmode="tel" autocomplete="off" placeholder="+998 XX XXX XX XX" onkeydown="if(event.key==='Enter'){event.preventDefault();btSearchMasterClient()}"><button type="button" onclick="btSearchMasterClient()">Найти клиента</button><p class="subtitle">Введите полный номер телефона. Список клиентов не отображается.</p></article><div id="btClientSearchResults" aria-live="polite"></div>`);
+}
+async function btSearchMasterClient(){
+ const input=document.getElementById('btClientPhone'),out=document.getElementById('btClientSearchResults');if(!input||!out)return;
+ const wanted=btClientPhone(input.value);if(wanted.length!==12||!wanted.startsWith('998')){out.innerHTML='<article class="card">Введите номер Узбекистана полностью: +998 XX XXX XX XX.</article>';return;}
+ out.innerHTML='<article class="card">Ищем клиента…</article>';
+ try{
+   // Only data scoped to the authenticated master is used; never search global records.
+   await loadMasterData();
+   if(!document.getElementById('btClientSearchResults'))return;
+   const acts=masterCache.acts.filter(a=>btClientPhone(a.client_phone)===wanted&&a.status!=='cancelled');
+   const client=masterCache.clients.find(c=>btClientPhone(c.phone)===wanted);
+   if(!client&&!acts.length){out.innerHTML='<article class="card">Клиент с таким номером не найден.</article>';return;}
+   const rows=acts.map(a=>`<div class="bt-client-repair"><b>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' ')||'Бытовая техника')}</b><div>Стоимость: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</div><div>Дата ремонта: ${masterEsc(String(a.created_at||'').slice(0,10)||'—')}</div><div>Гарантия: ${masterEsc(btClientWarranty(a))}</div></div>`).join('');
+   out.innerHTML=`<article class="card bt-client-result"><h2>${masterEsc(client?.name||acts[0]?.client_name||'Клиент')}</h2><p>${masterEsc(input.value)}</p>${rows||'<p class="subtitle">Ремонтов у этого мастера пока нет.</p>'}</article>`;
+ }catch(e){out.innerHTML=`<article class="card error">${masterEsc(e.message)}</article>`;}
+}
 async function showMasterMessages(){
     try{await loadMasterData();}catch(e){return masterShell('Чаты',`<article class="card error">${masterEsc(e.message)}</article>`)}
     const grouped=new Map();
@@ -512,7 +639,11 @@ let btActsObserver=null;
 async function showMasterActs(){
  try{await loadMasterData();}catch(e){return masterShell('Акты',`<article class="card error">${masterEsc(e.message)}</article>`);}
  clearMasterPdfUrl();
- const rows=masterCache.acts.filter(a=>a.status!=='cancelled').map(a=>`<article class="card"><div class="card-row"><b>Акт № ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div><p>${masterEsc([a.client_name,a.client_phone].filter(Boolean).join(' · '))}</p><p>${masterEsc([a.device,a.brand,a.model].filter(Boolean).join(' '))}</p><p><b>Итого: ${masterEsc(fmtPrice(a.final_price??a.price??0))}</b>${Number(a.discount_amount||0)>0?` · скидка ${masterEsc(fmtPrice(a.discount_amount))}`:''} · гарантия: ${masterEsc(a.guarantee_text||'—')}</p>${a.amounts_need_review?'<p class="error">Требуется проверка суммы в админке</p>':''}<p class="subtitle">Заявка: ${masterEsc(a.order_id||'без заявки')} · ${masterEsc(a.created_at||'')}</p>${a.correction_request_status==='pending'?'<p class="subtitle">📝 Запрос на исправление ожидает администратора</p>':a.correction_request_status==='resolved'?'<p class="subtitle">✓ Исправления внесены администратором</p>':''}<div class="button-row"><button type="button" onclick="previewMasterAct('${masterEsc(a.number)}')">◫ Открыть акт</button><button type="button" class="secondary" onclick="shareMasterAct('${masterEsc(a.number)}')">↗ Поделиться</button>${['pending','sending','pending_client','pending_delivery','sending_failed'].includes(a.status)?`<button type="button" onclick="retryMasterActDelivery('${masterEsc(a.number)}')">↻ Повторить доставку</button>`:''}</div><button type="button" class="secondary" onclick="showMasterActCorrection('${masterEsc(a.number)}')">✎ Подать заявку на исправление</button></article>`);
+ const rows=masterCache.acts.filter(a=>a.status!=='cancelled').map(a=>`<article class="card bt-master-act-compact">
+ <div class="card-row"><b>№ ${masterEsc(a.number)}</b><span class="status-pill">${masterEsc(masterActStatus(a.status))}</span></div>
+ <div><b>${masterEsc(a.client_name||'Клиент')}</b> · ${masterEsc([a.device,a.brand].filter(Boolean).join(' '))}</div>
+ <div class="subtitle"><b>${masterEsc(fmtPrice(a.final_price??a.price??0))}</b> · ${masterEsc(btMasterActPaymentLabel(a.payment_status))}</div>
+ <button type="button" class="secondary" onclick="previewMasterAct('${masterEsc(a.number)}')">Подробнее ›</button></article>`);
  if(btActsObserver){btActsObserver.disconnect();btActsObserver=null;}
  // Render only three act cards initially; add the next three when scrolling near the end.
  const listId='btMasterActPagedList', markerId='btMasterActsSentinel';
@@ -676,7 +807,7 @@ async function renderMasterActForm(o=null){
  <div class="bt-master-address-row"><div><label>Дом *</label><input id="actHouse" required maxlength="80" value="${masterEsc(o?.house||'')}" placeholder="15А"></div><div><label>Квартира</label><input id="actApartment" maxlength="80" value="${masterEsc(o?.apartment||'')}" placeholder="42"></div></div>
  <button id="actLocationButton" type="button" class="secondary bt-act-required" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
 
- <button id="actSubmit" type="submit">▣ Создать акт</button><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
+ <button id="actSubmit" type="submit">▣ Создать акт</button><p class="bt-act-payment-warning"><b>Нажимая «Создать акт», Вы подтверждаете, что получили оплату за выполненный ремонт и работы.</b></p><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
  toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();btActUpdateLocationGlow();
 }
 function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';}
@@ -720,7 +851,7 @@ async function submitMasterAct(event,orderId){
   window.RemontMobile?.clearDirty();
   st.textContent=r.message||`Акт № ${r.number||''} создан.`;st.className='notice';masterToast(st.textContent);
   // Не скачиваем PDF автоматически: мастер открывает его в разделе «Акты».
-  try{await showMasterActs();}catch(e){st.textContent='Акт создан, но список не обновился. Откройте «Все акты». Через кнопку создавать его повторно не нужно.';}
+  try{await loadMasterData();btMasterAskPayment(r.number);}catch(e){st.textContent='Акт создан. Откройте «Все акты», чтобы отметить оплату. Повторно создавать акт не нужно.';}
  }catch(e){
    const networkFailure=(typeof navigator!=='undefined'&&navigator.onLine===false)||/failed to fetch|networkerror|load failed|fetch failed/i.test(String(e.message||''));
    if(networkFailure&&payload&&typeof queueOperation==='function'){
@@ -758,7 +889,7 @@ async function showMasterPromos(){
         <p><b>К выплате:</b> ${money(st.balance_due)}</p>
        </div></details>${Number(st.balance_due)>0 && p.advertiser_linked?`<button type="button" class="bt-payout-action" onclick="showMasterPayout('${masterEsc(p.code)}')">💳 Выплатить рекламодателю · ${money(st.balance_due)}</button>`:''}${!p.active&&p.awaiting_master_activation?`<button type="button" onclick="activateMasterPromo('${masterEsc(p.code)}')">✓ Активировать промокод</button>`:''}</article>`;
   }).join('');
-  masterShell('Промокоды',`<button onclick="showCreateMasterPromo()">＋ Создать промокод</button><div class="stack-list">${rows||'<article class="card">Промокодов пока нет.</article>'}</div>`);
+  masterShell('Промокоды',`<div class="bt-promo-actions"><button type="button" onclick="showCreateMasterPromo()">＋ Создать промокод</button></div><div class="stack-list">${rows||'<p class="bt-promo-empty">Промокодов пока нет.</p>'}</div>`);
 }
 let btMasterPayoutRequestId='';
 async function showMasterPayout(code){
@@ -822,10 +953,19 @@ async function showMasterProfile(){
   const p=masterCache.profile||{},r=p.referral_settings||{};
   const localEnabled=r.master_enabled!==undefined?!!r.master_enabled:(r.enabled!==false);
   const adminEnabled=r.admin_enabled!==false;
-  masterShell('Настройки профиля',`<article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Переключатели сохраняются сразу после нажатия. Остальные поля сохраняются кнопкой ниже.</p></article>
+  masterShell('Настройки профиля',`<style id="bt-master-profile-tweaks">.bt-identity-status{padding:9px 12px;border-radius:10px;border:1px solid #ef4444;box-shadow:0 0 12px rgba(255,38,55,.45);color:#ffb7bd;font-weight:700}.bt-identity-approved{border-color:#24d57b;box-shadow:0 0 12px rgba(26,220,105,.5);color:#baffd4}.bt-profile-form input:not([type=file]):not([type=checkbox]),.bt-profile-form textarea{border-color:#e64a5e;box-shadow:0 0 9px rgba(238,46,68,.3)}.bt-profile-form .bt-field-filled{border-color:#25c878!important;box-shadow:0 0 9px rgba(37,200,120,.28)!important}.bt-avatar-file-button{display:inline-flex;align-items:center;justify-content:center;padding:13px 18px;border:1px solid #36b8ff;border-radius:12px;background:linear-gradient(125deg,#167bca,#275fe0);color:#fff;font-weight:700;cursor:pointer;margin:8px 0}.bt-avatar-file-input{position:absolute!important;width:1px!important;height:1px!important;opacity:0!important;overflow:hidden!important}.bt-avatar-file-button:focus-within{outline:2px solid #fff}.bt-client-repair{padding:12px 0;border-top:1px solid #31557d;line-height:1.65}.bt-promo-actions{margin:6px 0 18px}.bt-promo-actions button{width:auto;max-width:100%;padding:12px 18px}.bt-promo-empty{margin:0;padding:12px 4px;color:#a9bed9}</style><article class="card settings-intro"><h2>Профиль мастера</h2><p class="subtitle">Переключатели сохраняются сразу после нажатия. Остальные поля сохраняются кнопкой ниже.</p></article>
   <article class="card"><h2>🪪 Идентификация личности</h2><p id="identityStatus">Загрузка статуса…</p><button type="button" onclick="showMasterIdentity()">Пройти идентификацию</button></article>
-  <form class="stack-list" onsubmit="event.preventDefault();saveMasterSettings()">
-  <article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"><label for="masterAbout">О мастере (видно клиентам)</label><textarea id="masterAbout" maxlength="700" rows="4" placeholder="Опыт работы, специализация, подход к ремонту">${masterEsc(p.about||'')}</textarea><label for="masterAvatar">Фото профиля (видно клиентам)</label><div id="masterAvatarPreview">${p.avatar?`<img src="${masterEsc(p.avatar)}" alt="Фото мастера" style="width:96px;height:96px;border-radius:50%;object-fit:cover">`:''}</div><input id="masterAvatar" type="file" accept="image/jpeg,image/png,image/webp" onchange="btPreviewMasterAvatar(this)"><button type="button" class="secondary" onclick="btClearMasterAvatar()">Удалить фото</button></article>
+  <form class="stack-list bt-profile-form" onsubmit="event.preventDefault();saveMasterSettings()">
+  <article class="card"><label for="masterProfileName">Имя мастера</label><input id="masterProfileName" maxlength="100" required value="${masterEsc(p.name||'')}"><label for="masterProfilePhone">Телефон</label><input id="masterProfilePhone" maxlength="40" value="${masterEsc(p.phone||'')}" placeholder="+998…"><label for="masterAbout">О мастере (видно клиентам)</label><textarea id="masterAbout" maxlength="700" rows="4" placeholder="Опыт работы, специализация, подход к ремонту">${masterEsc(p.about||'')}</textarea><label for="masterAvatar">Фото профиля (видно клиентам)</label><div id="masterAvatarPreview">${p.avatar?`<img src="${masterEsc(p.avatar)}" alt="Фото мастера" style="width:96px;height:96px;border-radius:50%;object-fit:cover">`:''}</div><label for="masterAvatar" class="bt-avatar-file-button">📷 Выбрать фото профиля</label><input id="masterAvatar" class="bt-avatar-file-input" type="file" accept="image/jpeg,image/png,image/webp" onchange="btPreviewMasterAvatar(this)"><p id="btAvatarFileName" class="subtitle">JPG, PNG или WebP · до 4 МБ</p><button type="button" class="secondary" onclick="btClearMasterAvatar()">Удалить фото</button></article>
+  <article class="card"><h2>🗺️ Навигатор</h2><p class="subtitle">Выберите, где открывать маршрут к клиенту. Настройка сохраняется на этом устройстве.</p>
+  <label for="masterPreferredNavigator">Приложение для маршрутов</label>
+  <select id="masterPreferredNavigator" onchange="masterSetPreferredNavigator(this.value)">
+    <option value="" ${!masterPreferredNavigator()?'selected':''}>Спрашивать каждый раз</option>
+    <option value="google" ${masterPreferredNavigator()==='google'?'selected':''}>Google Maps</option>
+    <option value="yandex" ${masterPreferredNavigator()==='yandex'?'selected':''}>Яндекс Карты</option>
+    <option value="2gis" ${masterPreferredNavigator()==='2gis'?'selected':''}>2ГИС</option>
+  </select>
+  <p id="masterNavigatorStatus" class="subtitle" role="status">${masterPreferredNavigator()?'Выбор сохранён. Маршрут будет открываться без дополнительного окна.':'При открытии маршрута будет предложен выбор навигатора.'}</p></article>
   <article class="card"><h2>Реферальная программа</h2><p class="subtitle">Рефералы работают отдельно от промокодов. Настройка мастера и разрешение администратора проверяются сервером.</p>
   <label class="toggle-row bt-setting-toggle"><span>Разрешить рефералы моим клиентам</span><input id="masterReferralEnabled" type="checkbox" ${localEnabled?'checked':''} onchange="btSaveMasterToggle(this,'referrals')"></label>
   <p id="masterReferralToggleState" class="subtitle" role="status">${!adminEnabled?'⛔ Администратор отключил программу для всех. Ваша галочка сохраняется, но клиенты не увидят ссылку, пока администратор не включит программу.':localEnabled?'✅ Программа доступна клиентам, привязанным к вам.':'Рефералы выключены — клиенты не увидят кнопку приглашения.'}</p>
@@ -833,7 +973,14 @@ async function showMasterProfile(){
   <label>Вознаграждение пригласившему, %</label><input id="masterReferralReward" type="number" min="0" max="100" step="0.5" value="${Number(r.referrer_reward_percent??5)}">
   <label>Приглашений в одной партии</label><input id="masterReferralInvites" type="number" min="1" max="100" step="1" value="${Number(r.invites_per_batch??10)}">
   </article><article class="card"><button id="masterSettingsSave" type="submit">Сохранить остальные настройки</button><p id="masterSettingsStatus" class="subtitle" role="status"></p></article></form>
-  <button class="bt-master-support-entry" type="button" onclick="showMasterSupport()">💬 Написать в поддержку</button>`);masterIdentityStatus();
+  <button class="bt-master-support-entry" type="button" onclick="showMasterSupport()">💬 Написать в поддержку</button>`);masterIdentityStatus();btProfileMarkFields();
+}
+function btProfileMarkFields(){
+ const form=document.querySelector('.bt-profile-form');if(!form)return;
+ for(const field of form.querySelectorAll('input:not([type=file]):not([type=checkbox]),textarea')){
+  const update=()=>field.classList.toggle('bt-field-filled',String(field.value||'').trim().length>0);
+  update();field.addEventListener('input',update);
+ }
 }
 function btIdentityFileChosen(input){
  const file=input.files?.[0],label=document.getElementById(input.id+'Label'),preview=document.getElementById(input.id+'Preview');
@@ -846,7 +993,17 @@ async function showMasterIdentity(){
   document.querySelector('.bt-identity-card')?.scrollIntoView({block:'start'});
 }
 async function submitMasterIdentity(){const btn=document.getElementById('identitySend'),msg=document.getElementById('identityMessage');btn.disabled=true;try{const image=async id=>{const f=document.getElementById(id).files[0];if(!f)return null;if(!['image/jpeg','image/png'].includes(f.type)||f.size>4*1024*1024)throw Error('JPG/PNG до 4 МБ');return await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(Error('Ошибка файла'));reader.readAsDataURL(f)})};const payload={full_name:document.getElementById('identityName').value,consent:document.getElementById('identityConsent').checked,front:await image('identityFront'),back:await image('identityBack'),selfie:await image('identitySelfie')};const r=await masterApi('/api/master/identity','POST',payload);msg.textContent=r.message;setTimeout(showMasterProfile,900)}catch(e){msg.textContent=e.message;btn.disabled=false}}
-async function masterIdentityStatus(){try{const r=await masterApi('/api/master/identity');const el=document.getElementById('identityStatus');if(el)el.textContent=({unverified:'Не проверен',pending:'На проверке',approved:'✅ Личность проверена',rejected:'Отклонено — '+(r.review_note||'')})[r.status]||r.status}catch(e){const el=document.getElementById('identityStatus');if(el)el.textContent='Статус временно недоступен. Проверьте подключение сервера и установку cryptography. ('+e.message+')'}}
+async function masterIdentityStatus(){
+ const el=document.getElementById('identityStatus');if(!el)return;
+ try{
+  const r=await masterApi('/api/master/identity');if(!document.getElementById('identityStatus'))return;
+  const status=String(r.status||'unverified').toLowerCase();
+  const labels={unverified:'Не проверена',pending:'На проверке у администратора',approved:'Личность проверена администратором',rejected:'Требуется повторная проверка'};
+  el.textContent=labels[status]||'Статус не определён';
+  el.className='bt-identity-status '+(status==='approved'?'bt-identity-approved':'bt-identity-unverified');
+  const btn=el.parentElement?.querySelector('button');if(btn&&status==='approved'){btn.style.display='none';}
+ }catch(e){el.textContent='Не удалось получить статус проверки';el.className='bt-identity-status bt-identity-unverified';}
+}
 async function btSaveMasterToggle(el,kind){
   const old=!el.checked,desired=!!el.checked;
   const status=document.getElementById('masterReferralToggleState');
@@ -864,9 +1021,9 @@ async function btSaveMasterToggle(el,kind){
     if(status){status.textContent='Не удалось сохранить: '+e.message;status.className='error'}
   }finally{el.disabled=false}
 }
-function btClearMasterAvatar(){window.btMasterAvatarDraft='';document.getElementById('masterAvatarPreview').replaceChildren();const inp=document.getElementById('masterAvatar');if(inp)inp.value='';}
+function btClearMasterAvatar(){const label=document.getElementById('btAvatarFileName');if(label)label.textContent='Фото будет удалено после сохранения настроек.';window.btMasterAvatarDraft='';document.getElementById('masterAvatarPreview').replaceChildren();const inp=document.getElementById('masterAvatar');if(inp)inp.value='';}
 async function btPreviewMasterAvatar(input){
- const file=input.files?.[0];if(!file)return;
+ const file=input.files?.[0];if(!file)return;const label=document.getElementById('btAvatarFileName');if(label)label.textContent=file.name;
  if(!['image/jpeg','image/png','image/webp'].includes(file.type)||file.size>4*1024*1024){masterToast('Фото: JPG, PNG или WebP до 4 МБ',true);return;}
  try{
   const bitmap=await createImageBitmap(file),c=document.createElement('canvas');c.width=256;c.height=256;
@@ -944,35 +1101,54 @@ async function btCopyMasterInviteLink(){
  catch(_){document.getElementById('btInviteLinkUrl')?.select();masterToast('Выделите ссылку и скопируйте');}
 }
 async function showMasterPaymentQr(){
- masterShell('Мой QR для оплаты',`<article class="card"><h2>QR для оплаты</h2><p class="subtitle">Загрузите готовый QR-код из вашего банка или платёжного приложения. Это только изображение для показа клиенту: оплата не подтверждается автоматически.</p><div id="btPaymentQrPreview">Загружаем…</div><label for="btPaymentQrFile">Выбрать изображение QR</label><input id="btPaymentQrFile" type="file" accept="image/png,image/jpeg,image/webp" onchange="btUploadPaymentQr(this)"><div id="btPaymentQrStatus" role="status"></div><button type="button" class="secondary" onclick="btDeletePaymentQr()">Удалить QR</button><button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
- await btRefreshPaymentQr();
+  masterShell('Моя ссылка для оплаты',`<article class="card"><h2>Paynet Xolis</h2>
+    <p class="subtitle">Вставьте ссылку на оплату из Paynet Xolis. Клиент увидит кнопку оплаты в своём акте, только если ссылка сохранена.</p>
+    <label for="btMasterPaymentLink">Ссылка Paynet Xolis</label>
+    <textarea id="btMasterPaymentLink" rows="4" maxlength="2048" placeholder="https://app.paynet.uz/qr-online/..."></textarea>
+    <div id="btMasterPaymentLinkStatus" class="subtitle" role="status"></div>
+    <button type="button" id="btMasterPaymentLinkSave" onclick="btSaveMasterPaymentLink()">Сохранить ссылку</button>
+    <button type="button" class="secondary" onclick="btTestMasterPaymentLink()">Проверить ссылку</button>
+    <button type="button" class="secondary" onclick="btRemoveMasterPaymentLink()">Удалить ссылку</button>
+    <button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button>
+    <p class="subtitle">Переход по ссылке не подтверждает оплату. Проверяйте поступление денег в Paynet Xolis.</p></article>`);
+  try{
+    await loadMasterData();
+    const field=document.getElementById('btMasterPaymentLink');
+    if(field)field.value=masterCache.profile?.paynet_url||'';
+  }catch(e){const status=document.getElementById('btMasterPaymentLinkStatus');if(status)status.textContent=e.message;}
 }
-async function btRefreshPaymentQr(){
- const el=document.getElementById('btPaymentQrPreview');if(!el)return;
- try{const d=await masterApi('/api/master/payment-qr');
-  if(!document.getElementById('btPaymentQrPreview'))return;
-  el.innerHTML=d.image?`<img alt="QR-код для оплаты мастеру" src="${masterEsc(d.image)}" style="display:block;width:100%;max-width:340px;margin:10px auto;image-rendering:auto"><p class="subtitle">Покажите этот QR клиенту для оплаты.</p>`:'<p class="subtitle">QR ещё не загружен.</p>';
- }catch(e){el.textContent=e.message;}
+function btValidMasterPaymentLink(value){
+  if(!value)return true;
+  try{const u=new URL(value);return u.protocol==='https:' && ['app.paynet.uz','paynet.uz'].includes(u.hostname.toLowerCase()) && !u.username && !u.password && !/\s/.test(value) && value.length<=2048;}
+  catch(_){return false;}
 }
-async function btUploadPaymentQr(input){
- const file=input.files?.[0],status=document.getElementById('btPaymentQrStatus');if(!file)return;
- if(!['image/png','image/jpeg','image/webp'].includes(file.type)){status.textContent='Выберите PNG, JPEG или WebP.';return;}
- if(file.size>5*1024*1024){status.textContent='Файл слишком большой (максимум 5 МБ).';return;}
- status.textContent='Подготавливаем изображение…';input.disabled=true;
- try{
-  const bitmap=await createImageBitmap(file);const canvas=document.createElement('canvas');
-  const ratio=Math.min(1,700/Math.max(bitmap.width,bitmap.height));canvas.width=Math.max(1,Math.round(bitmap.width*ratio));canvas.height=Math.max(1,Math.round(bitmap.height*ratio));
-  canvas.getContext('2d').drawImage(bitmap,0,0,canvas.width,canvas.height);bitmap.close?.();
-  // PNG сохраняет резкие границы QR без JPEG-артефактов.
-  const image=canvas.toDataURL('image/png');
-  if(image.length>250000)throw new Error('QR слишком сложный для хранения. Обрежьте изображение до самого QR и повторите.');
-  await masterApi('/api/master/payment-qr','POST',{image});status.textContent='QR сохранён.';await btRefreshPaymentQr();
- }catch(e){status.textContent='Ошибка: '+e.message;}finally{input.disabled=false;input.value='';}
+async function btSaveMasterPaymentLink(){
+  const field=document.getElementById('btMasterPaymentLink'),status=document.getElementById('btMasterPaymentLinkStatus'),button=document.getElementById('btMasterPaymentLinkSave');
+  if(!field||!status||!button)return;
+  const url=field.value.trim();
+  if(!url){status.textContent='Введите ссылку или нажмите «Удалить ссылку».';return;}
+  if(!btValidMasterPaymentLink(url)){status.textContent='Нужна корректная HTTPS-ссылка Paynet Xolis.';return;}
+  button.disabled=true;status.textContent='Сохраняем…';
+  try{
+    await masterApi('/api/master/settings','POST',{paynet_url:url});
+    if(!masterCache.profile)masterCache.profile={};masterCache.profile.paynet_url=url;
+    status.textContent='Ссылка сохранена. Клиент увидит кнопку оплаты в акте.';
+  }catch(e){status.textContent='Ошибка: '+e.message;}finally{button.disabled=false;}
 }
-async function btDeletePaymentQr(){
- const status=document.getElementById('btPaymentQrStatus');
- try{await masterApi('/api/master/payment-qr','POST',{image:null});if(status)status.textContent='QR удалён.';await btRefreshPaymentQr();}
- catch(e){if(status)status.textContent=e.message;}
+function btTestMasterPaymentLink(){
+  const field=document.getElementById('btMasterPaymentLink'),status=document.getElementById('btMasterPaymentLinkStatus');
+  const url=field?.value.trim()||'';
+  if(!url||!btValidMasterPaymentLink(url)){if(status)status.textContent='Сначала укажите корректную ссылку Paynet.';return;}
+  window.open(url,'_blank','noopener,noreferrer');
+}
+async function btRemoveMasterPaymentLink(){
+  const status=document.getElementById('btMasterPaymentLinkStatus'),field=document.getElementById('btMasterPaymentLink');
+  if(!status||!field)return;
+  status.textContent='Удаляем…';
+  try{await masterApi('/api/master/settings','POST',{paynet_url:''});
+    if(!masterCache.profile)masterCache.profile={};masterCache.profile.paynet_url='';field.value='';
+    status.textContent='Ссылка удалена. Кнопка оплаты у клиента скрыта.';
+  }catch(e){status.textContent='Ошибка: '+e.message;}
 }
 
 /* Finance module: read-only balance and manual Paynet Xolis receipt request.
@@ -984,15 +1160,73 @@ async function showMasterFinance(){
     const fmt = t => new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(Number(t||0)/100);
     const effectiveBalance = Number.isFinite(Number(d.available_tiyin)) ? Number(d.available_tiyin) : Number(d.balance_tiyin||0);
     const labels={admin_credit:'Пополнение администратором',receipt_credit:'Подтверждённый чек',act_commission:'Комиссия за акт',correction:'Корректировка'};
-    const operations=(d.operations||[]).map(o=>`<div class="card"><b>${masterEsc(labels[o.kind]||o.kind)}</b><p>${masterEsc(fmt(o.amount_tiyin))} сум ${o.act_number?'· акт '+masterEsc(o.act_number):''}</p><small>${masterEsc(o.created_at||'')}</small></div>`).join('');
-    const receipts=(d.receipts||[]).map(r=>`<p>${masterEsc(fmt(r.amount_tiyin))} сум — ${masterEsc(({pending:'Ожидает проверки',approved:'Подтверждено',rejected:'Отклонено'})[r.status]||r.status)} ${r.review_note?'('+masterEsc(r.review_note)+')':''}</p>`).join('');
+    const operations=(d.operations||[]).map(o=>`<div class="finance-compact-row"><b>${masterEsc(labels[o.kind]||o.kind)}</b><span>${masterEsc(fmt(o.amount_tiyin))} сум</span><small>${masterEsc(o.created_at||'')}</small></div>`).join('');
+    const receipts=(d.receipts||[]).map(r=>`<div class="finance-compact-row"><b>${masterEsc(fmt(r.amount_tiyin))} сум</b><span>${masterEsc(({pending:'Ожидает проверки',approved:'Подтверждено',rejected:'Отклонено'})[r.status]||r.status)}</span>${r.review_note?`<small>${masterEsc(r.review_note)}</small>`:''}</div>`).join('');
     const paymentUrl = typeof d.payment_url==='string' && /^https:\/\/[^\s]+$/i.test(d.payment_url) ? d.payment_url : '';
-    const paymentLink = paymentUrl ? `<a class="btn master-deposit-pay-link" href="${masterEsc(paymentUrl)}" target="_blank" rel="noopener noreferrer">Перейти к пополнению</a>` : '<p class="subtitle">Ссылка для оплаты пока не настроена администратором.</p>';
-    masterShell('Мой депозит', `<article class="card"><h2>Баланс: ${masterEsc(fmt(effectiveBalance))} сум</h2>${paymentLink}<p>Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% от суммы выданного акта.</p><p class="subtitle">Пополнение зачисляется только после проверки платежа администратором.</p></article>
-      <article class="card"><h2>Отправить чек пополнения</h2><p>Оплатите пополнение по ссылке выше, затем укажите сумму и прикрепите чек. Средства зачисляются только после подтверждения администратора.</p><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()"><label>Сумма, сум</label><input id="financeAmount" type="number" oninput="masterFinanceSubmissionId=null" min="1000" max="100000000" step="1" required><label for="financeReceipt">Чек JPG или PNG, до 4 МБ</label><label class="master-deposit-file-picker" for="financeReceipt"><span class="master-deposit-file-icon" aria-hidden="true">📎</span><span id="financeReceiptLabel">Выбрать чек</span></label><input id="financeReceipt" class="master-deposit-file-input" type="file" accept="image/jpeg,image/png" required onchange="masterFinanceReceiptSelected(this)"><button type="submit" id="masterFinanceSubmitReceipt">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p></form></article>
-      <article class="card"><h2>Заявки на пополнение</h2>${receipts||'<p>Заявок пока нет.</p>'}</article>
-      <article class="card"><h2>Последние операции</h2>${operations||'<p>Операций пока нет.</p>'}</article>`);
+    const paymentLink = paymentUrl ? `<a class="btn master-deposit-pay-link" href="${masterEsc(paymentUrl)}" target="_blank" rel="noopener noreferrer">💳 Перейти к оплате</a>` : '<p class="subtitle">Ссылка на оплату пока не настроена.</p>';
+    masterShell('Мой депозит', `<style>
+      .finance-compact .card{padding:14px 16px!important;margin:0 0 10px!important}
+      .finance-compact .card h2{margin:0 0 9px!important}
+      .finance-compact .card p{margin:5px 0!important;line-height:1.35!important}
+      .finance-compact .master-deposit-pay-link{display:block;text-align:center;padding:12px 14px;margin:10px 0 6px;text-decoration:none;border-radius:12px;background:linear-gradient(120deg,#147bda,#346ff1);color:white;font-weight:700}
+      .finance-compact form{display:grid;gap:8px}
+      .finance-compact form label{margin:0!important}
+      .finance-compact #financeAmount,.finance-compact .master-deposit-file-picker{margin:0!important;box-sizing:border-box;width:100%}
+      .finance-compact .finance-required-invalid{border:1px solid #ff405e!important;box-shadow:0 0 9px #ff315b8a!important}
+      .finance-compact .finance-required-valid{border:1px solid #29c980!important;box-shadow:0 0 9px #20d18b70!important}
+      .finance-compact #masterFinanceSubmitReceipt.finance-submit-ready{box-shadow:0 0 0 1px #34ef9b,0 0 16px #20d68d!important;border:1px solid #37e5a0!important}
+      .finance-compact #masterFinanceSubmitReceipt.finance-submit-waiting{box-shadow:0 0 0 1px #f34c68,0 0 12px #ff315b70!important;border:1px solid #f34c68!important}
+      .finance-compact .finance-compact-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 8px;padding:7px 0;border-bottom:1px solid #ffffff18}
+      .finance-compact .finance-compact-row small{width:100%;opacity:.7}
+      .finance-compact details summary{cursor:pointer;font-weight:700}
+      .finance-compact details[open] summary{margin-bottom:8px}
+    </style><div class="finance-compact">
+    <article class="card"><h2>Баланс: ${masterEsc(fmt(effectiveBalance))} сум</h2><p class="subtitle" style="color:#ffd38a;font-weight:700">⚠️ После оплаты сохраните скриншот чека — он понадобится для подтверждения пополнения.</p>${paymentLink}<p class="subtitle">Пополнение пока доступно только через приложение Paynet Xolis.</p><p class="subtitle">Комиссия: ${masterEsc((Number(d.commission_basis_points)/100).toLocaleString('ru-RU'))}% за выданный акт. Зачисление после проверки администратором.</p></article>
+    <article class="card"><h2>Отправить чек пополнения</h2><form onsubmit="event.preventDefault();submitMasterFinanceReceipt()">
+      <label for="financeAmount">Сумма, сум</label><input id="financeAmount" type="text" inputmode="numeric" autocomplete="off" placeholder="Например: 100 000" oninput="masterFinanceSubmissionId=null;masterFinanceFormatAmount(this);masterFinanceUpdateValidity()" required>
+      <label for="financeReceipt">Чек JPG/PNG, до 4 МБ</label><label class="master-deposit-file-picker" id="financeReceiptPicker" for="financeReceipt"><span class="master-deposit-file-icon" aria-hidden="true">📎</span><span id="financeReceiptLabel">Выбрать чек</span></label>
+      <input id="financeReceipt" class="master-deposit-file-input" type="file" accept="image/jpeg,image/png" required onchange="masterFinanceReceiptSelected(this)">
+      <button type="submit" id="masterFinanceSubmitReceipt" class="finance-submit-waiting">Отправить на проверку</button><p id="financeUploadStatus" role="status"></p>
+    </form></article>
+    <article class="card"><details ${receipts?'':'open'}><summary>Заявки на пополнение${d.receipts?.length?' ('+d.receipts.length+')':''}</summary>${receipts||'<p class="subtitle">Заявок пока нет.</p>'}</details></article>
+    <article class="card"><details ${operations?'':'open'}><summary>Последние операции${d.operations?.length?' ('+d.operations.length+')':''}</summary>${operations||'<p class="subtitle">Операций пока нет.</p>'}</details></article>
+    </div>`);
+    masterFinanceUpdateValidity();
   }catch(e){masterShell('Мой депозит',`<article class="card"><p class="error">${masterEsc(e.message)}</p><p>Финансовый раздел пока не активирован администратором. Остальные функции мастера работают как раньше.</p></article>`)}
+}
+function masterFinanceAmountNumber(value){
+ const digits=String(value||'').replace(/\D/g,'');
+ return digits ? Number(digits) : NaN;
+}
+function masterFinanceFormatAmount(input){
+ if(!input)return;
+ const previous=input.value;
+ const cursor=input.selectionStart??previous.length;
+ const digitsBefore=previous.slice(0,cursor).replace(/\D/g,'').length;
+ const digits=previous.replace(/\D/g,'').slice(0,9);
+ const formatted=digits.replace(/\B(?=(\d{3})+(?!\d))/g,' ');
+ input.value=formatted;
+ if(typeof input.setSelectionRange==='function'){
+  let position=0,seen=0;
+  while(position<formatted.length && seen<digitsBefore){if(/\d/.test(formatted[position]))seen++;position++;}
+  try{input.setSelectionRange(position,position)}catch(e){}
+ }
+}
+function masterFinanceUpdateValidity(){
+ const amount=document.getElementById('financeAmount');
+ const picker=document.getElementById('financeReceiptPicker');
+ const button=document.getElementById('masterFinanceSubmitReceipt');
+ const file=document.getElementById('financeReceipt')?.files?.[0];
+ const number=masterFinanceAmountNumber(amount?.value);
+ const validAmount=!!amount?.value && Number.isSafeInteger(number) && number>=1000 && number<=100000000;
+ const validFile=!!file && ['image/jpeg','image/png'].includes(file.type) && file.size>0 && file.size<=4*1024*1024;
+ amount?.classList.toggle('finance-required-valid',validAmount);
+ amount?.classList.toggle('finance-required-invalid',!validAmount);
+ picker?.classList.toggle('finance-required-valid',validFile);
+ picker?.classList.toggle('finance-required-invalid',!validFile);
+ button?.classList.toggle('finance-submit-ready',validAmount&&validFile);
+ button?.classList.toggle('finance-submit-waiting',!(validAmount&&validFile));
+ if(button)button.disabled=!(validAmount&&validFile)||masterFinanceReceiptSending;
 }
 function masterFinanceReceiptSelected(input){
   const file=input?.files?.[0];
@@ -1002,6 +1236,7 @@ function masterFinanceReceiptSelected(input){
   if(status)status.textContent='';
   // A different receipt or amount must not reuse the previous request identifier.
   masterFinanceSubmissionId=null;
+  masterFinanceUpdateValidity();
 }
 let masterFinanceReceiptSending = false;
 let masterFinanceSubmissionId = null;
@@ -1009,8 +1244,8 @@ async function submitMasterFinanceReceipt(){
   if(masterFinanceReceiptSending)return;
   const status=document.getElementById('financeUploadStatus');
   const file=document.getElementById('financeReceipt')?.files?.[0];
-  const amount=document.getElementById('financeAmount')?.value;
-  const amountNumber=Number(amount);
+  const amountText=document.getElementById('financeAmount')?.value;
+  const amountNumber=masterFinanceAmountNumber(amountText);
   if(!Number.isSafeInteger(amountNumber)||amountNumber<1000||amountNumber>100000000){if(status)status.textContent='Укажите сумму от 1 000 до 100 000 000 сум.';return;}
   if(!file||!['image/jpeg','image/png'].includes(file.type)||file.size===0||file.size>4*1024*1024){if(status)status.textContent='Нужен JPG или PNG до 4 МБ.';return;}
   masterFinanceSubmissionId ||= (globalThis.crypto?.randomUUID?.() || 'receipt-'+Date.now()+'-'+Math.random().toString(36).slice(2));
@@ -1020,7 +1255,7 @@ async function submitMasterFinanceReceipt(){
   if(status)status.textContent='Отправляем чек…';
   try{
     const image=await new Promise((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(reader.result);reader.onerror=()=>reject(new Error('Ошибка чтения чека'));reader.readAsDataURL(file)});
-    await masterApi('/api/master/finance/receipt','POST',{amount,image,submission_id:masterFinanceSubmissionId});
+    await masterApi('/api/master/finance/receipt','POST',{amount:String(amountNumber),image,submission_id:masterFinanceSubmissionId});
     masterFinanceSubmissionId=null;
     await showMasterFinance();masterToast('Чек отправлен на проверку.');
   }catch(e){if(status)status.textContent=e.message;}
