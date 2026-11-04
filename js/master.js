@@ -1,3 +1,46 @@
+
+/* Versioned legal terms acknowledgement. Server is the authority. */
+let btLegalApproved = false;
+let btLegalChecking = false;
+async function btLegalGate(api, onSuccess, role){
+  if(btLegalApproved){onSuccess();return;}
+  if(btLegalChecking)return;
+  btLegalChecking=true;
+  try{
+    const status=await api('/api/legal/status');
+    if(status.accepted){btLegalApproved=true;onSuccess();return;}
+    btLegalDialog(api,onSuccess,role,status.version);
+  }catch(e){
+    alert('Не удалось проверить условия использования. Проверьте подключение и повторите попытку. '+(e.message||''));
+  }finally{btLegalChecking=false;}
+}
+function btLegalDialog(api,onSuccess,role,version){
+  document.getElementById('btLegalOverlay')?.remove();
+  const uz=String(document.documentElement.lang||localStorage.getItem('remont_lang')||'ru').toLowerCase().startsWith('uz');
+  const div=document.createElement('div');div.id='btLegalOverlay';div.className='bt-legal-overlay';
+  div.innerHTML=`<section class="bt-legal-dialog" role="dialog" aria-modal="true" aria-label="${uz?'Foydalanish shartlari':'Условия использования'}">
+   <img class="bt-legal-logo" src="img/remont-bt-icon.png" alt="ТехСервис">
+   <div class="bt-legal-shield">🛡️</div><h2>${uz?'TehServis foydalanish shartlari':'Условия использования ТехСервис'}</h2>
+   <p>${uz?'TehServis mijozlar va mustaqil ustalar uchun raqamli vositalarni taqdim etadi.':'ТехСервис предоставляет цифровые инструменты клиентам и независимым мастерам.'}</p>
+   <div class="bt-legal-facts"><p>🔧 ${uz?'Usta ta’mirlash sifati, kafolat, to‘lov va o‘z soliqlari uchun javob beradi.':'Мастер самостоятельно отвечает за качество ремонта, гарантии, расчёты и свои налоги.'}</p>
+   <p>💠 ${uz?'Platforma operatori o‘z xizmatlari va qonuniy majburiyatlari uchun javobgar.':'Оператор отвечает за работу платформы и собственные обязательства по закону.'}</p>
+   <p>🔒 ${uz?'Ma’lumotlar maxfiylik siyosatiga muvofiq qayta ishlanadi.':'Данные обрабатываются согласно политике конфиденциальности.'}</p></div>
+   <a class="bt-legal-read" href="legal.html" target="_blank" rel="noopener">📄 ${uz?'To‘liq shartlar va maxfiylik siyosatini o‘qish':'Прочитать полные условия и политику данных'} ↗</a>
+   <p class="bt-legal-version">${uz?'Tahrir':'Редакция'}: ${version}</p>
+   <button class="bt-legal-accept" type="button">${uz?'Tanishdim va roziman':'Ознакомлен и согласен'}</button>
+   <button class="bt-legal-later" type="button">${uz?'Hozir emas':'Не согласен / Назад'}</button>
+   <p class="bt-legal-error" role="status"></p>
+   </section>`;
+  document.body.appendChild(div);
+  div.querySelector('.bt-legal-later').onclick=()=>div.remove();
+  div.querySelector('.bt-legal-accept').onclick=async()=>{
+    const button=div.querySelector('.bt-legal-accept'),error=div.querySelector('.bt-legal-error');
+    button.disabled=true;error.textContent='';
+    try{await api('/api/legal/accept','POST',{version,accepted:true});btLegalApproved=true;div.remove();onSuccess();}
+    catch(e){error.textContent=e.message||'Не удалось сохранить согласие';button.disabled=false;}
+  };
+}
+
 /* ТехСервис — мастерский WebApp. Act button click fix 20261020. */
 const masterApiBase = window.REMONT_ADVERTISER_API_BASE || 'http://127.0.0.1:8767';
 let masterCache = {orders:[], clients:[], messages:[], acts:[], promos:[], stats:{}};
@@ -356,6 +399,7 @@ function btMasterRecentThreadsMarkup(){
   </button>`).join(''):'<p class="subtitle bt-recent-empty">Сообщений пока нет.</p>';
 }
 async function renderMasterMenu() {
+  if(!btLegalApproved){void btLegalGate(masterApi,renderMasterMenu,"master");return;}
   try { await loadMasterData(); } catch(e) { masterShell('Панель мастера',`<article class="card error">${masterEsc(e.message)}</article>`); return; }
   const s=masterCache.stats||{};
   masterShell('Панель мастера',`${btMasterOldOrders().length?`<div class="card bt-overdue-orders"><b>⚠ Заявки ожидают более двух часов: ${btMasterOldOrders().length}</b><p class="subtitle">Проверьте очередь новых обращений.</p><button type="button" onclick="showMasterOrders()">Открыть ожидающие заявки</button></div>`:''}
@@ -382,9 +426,11 @@ async function renderMasterMenu() {
 function showMasterFAQ(){
  const ru=[["Как зарегистрироваться мастером?", "Откройте приложение мастера в Telegram, заполните ФИО, телефон и остальные обязательные данные. Отправьте заявку на рассмотрение; после одобрения откроется кабинет."], ["Какие два способа создать заявку?", "Первый: открыть соответствующий раздел в кабинете и заполнить заявку. Второй: отправить или переслать геолокацию клиента прямо в чат бота и продолжить оформление через предложенные кнопки."], ["ВАЖНО: как быстро оформить заявку через локацию?", "Когда клиент прислал Вам геолокацию, перешлите её боту. Или сами отправьте точку в чат бота. Бот предложит продолжить оформление. Это удобно при обращении по телефону или в личной переписке; сама локация ещё не создаёт готовую заявку."], ["Как принимать заявки?", "В разделе «Заявки» откройте новое обращение, проверьте сведения и нажмите «Принять». Не принимайте заявки, которые не сможете выполнить."], ["Как открыть маршрут?", "В принятой заявке нажмите «Показать маршрут», если сохранены координаты или адрес. Перед выездом уточните точный адрес у клиента."], ["Как связаться с клиентом?", "Откройте чат из заявки или раздел «Чаты»; уточните неисправность, время и адрес."], ["Как создать акт по заявке?", "Откройте принятую заявку → «Создать акт», заполните работы, детали, стоимость, гарантию и обязательные поля, проверьте итоговую сумму."], ["Как создать акт без заявки?", "На главной выберите «Создать акт» и укажите имя и телефон клиента, технику, работы, стоимость, гарантию и адрес. Такой вариант подходит для обращений лично или по телефону."], ["Как учитываются скидки?", "Если у найденного клиента действует промокод или реферальная скидка, предварительная итоговая сумма показывается над кнопкой «Создать акт». При выдаче акта сервер пересчитывает сумму по действующим правилам."], ["Что означает кнопка «Создать акт»?", "Нажатие подтверждает получение оплаты за ремонт согласно предупреждению в форме. Перед нажатием проверьте данные и сумму."], ["Где посмотреть акт и гарантию?", "Откройте «Акты», выберите нужный документ и PDF. В нём зафиксированы работы, стоимость и гарантийные условия."], ["Как исправить акт?", "Откройте акт и отправьте запрос на исправление, если функция доступна. Не создавайте повторный акт взамен уже выданного."], ["Как клиент подтверждает акт?", "Клиент может подтвердить акт в доступном интерфейсе. Если он не отвечает, предусмотрено автоматическое подтверждение по настроенному сроку."], ["Как клиент оставляет отзыв?", "После ремонта клиенту доступно приглашение оценить работу. Попросите его оставить честную оценку, не навязывая ответ."], ["Как работает комиссия и депозит?", "Комиссия рассчитывается при выдаче акта по действующему тарифу. Баланс и операции смотрите в разделе финансов. При недостатке депозита создание новых актов может быть ограничено."], ["Как пополнить депозит?", "Откройте баланс, перейдите по доступной ссылке оплаты, прикрепите чек при необходимости и дождитесь проверки."], ["Как работают промокоды и рекламная ссылка?", "В соответствующих разделах создавайте промокоды и получайте ссылку для клиентов. Условия, срок действия, лимиты и вознаграждение партнёра указаны в настройках."], ["Что даёт идентификация?", "Она добровольная. После проверки документов администратором появляется отметка «Личность проверена». За первое одобрение предусмотрен однократный бонус 20 000 сум."], ["Как написать в поддержку или группу?", "Откройте «Написать в поддержку» в кабинете мастера, опишите проблему и укажите номер заявки или акта. Если опубликована официальная ссылка на группу поддержки, используйте её. Не отправляйте пароли и токены."], ["Что делать, если Mini App не обновился?", "Полностью закройте Mini App и откройте его из актуальной кнопки в чате Telegram."]];
  const uz=[["Usta sifatida qanday ro‘yxatdan o‘taman?", "Telegramdagi usta ilovasini oching, F.I.Sh., telefon va boshqa majburiy ma’lumotlarni kiriting. Ariza tasdiqlangach kabinet ochiladi."], ["Buyurtma yaratishning ikki usuli qanday?", "Birinchisi: kabinetdagi buyurtma shaklini to‘ldirish. Ikkinchisi: mijoz lokatsiyasini bot chatiga yuborish yoki uzatish va bot ko‘rsatgan bosqichlarni davom ettirish."], ["MUHIM: lokatsiya orqali qanday tez boshlash mumkin?", "Mijoz sizga lokatsiya yuborgan bo‘lsa, uni botga uzating. Yoki o‘zingiz bot chatiga nuqta yuboring. Bot buyurtmani davom ettirishni taklif qiladi. Faqat lokatsiya yuborish tayyor buyurtma degani emas."], ["Buyurtmani qanday qabul qilaman?", "«Buyurtmalar» bo‘limida yangi murojaatni oching, ma’lumotlarni tekshiring va «Qabul qilish» tugmasini bosing."], ["Mijozga yo‘nalishni qanday ochaman?", "Qabul qilingan buyurtmada koordinata yoki manzil bo‘lsa, «Marshrutni ko‘rsatish» tugmasini bosing."], ["Mijoz bilan qanday bog‘lanaman?", "Buyurtma yoki «Chatlar» bo‘limidan yozing, manzil va vaqtni aniqlashtiring."], ["Buyurtma asosida dalolatnoma qanday yaratiladi?", "Qabul qilingan buyurtmadan «Dalolatnoma yaratish»ni tanlang, ishlar, narx, kafolat va kerakli ma’lumotlarni kiriting."], ["Buyurtmasiz dalolatnoma yaratish mumkinmi?", "Ha. Asosiy sahifada «Dalolatnoma yaratish»ni tanlang, mijoz ismi, telefon, texnika, ishlar, narx va manzilni kiriting."], ["Chegirmalar qanday hisoblanadi?", "Mijozda amaldagi promokod yoki taklif chegirmasi bo‘lsa, tugma ustida taxminiy yakuniy summa ko‘rsatiladi. Dalolatnoma chiqarilganda server summani qayta tekshiradi."], ["«Dalolatnoma yaratish» nimani tasdiqlaydi?", "Tugmani bosish ta’mir uchun to‘lov olinganini tasdiqlaydi. Oldin ma’lumot va summani tekshiring."], ["Dalolatnoma va kafolat qayerda?", "«Dalolatnomalar» bo‘limida kerakli PDFni oching. Ishlar, narx va kafolat shu yerda."], ["Dalolatnomadagi xatoni qanday tuzataman?", "Mavjud bo‘lsa, dalolatnomadan tuzatish so‘rovini yuboring. Takroriy dalolatnoma yaratmang."], ["Mijoz dalolatnomani qanday tasdiqlaydi?", "Mijoz tasdiqlash tugmasidan foydalanishi mumkin. Javob bo‘lmasa, belgilangan vaqtdan so‘ng avtomatik tasdiqlash ishlashi mumkin."], ["Mijoz qanday fikr qoldiradi?", "Ta’mirdan keyin mijoz baholash taklifini olishi mumkin. Halol baho qoldirishni so‘rang."], ["Komissiya va depozit qanday ishlaydi?", "Komissiya dalolatnoma chiqarilganda tarif bo‘yicha hisoblanadi. Balans va operatsiyalarni moliya bo‘limida ko‘ring."], ["Depozitni qanday to‘ldiraman?", "Balans sahifasidan to‘lov havolasiga o‘ting, kerak bo‘lsa chekni biriktiring va tekshiruvni kuting."], ["Promokod va reklama havolasi nima?", "Tegishli bo‘limlarda mijozlar uchun kodlar va havolalarni boshqaring; muddat va limitlarga rioya qiling."], ["Shaxsni tasdiqlash nima beradi?", "Ixtiyoriy tekshiruvdan so‘ng «Shaxs tasdiqlangan» belgisi paydo bo‘ladi. Birinchi tasdiq uchun bir martalik 20 000 so‘m bonus belgilangan."], ["Yordamga yoki guruhga qanday yozaman?", "Kabinetdagi «Yordamga yozish» orqali muammo va buyurtma/dalolatnoma raqamini yuboring. Rasmiy guruh havolasi bo‘lsa, undan foydalaning. Parol va token yubormang."], ["Mini App yangilanmasa nima qilaman?", "Ilovani to‘liq yoping va Telegramdagi yangi tugma orqali qayta oching."]];
+ ru.push(['Правовая информация','ТехСервис предоставляет программную платформу. Мастер самостоятельно отвечает за ремонт, оплату, гарантию и налоги. Полные условия и политика данных доступны по кнопке ниже.']);
+ uz.push(['Huquqiy ma’lumot','TehServis raqamli platforma. Usta ta’mirlash, to‘lov, kafolat va soliqlar uchun mustaqil javob beradi. To‘liq hujjatlar quyidagi tugma orqali ochiladi.']);
  const language=(document.documentElement.lang||localStorage.getItem('remont_lang')||'ru').toLowerCase();
  const items=language.startsWith('uz')?uz:ru;
- masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">${language.startsWith('uz')?'Tizimdan foydalanish bo‘yicha savol-javoblar.':'Подробная инструкция по работе с ТехСервис.'}</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
+ masterShell('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">${language.startsWith('uz')?'Tizimdan foydalanish bo‘yicha savol-javoblar.':'Подробная инструкция по работе с ТехСервис.'}</p>${items.map(([q,a])=>`<details><summary>${masterEsc(q)}</summary><p>${masterEsc(a)}</p></details>`).join('')}<button type="button" onclick="window.open('legal.html','_blank')">🛡 Правовая информация / Huquqiy ma’lumot</button><button type="button" class="secondary" onclick="renderMasterMenu()">← Главная</button></article>`);
 }
 
 // Navigation uses confirmed GPS coordinates first; house/apartment remain visible in the order.
@@ -651,7 +697,7 @@ async function showMasterActs(){
  }
 
 }
-async function showMasterCreateAct(orderId){if(!(await btMasterCanOpenAct()))return;try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
+async function showMasterCreateAct(orderId){if(!btLegalApproved){void btLegalGate(masterApi,()=>showMasterCreateAct(orderId),"master");return;}if(!(await btMasterCanOpenAct()))return;try{await loadMasterData()}catch(e){return masterToast(e.message,true)}const o=masterCache.orders.find(x=>String(x.id)===String(orderId));if(!o||o.status!=='accepted'||o.act_number)return masterToast('Заявка уже недоступна для создания акта.',true);renderMasterActForm(o);}
 /* Каждый список содержит 5 стандартных вариантов и шестой «Другое». */
 const masterAppliances=[
  {value:'Стиральная машина',icon:'♻'},
@@ -995,7 +1041,7 @@ async function activateMasterPromo(code){
 }
 function showCreateMasterPromo(){masterShell('Новый промокод',`<button class="back-btn" onclick="showMasterPromos()">← Назад</button><form class="card" onsubmit="event.preventDefault();submitMasterPromo()"><label>Код</label><input id="pCode" required maxlength="20" pattern="[A-Za-z0-9_-]{4,20}" placeholder="PARTNER10"><label>Имя партнёра</label><input id="pName" required maxlength="150"><label>Telegram партнёра</label><input id="pContact" required maxlength="150" placeholder="@username"><label>Телефон рекламодателя</label><input id="pPartnerPhone" required type="tel" placeholder="+998901234567"><label>Номер карты</label><input id="pCard" required inputmode="numeric" maxlength="23" placeholder="16–19 цифр"><label>Скидка клиенту, %</label><input id="pDiscount" required type="number" min="1" max="50" value="5"><label>Вознаграждение партнёру, %</label><input id="pReward" required type="number" min="0" max="30" value="5"><label>Использований на клиента</label><input id="pLimit" required type="number" min="1" max="100" value="1"><label>Действует до</label><input id="pExpiry" required type="date" value="${new Date(Date.now()+30*86400000).toISOString().slice(0,10)}"><button type="submit" id="promoSubmit">Создать промокод</button><p id="promoStatus" class="subtitle"></p></form>`);}
 async function submitMasterPromo(){const btn=document.getElementById('promoSubmit'),st=document.getElementById('promoStatus');btn.disabled=true;try{const r=await masterApi('/api/master/promo','POST',{code:document.getElementById('pCode').value.trim().toUpperCase(),partner_name:document.getElementById('pName').value.trim(),partner_contact:document.getElementById('pContact').value.trim(),partner_phone:document.getElementById('pPartnerPhone').value.trim(),partner_card:document.getElementById('pCard').value.replace(/\D/g,''),discount_percent:Number(document.getElementById('pDiscount').value),reward_percent:Number(document.getElementById('pReward').value),max_act:Number(document.getElementById('pLimit').value),expires_at:document.getElementById('pExpiry').value+'T23:59:59'});st.textContent=r.message;await showMasterPromos();}catch(e){st.textContent=e.message;st.className='error';btn.disabled=false;}}
-async function showCreateAct(){if(!(await btMasterCanOpenAct()))return;const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}
+async function showCreateAct(){if(!btLegalApproved){void btLegalGate(masterApi,showCreateAct,"master");return;}if(!(await btMasterCanOpenAct()))return;const accepted=masterCache.orders.find(o=>o.status==='accepted'&&!o.act_number);if(accepted)return showMasterCreateAct(accepted.id);return renderMasterActForm(null);}
 function showCreatePromoForm(){showCreateMasterPromo();}
 function sendEvent(){showAlert('Это действие теперь выполняется в мастерской панели. Выберите раздел в меню.');return false;}
 bootMasterApp();

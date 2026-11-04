@@ -1,3 +1,46 @@
+
+/* Versioned legal terms acknowledgement. Server is the authority. */
+let btLegalApproved = false;
+let btLegalChecking = false;
+async function btLegalGate(api, onSuccess, role){
+  if(btLegalApproved){onSuccess();return;}
+  if(btLegalChecking)return;
+  btLegalChecking=true;
+  try{
+    const status=await api('/api/legal/status');
+    if(status.accepted){btLegalApproved=true;onSuccess();return;}
+    btLegalDialog(api,onSuccess,role,status.version);
+  }catch(e){
+    alert('Не удалось проверить условия использования. Проверьте подключение и повторите попытку. '+(e.message||''));
+  }finally{btLegalChecking=false;}
+}
+function btLegalDialog(api,onSuccess,role,version){
+  document.getElementById('btLegalOverlay')?.remove();
+  const uz=String(document.documentElement.lang||localStorage.getItem('remont_lang')||'ru').toLowerCase().startsWith('uz');
+  const div=document.createElement('div');div.id='btLegalOverlay';div.className='bt-legal-overlay';
+  div.innerHTML=`<section class="bt-legal-dialog" role="dialog" aria-modal="true" aria-label="${uz?'Foydalanish shartlari':'Условия использования'}">
+   <img class="bt-legal-logo" src="img/remont-bt-icon.png" alt="ТехСервис">
+   <div class="bt-legal-shield">🛡️</div><h2>${uz?'TehServis foydalanish shartlari':'Условия использования ТехСервис'}</h2>
+   <p>${uz?'TehServis mijozlar va mustaqil ustalar uchun raqamli vositalarni taqdim etadi.':'ТехСервис предоставляет цифровые инструменты клиентам и независимым мастерам.'}</p>
+   <div class="bt-legal-facts"><p>🔧 ${uz?'Usta ta’mirlash sifati, kafolat, to‘lov va o‘z soliqlari uchun javob beradi.':'Мастер самостоятельно отвечает за качество ремонта, гарантии, расчёты и свои налоги.'}</p>
+   <p>💠 ${uz?'Platforma operatori o‘z xizmatlari va qonuniy majburiyatlari uchun javobgar.':'Оператор отвечает за работу платформы и собственные обязательства по закону.'}</p>
+   <p>🔒 ${uz?'Ma’lumotlar maxfiylik siyosatiga muvofiq qayta ishlanadi.':'Данные обрабатываются согласно политике конфиденциальности.'}</p></div>
+   <a class="bt-legal-read" href="legal.html" target="_blank" rel="noopener">📄 ${uz?'To‘liq shartlar va maxfiylik siyosatini o‘qish':'Прочитать полные условия и политику данных'} ↗</a>
+   <p class="bt-legal-version">${uz?'Tahrir':'Редакция'}: ${version}</p>
+   <button class="bt-legal-accept" type="button">${uz?'Tanishdim va roziman':'Ознакомлен и согласен'}</button>
+   <button class="bt-legal-later" type="button">${uz?'Hozir emas':'Не согласен / Назад'}</button>
+   <p class="bt-legal-error" role="status"></p>
+   </section>`;
+  document.body.appendChild(div);
+  div.querySelector('.bt-legal-later').onclick=()=>div.remove();
+  div.querySelector('.bt-legal-accept').onclick=async()=>{
+    const button=div.querySelector('.bt-legal-accept'),error=div.querySelector('.bt-legal-error');
+    button.disabled=true;error.textContent='';
+    try{await api('/api/legal/accept','POST',{version,accepted:true});btLegalApproved=true;div.remove();onSuccess();}
+    catch(e){error.textContent=e.message||'Не удалось сохранить согласие';button.disabled=false;}
+  };
+}
+
 // miniapp/js/client.js
 
 // ============ СОСТОЯНИЕ ============
@@ -147,6 +190,7 @@ function showClientReferral(){
  }).catch(()=>{const box=document.getElementById('btReferralPanel');if(box)box.textContent='Не удалось проверить программу. Повторите позже.'});
 }
 function renderClientMenu() {
+    if(!btLegalApproved){void btLegalGate(clientApi,renderClientMenu,"client");return;}
     window.RemontMobile?.enter('client/home',()=>renderClientMenu(),{root:true});
     btStopOrderProgressRefresh();
     btStopChatRefresh();
@@ -166,7 +210,6 @@ function renderClientMenu() {
             <button class="menu-btn bt-reviews-entry" id="btClientReviewsEntry" type="button" onclick="showClientMasterReviews()" hidden><span class="emoji bt-line-icon">☆</span><b>Мой мастер</b><small>Профиль и отзывы</small></button>
             <button class="menu-btn bt-referral-entry" id="btClientReferralEntry" type="button" onclick="showClientReferral()" hidden><span class="emoji bt-line-icon">↗</span><b>Пригласить друга</b><small>Рефералы</small></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><b>Профиль</b><small>Мои данные</small></button>
-            <button class="menu-btn bt-advertiser-tile" id="clientAdvertiserBtn" type="button" onclick="openAdvertiserCabinet()" hidden><span class="emoji bt-line-icon">♧</span><b>Кабинет рекламодателя</b><small>Промокоды и выплаты</small></button>
             <button class="menu-btn" onclick="showClientFAQ()"><span class="emoji bt-line-icon">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
           </div>
           <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
@@ -180,18 +223,18 @@ function renderClientMenu() {
               <p id="clientChatFileName" class="subtitle"></p><p id="messageStatus" class="subtitle" role="status"></p>
             </form>
           </section>
-          <nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
+          <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     btRefreshClientReferralEntry();
     window.btMountClientLanguage?.();
     btRefreshClientReviewsEntry();
     btStartClientPromoCarousel(btPromoGeneration);
-    // Role is determined server-side. Keep the tile in the existing grid.
-    clientApi('/api/session/roles').then(d => {
-        if (btPromoGeneration !== btClientHomeGeneration) return;
-        const tile = document.getElementById('clientAdvertiserBtn');
-        if (tile) tile.hidden = !Boolean(d?.roles?.advertiser);
-    }).catch(() => {});
+    clientApi('/api/advertiser/dashboard').then(d => {
+        if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
+        const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
+        const btn = document.createElement('button'); btn.id='clientAdvertiserBtn'; btn.className='bt-main-action bt-advertiser-action';
+        btn.textContent='📣 Кабинет рекламодателя'; btn.onclick=()=>openAdvertiserCabinet(); slot.appendChild(btn);
+    }).catch(()=>{});
     clientApi('/api/client/dashboard').then(d => {
         const name=String(d.profile?.name||'').trim().replace(/\s+([.,!?])/g,'$1'); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
         btClientRecentOrder(d);
@@ -226,9 +269,9 @@ function showClientFAQ(){
       ['Как пригласить друга?','Поделитесь своей реферальной ссылкой, если она доступна в кабинете. Условия скидки зависят от завершения ремонта приглашённого клиента и действующих правил программы.'],
       ['Можно ли изменить мастера?','В настройках доступен запрос на смену мастера. Укажите причину; заявку рассмотрит администратор. До подтверждения текущий мастер не меняется.'],
       ['Что делать, если заявка отменена администратором?','Откройте историю заявок и посмотрите статус и причину. При необходимости создайте новую заявку или свяжитесь с поддержкой.'],
-      ['Что делать, если приложение не обновилось?','Полностью закройте Mini App и откройте его снова из актуальной кнопки в Telegram. При повторной ошибке обратитесь в поддержку.']
+      ['Правовая информация и ответственность','ТехСервис предоставляет цифровую платформу, а ремонт, оплату, гарантии и налоговые обязательства мастер и клиент согласуют самостоятельно. Полные условия и политика конфиденциальности доступны в разделе «Правовая информация».'], ['Что делать, если приложение не обновилось?','Полностью закройте Mini App и откройте его снова из актуальной кнопки в Telegram. При повторной ошибке обратитесь в поддержку.']
     ];
-    setPage('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Частые вопросы о пользовании ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${escapeClient(q)}</summary><p>${escapeClient(a)}</p></details>`).join('')}<button type="button" onclick="renderClientMenu()">← Главная</button></article>`);
+    setPage('F.A.Q. — Помощь',`<article class="card bt-faq-card"><p class="subtitle">Частые вопросы о пользовании ТехСервис.</p>${items.map(([q,a])=>`<details><summary>${escapeClient(q)}</summary><p>${escapeClient(a)}</p></details>`).join('')}<button type="button" onclick="window.open('legal.html','_blank')">🛡 Правовая информация / Huquqiy ma’lumot</button><button type="button" onclick="renderClientMenu()">← Главная</button></article>`);
 }
 function btFocusHomeChat(){
     const chat=document.getElementById('btHomeChat');
@@ -734,7 +777,7 @@ function showClientActPreview(number){
       <p><b>Итого:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
       <p><b>Гарантия:</b> ${escapeClient(act.guarantee_text||'—')} · до ${escapeClient(act.guarantee_until||'—')}</p>
       <p>${btWarrantyIndicator(act)}</p>
-      ${act.paynet_url && String(act.payment_status||'').toLowerCase()!=='paid'?`<a class="btn" href="${escapeClient(act.paynet_url)}" target="_blank" rel="noopener noreferrer">💳 Оплатить через Paynet</a><p class="subtitle">Оплата откроется в Paynet. После оплаты сообщите мастеру — автоматической проверки пока нет.</p>`:''}
+      ${act.paynet_url && !['paid','confirmed','confirmed_automatic','confirmed_auto','auto_confirmed'].includes(String(act.payment_status==='paid'?'paid':act.status||''))?`<a class="btn" href="${escapeClient(act.paynet_url)}" target="_blank" rel="noopener noreferrer">💳 Оплатить через Paynet</a><p class="subtitle">Оплата откроется в Paynet. После оплаты сообщите мастеру — автоматической проверки пока нет.</p>`:''}
       <button type="button" onclick="openClientActPdf('${escapeClient(number)}')">📄 Открыть PDF</button>
       <button type="button" class="secondary" onclick="downloadClientActPdf('${escapeClient(number)}')">↓ Сохранить PDF</button>
       <button type="button" class="back-btn" onclick="showMyActs()">← Все акты</button></article>`);
@@ -1032,6 +1075,7 @@ function btSaveCurrentAddress(which){
 // ============ НОВАЯ ЗАЯВКА ============
 
 function showNewOrder() {
+    if(!btLegalApproved){void btLegalGate(clientApi,showNewOrder,"client");return;}
     window.RemontMobile?.enter('client/new-order',()=>showNewOrder());
     btOrderOperationId=uuidV4();
     orderData = {
