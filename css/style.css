@@ -1281,3 +1281,6 @@ body.bt-order-page .bt-map-open{margin-top:9px!important}
 .bt-map-style-switch{display:flex;gap:6px}
 .bt-map-style-switch button{flex:1;background:#112c4b!important;border:1px solid #356a9e!important;color:#dcefff!important;box-shadow:none!important}
 .bt-map-style-switch button.bt-map-style-active{background:#145e9f!important;border-color:#6bd5ff!important;box-shadow:0 0 9px #168bff66!important}
+
+/* Quote immediately above act issuance */
+.bt-act-quote{padding:13px 15px;border:1px solid #376eac;border-radius:12px;background:#102d4d;color:#e5f5ff;line-height:1.6;margin:8px 0 10px}.bt-act-quote b{font-size:1.12em}.bt-act-quote small{color:#bddbf5}
