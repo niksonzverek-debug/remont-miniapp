@@ -166,6 +166,7 @@ function renderClientMenu() {
             <button class="menu-btn bt-reviews-entry" id="btClientReviewsEntry" type="button" onclick="showClientMasterReviews()" hidden><span class="emoji bt-line-icon">☆</span><b>Мой мастер</b><small>Профиль и отзывы</small></button>
             <button class="menu-btn bt-referral-entry" id="btClientReferralEntry" type="button" onclick="showClientReferral()" hidden><span class="emoji bt-line-icon">↗</span><b>Пригласить друга</b><small>Рефералы</small></button>
             <button class="menu-btn" onclick="showProfile()"><span class="emoji bt-line-icon">◎</span><b>Профиль</b><small>Мои данные</small></button>
+            <button class="menu-btn bt-advertiser-tile" id="clientAdvertiserBtn" type="button" onclick="openAdvertiserCabinet()" hidden><span class="emoji bt-line-icon">♧</span><b>Кабинет рекламодателя</b><small>Промокоды и выплаты</small></button>
             <button class="menu-btn" onclick="showClientFAQ()"><span class="emoji bt-line-icon">♧</span><b>F.A.Q.</b><small>Помощь</small></button>
           </div>
           <section class="bt-live-panel" id="btRecentOrder" hidden><div class="bt-section-title">⚡ Электрическая цепь ремонта</div><div id="btOrderLabel" class="bt-order-label"></div><div class="bt-circuit"><span>Заявка</span><span>Принято</span><span>Ремонт</span><span>Акт</span></div></section>
@@ -179,18 +180,18 @@ function renderClientMenu() {
               <p id="clientChatFileName" class="subtitle"></p><p id="messageStatus" class="subtitle" role="status"></p>
             </form>
           </section>
-          <div id="btAdvertiserSlot"></div><nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
+          <nav class="bt-client-bottom-nav" aria-label="Навигация"><button onclick="renderClientMenu()"><span>⌂</span>Главная</button><button onclick="showMyOrders()"><span>▤</span>Заявки</button><button onclick="btFocusHomeChat()"><span>✉</span>Чат</button><button onclick="showProfile()"><span>♙</span>Профиль</button></nav>
         </main>`;
     btRefreshClientReferralEntry();
     window.btMountClientLanguage?.();
     btRefreshClientReviewsEntry();
     btStartClientPromoCarousel(btPromoGeneration);
-    clientApi('/api/advertiser/dashboard').then(d => {
-        if (!d?.advertiser || document.getElementById('clientAdvertiserBtn')) return;
-        const slot = document.getElementById('btAdvertiserSlot'); if (!slot) return;
-        const btn = document.createElement('button'); btn.id='clientAdvertiserBtn'; btn.className='bt-main-action bt-advertiser-action';
-        btn.textContent='📣 Кабинет рекламодателя'; btn.onclick=()=>openAdvertiserCabinet(); slot.appendChild(btn);
-    }).catch(()=>{});
+    // Role is determined server-side. Keep the tile in the existing grid.
+    clientApi('/api/session/roles').then(d => {
+        if (btPromoGeneration !== btClientHomeGeneration) return;
+        const tile = document.getElementById('clientAdvertiserBtn');
+        if (tile) tile.hidden = !Boolean(d?.roles?.advertiser);
+    }).catch(() => {});
     clientApi('/api/client/dashboard').then(d => {
         const name=String(d.profile?.name||'').trim().replace(/\s+([.,!?])/g,'$1'); const n=document.getElementById('clientWelcomeName'); if(n&&name)n.textContent=name;
         btClientRecentOrder(d);
@@ -733,7 +734,7 @@ function showClientActPreview(number){
       <p><b>Итого:</b> ${escapeClient(btActMoney(act.final_price??act.price))}</p>
       <p><b>Гарантия:</b> ${escapeClient(act.guarantee_text||'—')} · до ${escapeClient(act.guarantee_until||'—')}</p>
       <p>${btWarrantyIndicator(act)}</p>
-      ${act.paynet_url && !['paid','confirmed','confirmed_automatic','confirmed_auto','auto_confirmed'].includes(String(act.payment_status==='paid'?'paid':act.status||''))?`<a class="btn" href="${escapeClient(act.paynet_url)}" target="_blank" rel="noopener noreferrer">💳 Оплатить через Paynet</a><p class="subtitle">Оплата откроется в Paynet. После оплаты сообщите мастеру — автоматической проверки пока нет.</p>`:''}
+      ${act.paynet_url && String(act.payment_status||'').toLowerCase()!=='paid'?`<a class="btn" href="${escapeClient(act.paynet_url)}" target="_blank" rel="noopener noreferrer">💳 Оплатить через Paynet</a><p class="subtitle">Оплата откроется в Paynet. После оплаты сообщите мастеру — автоматической проверки пока нет.</p>`:''}
       <button type="button" onclick="openClientActPdf('${escapeClient(number)}')">📄 Открыть PDF</button>
       <button type="button" class="secondary" onclick="downloadClientActPdf('${escapeClient(number)}')">↓ Сохранить PDF</button>
       <button type="button" class="back-btn" onclick="showMyActs()">← Все акты</button></article>`);
