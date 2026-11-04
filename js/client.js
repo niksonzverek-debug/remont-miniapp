@@ -1693,19 +1693,18 @@ function btMapSetLayer(style){
     if(btMapLayers[btMapStyle])btAddressMapInstance.removeLayer(btMapLayers[btMapStyle]);
     btMapStyle=next;
     btMapLayers[next].addTo(btAddressMapInstance);
-    document.querySelectorAll('#btAddressOverlay [data-map-style]').forEach(b=>{
-        b.classList.toggle('bt-map-style-active',b.dataset.mapStyle===next);
-        b.setAttribute('aria-pressed',String(b.dataset.mapStyle===next));
-    });
+    const toggle=document.getElementById('btMapLayerToggle');
+    if(toggle){toggle.textContent=next==='street'?'🛰️ Спутник':'🗺️ Схема';toggle.setAttribute('aria-label',next==='street'?'Включить спутник':'Включить схему');}
 }
 async function btOpenAddressMap(){
     if(document.getElementById('btAddressOverlay'))return;
     const overlay=document.createElement('div');overlay.id='btAddressOverlay';overlay.className='bt-address-overlay';
     overlay.innerHTML=`<div class="bt-address-dialog" role="dialog" aria-modal="true" aria-label="Выбор адреса">
       <div class="bt-address-top"><strong>🗺️ Адрес ремонта</strong><button type="button" onclick="btCloseAddressMap()" aria-label="Закрыть">✕</button></div>
-      <div class="bt-address-search"><input id="btMapSearch" placeholder="Город, улица, дом или ориентир" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();btSearchAddressMap();}"><button type="button" id="btMapSearchButton" onclick="btSearchAddressMap()">🔎 Найти адрес</button></div><div id="btMapSearchResults" class="bt-map-search-results" aria-live="polite"></div>
-      <div class="bt-map-style-switch"><button type="button" data-map-style="street" onclick="btMapSetLayer('street')">Схема</button><button type="button" data-map-style="satellite" onclick="btMapSetLayer('satellite')">Спутник</button></div>
-      <div class="bt-map-stage"><div id="btAddressMap"></div><div class="bt-map-center-pin" aria-hidden="true"><span>📍</span></div></div>
+      <div class="bt-address-search"><input id="btMapSearch" placeholder="Улица, дом, махалля или ориентир" autocomplete="off" onkeydown="if(event.key==='Enter'){event.preventDefault();btSearchAddressMap();}"></div>
+      <button type="button" id="btMapSearchButton" onclick="btSearchAddressMap()">🔎 Найти адрес</button>
+      <div id="btMapSearchResults" class="bt-map-search-results" aria-live="polite"></div>
+      <div class="bt-map-stage"><div id="btAddressMap"></div><button type="button" id="btMapLayerToggle" onclick="btMapSetLayer(btMapStyle==='street'?'satellite':'street')" aria-label="Включить спутник">🛰️ Спутник</button><div class="bt-map-center-pin" aria-hidden="true"><span>📍</span></div></div>
       <p id="btMapHint">Передвигайте карту, чтобы поставить метку на нужный дом.</p>
       <div class="bt-address-actions"><button type="button" onclick="btCloseAddressMap()">Отмена</button><button type="button" id="btMapConfirm" onclick="btConfirmAddressMap()" disabled>✓ Подтвердить выбранную точку</button></div>
     </div>`;
@@ -1751,7 +1750,9 @@ async function btSearchAddressMap(){
         if(!places.length){if(hint)hint.textContent='Ничего не найдено. Уточните адрес или выберите точку вручную.';return;}
         for(const place of places){
             const item=document.createElement('button');item.type='button';item.className='bt-map-result';
-            item.textContent=place.address||'Найденный адрес';
+            const title=document.createElement('span');title.className='bt-map-result-title';title.textContent=place.title||place.address||'Найденный адрес';
+            const detail=document.createElement('span');detail.className='bt-map-result-detail';detail.textContent=place.address||'';
+            item.append(title,detail);
             item.addEventListener('click',()=>{
                 const lat=Number(place.lat),lon=Number(place.lon);
                 if(!Number.isFinite(lat)||!Number.isFinite(lon))return;
@@ -1762,7 +1763,7 @@ async function btSearchAddressMap(){
             });
             resultsBox?.appendChild(item);
         }
-        if(hint)hint.textContent='Выберите подходящий адрес из результатов, затем подтвердите точку.';
+        if(hint)hint.textContent='Сначала показаны адреса в радиусе 50 км от центра Ташкента. Выберите вариант или укажите точку вручную.';
     }catch(e){
         if(hint)hint.textContent='Поиск временно недоступен. Можно выбрать точку вручную на карте.';
         console.warn('Address search failed',e);
