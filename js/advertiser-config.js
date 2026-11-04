@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://enemies-immediate-natural-benefit.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://endorsed-laboratory-walls-merge.trycloudflare.com";
