@@ -1282,5 +1282,13 @@ body.bt-order-page .bt-map-open{margin-top:9px!important}
 .bt-map-style-switch button{flex:1;background:#112c4b!important;border:1px solid #356a9e!important;color:#dcefff!important;box-shadow:none!important}
 .bt-map-style-switch button.bt-map-style-active{background:#145e9f!important;border-color:#6bd5ff!important;box-shadow:0 0 9px #168bff66!important}
 
-/* Quote immediately above act issuance */
-.bt-act-quote{padding:13px 15px;border:1px solid #376eac;border-radius:12px;background:#102d4d;color:#e5f5ff;line-height:1.6;margin:8px 0 10px}.bt-act-quote b{font-size:1.12em}.bt-act-quote small{color:#bddbf5}
+/* Map address search: results are placed next to search, not near confirmation. */
+.bt-address-search{align-items:stretch!important}
+.bt-address-search #btMapSearchButton{background:#1163b2!important;border:1px solid #4cbcff!important;color:#fff!important;flex-shrink:0}
+.bt-address-search #btMapSearchButton:disabled{opacity:.5}
+.bt-map-search-results{display:flex;flex-direction:column;gap:5px;max-height:150px;overflow-y:auto}
+.bt-map-search-results:empty{display:none}
+.bt-map-result{text-align:left!important;white-space:normal!important;min-height:38px!important;background:#102e4c!important;border:1px solid #356b9d!important;color:#e9f5ff!important}
+.bt-map-result:focus-visible{outline:2px solid #65d7ff}
+#btMapConfirm{background:#176e5e!important;border:1px solid #44d5ac!important;color:#fff!important}
+@media(max-width:430px){.bt-address-search #btMapSearchButton{padding:9px!important;font-size:13px!important}.bt-address-dialog{max-height:96dvh}}
