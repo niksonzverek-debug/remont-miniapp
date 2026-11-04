@@ -791,10 +791,51 @@ async function renderMasterActForm(o=null){
  <div class="bt-master-address-row"><div><label>Дом *</label><input id="actHouse" required maxlength="80" value="${masterEsc(o?.house||'')}" placeholder="15А"></div><div><label>Квартира</label><input id="actApartment" maxlength="80" value="${masterEsc(o?.apartment||'')}" placeholder="42"></div></div>
  <button id="actLocationButton" type="button" class="secondary bt-act-required" onclick="captureActLocation()">⌖ Указать текущую локацию</button><p id="actLocationStatus" class="subtitle">Для создания акта требуется локация. Нажмите кнопку и разрешите доступ к GPS.</p>
 
+ <div id="actDiscountQuote" class="bt-act-quote" hidden aria-live="polite"></div>
  <button id="actSubmit" type="submit">▣ Создать акт</button><p class="bt-act-payment-warning"><b>Нажимая «Создать акт», Вы подтверждаете, что получили оплату за выполненный ремонт и работы.</b></p><p id="actStatus" role="status" class="subtitle"></p></article></form>`);
  toggleActCustom('actDevice','actDeviceCustomWrap');toggleActCustom('actBrand','actBrandCustomWrap');renderMasterActWorks();btActUpdateLocationGlow();
+ btActQuoteBind(id);
 }
-function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';}
+function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';btActQuoteSchedule();}
+// Read-only discount preview. Only a positive, current discount is shown.
+let btActQuoteTimer=null;
+let btActQuoteVersion=0;
+let btActQuoteOrderId='';
+function btActQuoteHide(){
+ const box=document.getElementById('actDiscountQuote');
+ if(box){box.hidden=true;box.replaceChildren();}
+}
+function btActQuoteBind(orderId){
+ btActQuoteOrderId=String(orderId||'');
+ btActQuoteVersion++;
+ clearTimeout(btActQuoteTimer);
+ btActQuoteHide();
+ const phone=document.getElementById('actClientPhone');
+ if(phone)phone.addEventListener('input',btActQuoteSchedule);
+}
+function btActQuoteSchedule(){
+ const version=++btActQuoteVersion;
+ clearTimeout(btActQuoteTimer);
+ btActQuoteHide();
+ const price=Number((document.getElementById('actPrice')?.value||'').replace(/\D/g,''));
+ const phone=document.getElementById('actClientPhone')?.value.trim()||'';
+ const orderId=btActQuoteOrderId;
+ if(!Number.isSafeInteger(price)||price<=0||(!orderId&&phone.replace(/\D/g,'').length<9))return;
+ btActQuoteTimer=setTimeout(async()=>{
+  try{
+   const data=await masterApi('/api/master/act/quote','POST',{price,order_id:orderId,client_phone:phone});
+   if(version!==btActQuoteVersion||!document.getElementById('actDiscountQuote'))return;
+   const discount=Number(data.discount_amount||0),final=Number(data.final_price);
+   if(!Number.isFinite(discount)||discount<=0||!Number.isFinite(final)||final<0)return;
+   const box=document.getElementById('actDiscountQuote');
+   const title=document.createElement('div');title.textContent=String(data.label||'Скидка клиента');
+   const amount=document.createElement('div');amount.textContent='Скидка: −'+Math.round(discount).toLocaleString('ru-RU')+' сум';
+   const total=document.createElement('b');total.textContent='К оплате: '+Math.round(final).toLocaleString('ru-RU')+' сум';
+   const note=document.createElement('small');note.textContent='Предварительный расчёт. При создании акта сумма проверяется повторно.';
+   box.replaceChildren(title,amount,total,note);box.hidden=false;
+  }catch(_error){if(version===btActQuoteVersion)btActQuoteHide();}
+ },350);
+}
 // Keep the same operation ID on retries, including ambiguous network failures.
 let masterActRequestId=null;
 function masterNewActRequestId(){
