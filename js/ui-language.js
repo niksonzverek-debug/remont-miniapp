@@ -23,8 +23,10 @@
     ["Заявок пока нет","Hozircha arizalar yo'q","No submissions yet"]
   ]);
   ROWS.push(...[['Моя ссылка', 'Mening havolam', 'My link'], ['Для клиентов', 'Mijozlar uchun', 'For customers'], ['Мой QR', 'Mening QR kodim', 'My QR'], ['Для оплаты', 'Toʻlov uchun', 'For payment'], ['Отчёт', 'Hisobot', 'Report'], ['Поддержка', 'Yordam xizmati', 'Support'], ['Написать администратору', 'Administratorga yozish', 'Message administrator'], ['Идентификация', 'Shaxsni tasdiqlash', 'Identity verification'], ['Идентификация личности', 'Shaxsni tasdiqlash', 'Identity verification'], ['Добровольная идентификация', 'Ixtiyoriy shaxsni tasdiqlash', 'Voluntary identity verification'], ['Выбрать фото', 'Suratni tanlash', 'Choose photo'], ['JPG или PNG, до 4 МБ', 'JPG yoki PNG, 4 MB gacha', 'JPG or PNG, up to 4 MB'], ['Лицевая сторона паспорта / ID', 'Pasport / ID old tomoni', 'ID front side'], ['Обратная сторона (если есть)', 'Orqa tomoni (mavjud boʻlsa)', 'Back side (if any)'], ['Согласен на обработку персональных данных для проверки личности', 'Shaxsni tekshirish uchun shaxsiy maʼlumotlarim qayta ishlanishiga roziman', 'I consent to processing personal data for identity review'], ['Отправить документы', 'Hujjatlarni yuborish', 'Submit documents'], ['← Назад к профилю', '← Profilga qaytish', '← Back to profile'], ['Фамилия, имя, отчество', 'Familiya, ism, sharif', 'Full name'], ['Настройки профиля', 'Profil sozlamalari', 'Profile settings'], ['Профиль мастера', 'Usta profili', 'Technician profile'], ['Финансы', 'Moliya', 'Finances']]);
+
+  ROWS.push(...[["Правовая информация", "Huquqiy maʼlumot", "Legal information"], ["Пользовательское соглашение", "Foydalanish shartlari", "Terms of service"], ["Политика конфиденциальности", "Maxfiylik siyosati", "Privacy policy"], ["Ознакомлен и согласен", "Tanishdim va roziman", "I have read and agree"], ["Не согласен", "Rozi emasman", "I do not agree"], ["Прочитать полные условия", "Toʻliq shartlarni oʻqish", "Read full terms"], ["Условия использования", "Foydalanish shartlari", "Terms of use"], ["Изменения условий", "Shartlardagi oʻzgarishlar", "Changes to terms"], ["Депозит", "Depozit", "Deposit"], ["Пополнить баланс", "Balansni toʻldirish", "Top up balance"], ["Проверить оплату", "Toʻlovni tekshirish", "Check payment"], ["Оплачено", "Toʻlangan", "Paid"], ["Не оплачено", "Toʻlanmagan", "Unpaid"], ["Оплата не указана", "Toʻlov koʻrsatilmagan", "Payment not specified"], ["Ссылка на оплату", "Toʻlov havolasi", "Payment link"], ["Подтвердить выбранную точку", "Tanlangan nuqtani tasdiqlash", "Confirm selected location"], ["Найти адрес", "Manzilni qidirish", "Find address"], ["Схема", "Xarita", "Map"], ["Спутник", "Sunʼiy yoʻldosh", "Satellite"], ["Адрес ремонта", "Taʼmirlash manzili", "Repair address"], ["Перемещайте карту под меткой", "Xaritani belgi ostida suring", "Move the map under the marker"], ["Выберите подходящий адрес из результатов, затем подтвердите точку.", "Natijalardan mos manzilni tanlang, soʻng nuqtani tasdiqlang.", "Select an address from the results, then confirm the location."], ["Отмена", "Bekor qilish", "Cancel"], ["Подтвердить", "Tasdiqlash", "Confirm"], ["Заявка отправлена", "Buyurtma yuborildi", "Request submitted"], ["Создать акт без заявки", "Buyurtmasiz dalolatnoma yaratish", "Create report without request"], ["Расчёт стоимости ремонта", "Taʼmir narxini hisoblash", "Repair cost breakdown"], ["Стоимость работ", "Ishlar narxi", "Cost of work"], ["Скидка клиента", "Mijoz chegirmasi", "Customer discount"], ["Итог к оплате", "Jami toʻlov", "Total due"], ["Кабинет рекламодателя", "Reklamachi kabineti", "Advertiser dashboard"], ["Промокоды и выплаты", "Promokodlar va toʻlovlar", "Promo codes and payouts"], ["Заявка на исправление", "Tuzatish soʻrovi", "Correction request"], ["Копировать ссылку", "Havolani nusxalash", "Copy link"], ["Поделиться через Telegram", "Telegram orqali ulashish", "Share via Telegram"], ["Слишком длинное значение в заявке.", "Buyurtmadagi qiymat juda uzun.", "A field in the request is too long."], ["Нет результатов", "Natijalar topilmadi", "No results"], ["Повторить попытку", "Qayta urinib koʻrish", "Try again"], ["Ошибка загрузки", "Yuklash xatosi", "Loading error"], ["Закрыть", "Yopish", "Close"], ["Назад", "Orqaga", "Back"], ["Поиск", "Qidirish", "Search"], ["Сохранено", "Saqlandi", "Saved"], ["Загрузка…", "Yuklanmoqda…", "Loading…"], ["Не удалось загрузить данные", "Maʼlumotlarni yuklab boʻlmadi", "Could not load data"], ["Показать маршрут", "Yoʻnalishni koʻrsatish", "Show route"], ["Геолокация клиента", "Mijoz joylashuvi", "Customer location"], ["На рассмотрении", "Koʻrib chiqilmoqda", "Under review"], ["Выберите файл", "Faylni tanlang", "Choose file"], ["Отправить чек", "Chekni yuborish", "Submit receipt"], ["Обработка персональных данных", "Shaxsiy maʼlumotlarni qayta ishlash", "Personal data processing"], ["Подтверждение акта", "Dalolatnomani tasdiqlash", "Report confirmation"], ["Акт подтверждён", "Dalolatnoma tasdiqlandi", "Report confirmed"], ["Оплата ожидается", "Toʻlov kutilmoqda", "Payment pending"], ["Администратор", "Administrator", "Administrator"], ["Статистика безопасности", "Xavfsizlik statistikasi", "Security statistics"], ["Поиск и отчёты", "Qidiruv va hisobotlar", "Search and reports"]]);
   const dictionary={uz:new Map(),en:new Map()};
-  for(const [ru,uz,en] of ROWS){dictionary.uz.set(ru,uz);dictionary.en.set(ru,en);}
+  for(const [ru,uz,en] of ROWS){if(!dictionary.uz.has(ru))dictionary.uz.set(ru,uz);if(!dictionary.en.has(ru))dictionary.en.set(ru,en);}
   const LANG_KEY='remont_bt_lang';
   const flags={ru:'🇷🇺',uz:'🇺🇿',en:'🇬🇧'};
   const names={ru:'Русский',uz:'Oʻzbekcha',en:'English'};
@@ -56,7 +58,7 @@
   }
   window.btTranslateText=t;
   // Do not alter customer names, message bodies, uploaded file details or user inputs.
-  const EXCLUDE='script,style,code,pre,textarea,.tablewrap,.detaildialog,.dialog,#dataTable,#recordFields,#jsonEditor,#historyResults,[contenteditable],.bt-chat-history,.chat-history,.bt-inbox-thread,.bt-recent-chat,.message-bubble,.bt-chat-bubble,.bt-user-content,[data-no-translate],#clientWelcomeName,.bt-header-name,#hello,#cardInfo';
+  const EXCLUDE='script,style,code,pre,textarea,.tablewrap,#dataTable,#recordFields,#jsonEditor,#historyResults,[contenteditable],.bt-chat-history,.chat-history,.bt-inbox-thread,.bt-recent-chat,.message-bubble,.bt-chat-bubble,.bt-user-content,[data-no-translate],#clientWelcomeName,.bt-header-name,#hello,#cardInfo';
   let processing=false;
   // Preserve original Russian template strings per DOM node, not form state.
   const originalText=new WeakMap(), lastText=new WeakMap();
@@ -92,10 +94,10 @@
         const value=t(source);
         lastText.set(node,value);
         if(value!==node.nodeValue)node.nodeValue=value;}
-      scan.querySelectorAll?.('input[placeholder],textarea[placeholder],select[aria-label],button[aria-label],[title]').forEach(el=>{
+      scan.querySelectorAll?.('input[placeholder],textarea[placeholder],select[aria-label],button[aria-label],[title],input[type=button][value],input[type=submit][value]').forEach(el=>{
         if(el.closest(EXCLUDE))return;
-        for(const key of ['placeholder','aria-label','title']){
-          if(!el.hasAttribute(key))continue;
+        for(const key of ['placeholder','aria-label','title','value']){
+          if(!el.hasAttribute(key)||key==='value'&&!['button','submit'].includes(el.type))continue;
           const source=sourceAttribute(el,key);
           const value=t(source);
           lastAttributes.get(el)[key]=value;
@@ -148,7 +150,7 @@
   }
   const run=()=>{ensureSwitch();translateTree(document.body);document.documentElement.lang=language();};
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});else run();
-  if(document.body){
+  {
     const mo=new MutationObserver(mutations=>{
       if(processing)return;
       let recreate=false,translate=false;
@@ -159,6 +161,6 @@
       if(recreate&&!document.getElementById('remontLangToggle'))ensureSwitch();
       if(translate)translateTree(document.body);
     });
-    mo.observe(document.body,{subtree:true,childList:true,characterData:true});
+    mo.observe(document.documentElement,{subtree:true,childList:true,characterData:true});
   }
 })();
