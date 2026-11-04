@@ -797,44 +797,70 @@ async function renderMasterActForm(o=null){
  btActQuoteBind(id);
 }
 function formatActPrice(input){const digits=String(input.value||'').replace(/\D/g,'');input.value=digits?digits.replace(/\B(?=(\d{3})+(?!\d))/g,' '):'';btActQuoteSchedule();}
-// Read-only discount preview. Only a positive, current discount is shown.
+// Server-authoritative quote: do not silently hide errors or permit an unverified charge.
 let btActQuoteTimer=null;
 let btActQuoteVersion=0;
 let btActQuoteOrderId='';
-function btActQuoteHide(){
- const box=document.getElementById('actDiscountQuote');
- if(box){box.hidden=true;box.replaceChildren();}
-}
-function btActQuoteBind(orderId){
- btActQuoteOrderId=String(orderId||'');
- btActQuoteVersion++;
- clearTimeout(btActQuoteTimer);
- btActQuoteHide();
- const phone=document.getElementById('actClientPhone');
- if(phone)phone.addEventListener('input',btActQuoteSchedule);
-}
-function btActQuoteSchedule(){
- const version=++btActQuoteVersion;
- clearTimeout(btActQuoteTimer);
- btActQuoteHide();
+let btActQuoteVerified=null;
+function btActQuoteInputs(){
  const price=Number((document.getElementById('actPrice')?.value||'').replace(/\D/g,''));
  const phone=document.getElementById('actClientPhone')?.value.trim()||'';
- const orderId=btActQuoteOrderId;
- if(!Number.isSafeInteger(price)||price<=0||(!orderId&&phone.replace(/\D/g,'').length<9))return;
+ const order_id=btActQuoteOrderId;
+ return {price,order_id,client_phone:phone};
+}
+function btActQuoteSignature(input){return JSON.stringify(input);}
+function btActQuoteHide(){const box=document.getElementById('actDiscountQuote');if(box){box.hidden=true;box.replaceChildren();}}
+function btActQuoteMessage(message){
+ const box=document.getElementById('actDiscountQuote');if(!box)return;
+ box.hidden=false;box.replaceChildren();const p=document.createElement('div');p.textContent=message;box.append(p);
+}
+function btActQuoteDisplay(data){
+ const box=document.getElementById('actDiscountQuote');if(!box)return;
+ const discount=Number(data.discount_amount||0),final=Number(data.final_price);
+ if(!Number.isFinite(discount)||!Number.isFinite(final)||discount<0||final<0)throw new Error('Сервер вернул некорректный расчёт скидки.');
+ if(discount===0){btActQuoteHide();return;}
+ const title=document.createElement('b');title.textContent=String(data.label||'Скидка клиента');
+ const amount=document.createElement('div');amount.textContent='Скидка: −'+Math.round(discount).toLocaleString('ru-RU')+' сум';
+ const total=document.createElement('b');total.textContent='Итого к оплате: '+Math.round(final).toLocaleString('ru-RU')+' сум';
+ const note=document.createElement('small');note.textContent='Предварительный расчёт. При выдаче акта сервер проверит скидку повторно.';
+ box.replaceChildren(title,amount,total,note);box.hidden=false;
+}
+function btActQuoteBind(orderId){
+ btActQuoteOrderId=String(orderId||'');btActQuoteVersion++;btActQuoteVerified=null;
+ clearTimeout(btActQuoteTimer);btActQuoteHide();
+ const phone=document.getElementById('actClientPhone');if(phone)phone.addEventListener('input',btActQuoteSchedule);
+}
+function btActQuoteSchedule(){
+ const version=++btActQuoteVersion;btActQuoteVerified=null;clearTimeout(btActQuoteTimer);btActQuoteHide();
+ const input=btActQuoteInputs();
+ if(!Number.isSafeInteger(input.price)||input.price<=0||(!input.order_id&&input.client_phone.replace(/\D/g,'').length<9))return;
  btActQuoteTimer=setTimeout(async()=>{
   try{
-   const data=await masterApi('/api/master/act/quote','POST',{price,order_id:orderId,client_phone:phone});
+   const data=await masterApi('/api/master/act/quote','POST',input);
    if(version!==btActQuoteVersion||!document.getElementById('actDiscountQuote'))return;
-   const discount=Number(data.discount_amount||0),final=Number(data.final_price);
-   if(!Number.isFinite(discount)||discount<=0||!Number.isFinite(final)||final<0)return;
-   const box=document.getElementById('actDiscountQuote');
-   const title=document.createElement('div');title.textContent=String(data.label||'Скидка клиента');
-   const amount=document.createElement('div');amount.textContent='Скидка: −'+Math.round(discount).toLocaleString('ru-RU')+' сум';
-   const total=document.createElement('b');total.textContent='К оплате: '+Math.round(final).toLocaleString('ru-RU')+' сум';
-   const note=document.createElement('small');note.textContent='Предварительный расчёт. При создании акта сумма проверяется повторно.';
-   box.replaceChildren(title,amount,total,note);box.hidden=false;
-  }catch(_error){if(version===btActQuoteVersion)btActQuoteHide();}
+   if(Number(data.price)!==input.price)throw new Error('Расчёт не совпадает с введённой стоимостью.');
+   btActQuoteVerified={signature:btActQuoteSignature(input),discount:Number(data.discount_amount||0),final:Number(data.final_price)};
+   btActQuoteDisplay(data);
+  }catch(error){if(version===btActQuoteVersion){btActQuoteVerified=null;btActQuoteMessage('⚠️ Не удалось проверить скидку: '+(error.message||'ошибка сервера')+'. Создание акта недоступно до успешной проверки.');}}
  },350);
+}
+async function btActQuoteBeforeSubmit(){
+ const input=btActQuoteInputs();
+ if(!Number.isSafeInteger(input.price)||input.price<=0)throw new Error('Укажите корректную стоимость.');
+ if(!input.order_id&&input.client_phone.replace(/\D/g,'').length<9)throw new Error('Укажите телефон клиента для проверки скидки.');
+ const signature=btActQuoteSignature(input),previous=btActQuoteVerified;
+ let data;
+ try{data=await masterApi('/api/master/act/quote','POST',input);}
+ catch(error){btActQuoteMessage('⚠️ Проверка скидки не удалась: '+(error.message||'ошибка сервера'));throw new Error('Акт не создан: невозможно проверить итоговую стоимость. Повторите попытку.');}
+ const discount=Number(data.discount_amount||0),final=Number(data.final_price);
+ if(Number(data.price)!==input.price||!Number.isSafeInteger(discount)||discount<0||!Number.isSafeInteger(final)||final<0||discount+final!==input.price)throw new Error('Акт не создан: сервер вернул некорректный расчёт.');
+ btActQuoteVerified={signature,discount,final};btActQuoteDisplay(data);
+ // A new/changed discount must be seen before the master confirms payment.
+ if(discount>0&&(!previous||previous.signature!==signature||previous.discount!==discount||previous.final!==final)){
+  document.getElementById('actDiscountQuote')?.scrollIntoView({behavior:'smooth',block:'center'});
+  throw new Error('Обнаружена скидка клиента. Проверьте итог к оплате выше и нажмите «Создать акт» ещё раз.');
+ }
+ return data;
 }
 // Keep the same operation ID on retries, including ambiguous network failures.
 let masterActRequestId=null;
@@ -868,6 +894,7 @@ async function submitMasterAct(event,orderId){
   if(!payload.device||!payload.brand||!payload.works.length||!payload.price||payload.price<=0)throw new Error('Заполните технику, бренд, работы и стоимость.');
   if(!payload.house)throw new Error('Укажите дом.');
   if(!payload.location||typeof payload.location.latitude!=='number'||typeof payload.location.longitude!=='number')throw new Error('Укажите GPS-локацию нажатием соответствующей кнопки.');
+  await btActQuoteBeforeSubmit();
   payload.request_id=masterNewActRequestId();
   const r=await masterApi('/api/master/act','POST',payload);
   // Reset only after the server confirms success (including idempotent replay).
