@@ -1,2 +1,2 @@
 // Автоматически обновляется start_cloudflare_auto.py. Не редактируйте вручную.
-window.REMONT_ADVERTISER_API_BASE = "https://came-briefs-formatting-downloading.trycloudflare.com";
+window.REMONT_ADVERTISER_API_BASE = "https://resolve-obligation-september-architect.trycloudflare.com";
