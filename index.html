@@ -6,7 +6,8 @@
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>ТехСервис — Открыть кабинет</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="css/style.css?v=20261025-identity-ui2">
+<script id="bt-lang-url-init">(function(){try{const l=new URLSearchParams(location.search).get('lang');if(['ru','uz','en'].includes(l))localStorage.setItem('remont_bt_lang',l);localStorage.setItem('remont_lang',l);}catch(_){}})();</script>
+<link rel="stylesheet" href="css/style.css?v=20261114-act-compact2">
 <link rel="manifest" href="manifest.webmanifest">
 <style>
 .bt-entry {min-height:100dvh;max-width:500px;margin:auto;padding:24px 16px 40px;display:flex;flex-direction:column;gap:16px;justify-content:center}
@@ -34,7 +35,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
 <script src="js/advertiser-config.js?v=20261021-p15-reviews-referral"></script>
 <script src="js/common.js?v=20261021-fullscreen-v1"></script>
 <script src="js/mobile-shell.js?v=20261021-fullscreen-v1"></script>
-<script src="js/ui-language.js?v=20261104-i18n-audit1"></script>
+<script src="js/ui-language.js?v=20261114-qr-receipt1"></script>
 <script>
 (async function bootRemontBT(){
   const area = document.getElementById('btEntry');
@@ -62,7 +63,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
     }
     // Existing applications are loaded only after server-side role discovery.
     const script=document.createElement('script');
-    script.src=role==='master'?'js/master.js?v=20261025-identity-ui2':'js/client.js?v=20261021-fullscreen-v1';
+    script.src=role==='master'?'js/master.js?v=20261114-act-compact2':'js/client.js?v=20261113-combined-fixes1';
     script.onerror=()=>show('Не удалось открыть кабинет','Не удалось загрузить файлы приложения. Проверьте публикацию GitHub Pages.',[{text:'Повторить',run:()=>location.reload()}]);
     // Remove the loader so existing client/master scripts own the body.
     area.remove(); document.body.appendChild(script);
@@ -124,7 +125,7 @@ window.WEBAPP_SENDDATA_SUPPORTED = launchMode === 'keyboard';
 </script>
 <script>
 if('serviceWorker' in navigator){window.addEventListener('load',async()=>{try{
- const reg=await navigator.serviceWorker.register('./sw.js?release=20261021-fullscreen-v1',{scope:'./',updateViaCache:'none'});await reg.update();
+ const reg=await navigator.serviceWorker.register('./sw.js?release=20261113-combined-fixes1',{scope:'./',updateViaCache:'none'});await reg.update();
 }catch(e){console.warn('SW update failed:',e)}},{once:true});}
 </script>
 </body>
